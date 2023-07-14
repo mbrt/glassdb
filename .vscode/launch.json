@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (rr)",
+            "type": "go",
+            "backend": "rr",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${fileDirname}"
+        }
+    ]
+}
