@@ -14,7 +14,8 @@ Apple's [FoundationDB](https://github.com/apple/foundationdb).
 
 Transactions _should_ be working correctly and performance could definitely
 improve. Interfaces and file formats are _not_ stable and can still change at
-any point.
+any point. Documentation is almost nil, but I'm planning to work on it very
+soon.
 
 Note also that currently we only support
 [Google GCS](https://cloud.google.com/storage/), but adding
