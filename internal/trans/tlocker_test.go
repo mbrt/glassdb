@@ -302,11 +302,12 @@ func TestWaitForTx(t *testing.T) {
 	})
 
 	// Schedule the read unlock to just after the write starts waiting.
-	go func() {
+	wg := conc.WaitGroup{}
+	wg.Go(func() {
 		time.Sleep(time.Millisecond)
 		err := locker.Unlock(ctx, key, txr)
 		assert.NoError(t, err)
-	}()
+	})
 
 	// Lock in write.
 	err = locker.LockWrite(ctx, key, txw)
@@ -318,13 +319,17 @@ func TestWaitForTx(t *testing.T) {
 	})
 
 	// Schedule abort of the write Tx for after a new read starts waiting.
-	go func() {
+	wg.Go(func() {
 		time.Sleep(time.Millisecond)
 		err := tctx.Monitor.AbortTx(ctx, txw)
 		assert.NoError(t, err)
-	}()
+	})
 
 	// Lock in read.
+	// TODO: Fix bug. Without this sleep, this can happen before the async
+	//       unlock for txr above finishes updating the local cache, causing
+	//       this to not run at all.
+	time.Sleep(time.Millisecond)
 	err = locker.LockRead(ctx, key, txr)
 	assert.NoError(t, err)
 
@@ -332,6 +337,7 @@ func TestWaitForTx(t *testing.T) {
 		Type:     storage.LockTypeRead,
 		LockedBy: []data.TxID{txr},
 	})
+	wg.Wait()
 }
 
 func TestQueueUp(t *testing.T) {
@@ -455,11 +461,12 @@ func TestLockUpgradeWait(t *testing.T) {
 	})
 
 	// Wait before lock write starts locking.
-	go func() {
+	wg := conc.WaitGroup{}
+	wg.Go(func() {
 		time.Sleep(5 * time.Millisecond)
 		err := locker.Unlock(ctx, key, txr)
 		assert.NoError(t, err)
-	}()
+	})
 
 	err = locker.LockWrite(ctx, key, tx)
 	assert.NoError(t, err)
@@ -467,6 +474,7 @@ func TestLockUpgradeWait(t *testing.T) {
 		Type:     storage.LockTypeWrite,
 		LockedBy: []data.TxID{tx},
 	})
+	wg.Wait()
 }
 
 func TestLockReadRemote(t *testing.T) {
