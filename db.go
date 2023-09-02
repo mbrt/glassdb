@@ -32,16 +32,23 @@ import (
 	"github.com/mbrt/glassdb/internal/trans"
 )
 
-const cacheSize = 512 * 1024 * 1024 // 64 MiB
+const cacheSize = 512 * 1024 * 1024 // 512 MiB
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 
-var DefaultOptions = Options{
-	Clock:  clockwork.NewRealClock(),
-	Logger: ConsoleLogger{},
-	Tracer: NoLogger{},
+// DefaultOptions provides the options used by `Open`. They should be a good
+// middle ground for a production deployment.
+func DefaultOptions() Options {
+	return Options{
+		Clock:  clockwork.NewRealClock(),
+		Logger: ConsoleLogger{},
+		Tracer: NoLogger{},
+	}
 }
 
+// Options makes it possible to tweak a client DB.
+//
+// TODO: Add cache size and retry timing options.
 type Options struct {
 	Clock  clockwork.Clock
 	Logger Logger
@@ -49,7 +56,7 @@ type Options struct {
 }
 
 func Open(name string, b backend.Backend) (*DB, error) {
-	return OpenWith(name, b, DefaultOptions)
+	return OpenWith(name, b, DefaultOptions())
 }
 
 func OpenWith(name string, b backend.Backend, opts Options) (*DB, error) {
@@ -57,7 +64,6 @@ func OpenWith(name string, b backend.Backend, opts Options) (*DB, error) {
 		return nil, fmt.Errorf("name must be alphanumeric, got %q", name)
 	}
 
-	opts = setDefaultOpts(opts)
 	cache := cache.New(cacheSize)
 	bg := concurr.NewBackground()
 
@@ -228,14 +234,4 @@ func (d *DB) updateStats(s *Stats) {
 	d.statsM.Lock()
 	d.stats.add(s)
 	d.statsM.Unlock()
-}
-
-func setDefaultOpts(opts Options) Options {
-	if opts.Clock == nil {
-		opts.Clock = DefaultOptions.Clock
-	}
-	if opts.Logger == nil {
-		opts.Logger = DefaultOptions.Logger
-	}
-	return opts
 }
