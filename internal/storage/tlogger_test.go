@@ -47,7 +47,7 @@ type testContext struct {
 
 func testTLoggerContext(t *testing.T) (TLogger, testContext) {
 	t.Helper()
-	return newTLoggerFromBackend(t, memory.New(context.Background(), t, false))
+	return newTLoggerFromBackend(t, memory.New())
 }
 
 func newTLoggerFromBackend(t *testing.T, b backend.Backend) (TLogger, testContext) {

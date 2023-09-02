@@ -26,7 +26,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"testing"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -72,7 +71,7 @@ func initBackend() (backend.Backend, error) {
 
 	switch *backendType {
 	case "memory":
-		backend := memory.New(ctx, &testing.T{}, false)
+		backend := memory.New()
 		if !*enableThrottling {
 			// Effectively disable throttling.
 			gcsDelays.SameObjWritePs = 100000

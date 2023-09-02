@@ -43,7 +43,7 @@ type monTestCtx struct {
 func initMonTest(t *testing.T) (*Monitor, monTestCtx) {
 	t.Helper()
 	clock := testkit.NewAcceleratedClock(1000)
-	b := memory.New(context.Background(), t, *debugBackend)
+	b := memory.New()
 	return newTestMonitor(t, clock, b)
 }
 
