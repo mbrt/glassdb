@@ -16,7 +16,6 @@ package trans
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"sort"
 	"testing"
@@ -37,9 +36,6 @@ import (
 	"github.com/mbrt/glassdb/internal/testkit"
 )
 
-// debug is useful to debug backend request and replies.
-var debugBackend = flag.Bool("debug-backend", false, "debug backend requests")
-
 type tlTestCtx struct {
 	Clock   clockwork.Clock
 	Local   storage.Local
@@ -52,7 +48,7 @@ type tlTestCtx struct {
 func initTLTest(t *testing.T) (*Locker, tlTestCtx) {
 	t.Helper()
 	clock := testkit.NewAcceleratedClock(1000)
-	b := memory.New(context.Background(), t, *debugBackend)
+	b := memory.New()
 	return newTestLocker(t, clock, b)
 }
 
@@ -585,7 +581,7 @@ func TestWaitRemote(t *testing.T) {
 func TestConcurrentLockUnlock(t *testing.T) {
 	ctx := context.Background()
 	clock := testkit.NewAcceleratedClock(1000)
-	innerB := memory.New(context.Background(), t, *debugBackend)
+	innerB := memory.New()
 	b := testkit.NewStallBackend(innerB)
 	defer b.WaitForStalled()
 	locker, tctx := newTestLocker(t, clock, b)

@@ -19,14 +19,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"testing"
 
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/stringset"
 )
 
-func New(ctx context.Context, t testing.TB, debug bool) *Backend {
-	// TODO: Tests should test both GCS and memory backends.
+func New() *Backend {
 	return &Backend{
 		objects: make(map[string]object),
 		nextGen: 1,

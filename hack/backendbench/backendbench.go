@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"testing"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -58,7 +57,7 @@ func initBackend() (backend.Backend, error) {
 
 	switch *backendType {
 	case "memory":
-		backend := memory.New(ctx, &testing.T{}, false)
+		backend := memory.New()
 		return middleware.NewDelayBackend(backend, clockwork.NewRealClock(), gcsDelays), nil
 	case "gcs":
 		return initGCSBackend(ctx)

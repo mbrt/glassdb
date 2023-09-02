@@ -60,7 +60,7 @@ type testContext struct {
 
 func testAlgoContext(t *testing.T) (Algo, testContext) {
 	t.Helper()
-	return newAlgoFromBackend(t, memory.New(context.Background(), t, false))
+	return newAlgoFromBackend(t, memory.New())
 }
 
 func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {

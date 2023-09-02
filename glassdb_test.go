@@ -32,7 +32,7 @@ import (
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
-	"github.com/mbrt/glassdb/backend/memory"
+	"github.com/mbrt/glassdb/backend/gcs"
 	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/internal/stringset"
 	"github.com/mbrt/glassdb/internal/testkit"
@@ -49,9 +49,15 @@ var (
 	debugLogs    = flag.Bool("debug-logs", false, "debug db logs")
 )
 
-func initBackend(t testing.TB) backend.Backend {
+func initGCSBackend(t testing.TB) backend.Backend {
 	t.Helper()
-	backend := memory.New(context.Background(), t, false)
+	ctx := context.Background()
+	client := testkit.NewGCSClient(ctx, t, false)
+	bucket := client.Bucket("test")
+	if err := bucket.Create(ctx, "", nil); err != nil {
+		t.Fatalf("creating 'test' bucket: %v", err)
+	}
+	backend := gcs.New(bucket)
 	if *debugBackend {
 		return middleware.NewBackendLogger(backend, "Backend", glassdb.ConsoleLogger{})
 	}
@@ -83,7 +89,7 @@ func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
 
 func TestRW(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	db := initDB(t, back, clockwork.NewRealClock())
 
 	key := []byte("key1")
@@ -108,7 +114,7 @@ func TestRW(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	db := initDB(t, back, clockwork.NewRealClock())
 
 	key := []byte("key1")
@@ -136,7 +142,7 @@ func TestDelete(t *testing.T) {
 
 func TestReadFromAnother(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(t, back, clock)
 	db2 := initDB(t, back, clock)
@@ -159,7 +165,7 @@ func TestReadFromAnother(t *testing.T) {
 
 func TestReadDeletedFromAnother(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(t, back, clock)
 	db2 := initDB(t, back, clock)
@@ -272,7 +278,7 @@ func rmw(ctx context.Context, db *glassdb.DB, coll glassdb.Collection, key []byt
 
 func TestRMW(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 
@@ -306,7 +312,7 @@ func TestRMW(t *testing.T) {
 
 func TestConcurrentRMW(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(t, back, clock)
 	db2 := initDB(t, back, clock)
@@ -380,7 +386,7 @@ func multipleRMW(
 
 func TestMultipleRMW(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 
@@ -407,7 +413,7 @@ func TestMultipleRMW(t *testing.T) {
 
 func TestReadMulti(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 
@@ -462,7 +468,7 @@ func TestReadMulti(t *testing.T) {
 
 func TestConcurrentMultipleRMW(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(t, back, clock)
 	db2 := initDB(t, back, clock)
@@ -503,7 +509,7 @@ func TestConcurrentMultipleRMW(t *testing.T) {
 
 func TestReadWeak(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	// This test relies on timing. Relax the speed a bit to allow for slower
 	// machines to complete correctly.
 	clock := testkit.NewAcceleratedClock(clockMultiplier / 10)
@@ -549,7 +555,7 @@ func TestReadWeak(t *testing.T) {
 
 func TestListKeys(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 
@@ -605,7 +611,7 @@ func TestListKeys(t *testing.T) {
 
 func TestListCollections(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 
@@ -683,7 +689,7 @@ func TestListCollections(t *testing.T) {
 }
 
 func TestReadonly(t *testing.T) {
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(t, back, clock)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -762,7 +768,7 @@ func TestReadonly(t *testing.T) {
 
 func TestStaleAbort(t *testing.T) {
 	ctx := context.Background()
-	back := initBackend(t)
+	back := initGCSBackend(t)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(t, back, clock)
 	db2 := initDB(t, back, clock)

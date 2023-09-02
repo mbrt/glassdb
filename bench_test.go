@@ -25,16 +25,27 @@ import (
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
+	"github.com/mbrt/glassdb/backend/memory"
+	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/internal/testkit"
 )
 
 var printStats = flag.Bool("print-stats", false, "print DB stats after benchmarking")
 
+func initMemoryBackend(t testing.TB) backend.Backend {
+	t.Helper()
+	backend := memory.New()
+	if *debugBackend {
+		return middleware.NewBackendLogger(backend, "Backend", glassdb.ConsoleLogger{})
+	}
+	return backend
+}
+
 func BenchmarkSingleRMW(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(b, back, clock)
 
@@ -71,7 +82,7 @@ func Benchmark10RMW(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(b, back, clock)
 
@@ -123,7 +134,7 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db1 := initDB(b, back, clock)
 	db2 := initDB(b, back, clock)
@@ -182,7 +193,7 @@ func Benchmark10R(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(b, back, clock)
 
@@ -241,7 +252,7 @@ func BenchmarkSharedR(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(b, back, clock)
 
@@ -302,7 +313,7 @@ func Benchmark100W(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	back := initBackend(b)
+	back := initMemoryBackend(b)
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	db := initDB(b, back, clock)
 
