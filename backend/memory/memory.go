@@ -127,7 +127,7 @@ func (b *Backend) SetTagsIf(
 	b.objects[path] = obj
 
 	return backend.Metadata{
-		Tags:    obj.Tags,
+		Tags:    copyTags(obj.Tags),
 		Version: obj.Version,
 	}, nil
 }
