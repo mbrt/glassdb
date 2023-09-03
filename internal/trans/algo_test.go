@@ -45,8 +45,8 @@ var collInfoContents = []byte("__foo__")
 
 type noLogger struct{}
 
-func (noLogger) Logf(format string, v ...any)   {}
-func (noLogger) Tracef(format string, v ...any) {}
+func (noLogger) Logf(string, ...any)   {}
+func (noLogger) Tracef(string, ...any) {}
 
 type testContext struct {
 	backend backend.Backend

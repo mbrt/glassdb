@@ -115,7 +115,7 @@ type DB struct {
 	statsM     sync.Mutex
 }
 
-func (d *DB) Close(ctx context.Context) error {
+func (d *DB) Close(context.Context) error {
 	d.background.Close()
 	return nil
 }

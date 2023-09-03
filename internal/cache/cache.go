@@ -65,23 +65,23 @@ func (c *Cache) Update(key string, fn func(v Value) Value) {
 	if e, ok := c.entries[key]; ok {
 		c.evicts.MoveToFront(e)
 		old := e.Value.(entry)
-		new := fn(old.value)
-		if new == nil {
+		newv := fn(old.value)
+		if newv == nil {
 			// We had a value and now it's gone.
 			c.deleteEntry(key, e)
 			return
 		}
-		c.currSizeB += new.SizeB() - old.value.SizeB()
-		e.Value = entry{key: key, value: new}
+		c.currSizeB += newv.SizeB() - old.value.SizeB()
+		e.Value = entry{key: key, value: newv}
 	} else {
-		new := fn(nil)
-		if new == nil {
+		newv := fn(nil)
+		if newv == nil {
 			// Nothing happened. We had nothing, we got nothing.
 			return
 		}
-		e := c.evicts.PushFront(entry{key: key, value: new})
+		e := c.evicts.PushFront(entry{key: key, value: newv})
 		c.entries[key] = e
-		c.currSizeB += new.SizeB()
+		c.currSizeB += newv.SizeB()
 	}
 
 	c.removeOldest()

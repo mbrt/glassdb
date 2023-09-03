@@ -289,9 +289,9 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 	err := t.fanout(ctx, len(vstate.Paths), func(ctx context.Context, i int) error {
 		item := &vstate.Paths[i]
 		if item.ReadVersion.IsLocal() {
-			return t.validateLocalRead(ctx, item, tx)
+			return t.validateLocalRead(ctx, item)
 		}
-		return t.validateBackendRead(ctx, item, tx)
+		return t.validateBackendRead(ctx, item)
 	})
 
 	if err != nil {
@@ -306,11 +306,7 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 	return err
 }
 
-func (t Algo) validateLocalRead(
-	ctx context.Context,
-	item *pathState,
-	tx *Handle,
-) error {
+func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 	// We need the freshest possible meta, because we don't have a lock.
 	meta, err := t.global.GetMetadata(ctx, item.Path)
 	if err != nil {
@@ -410,13 +406,9 @@ func (t Algo) validateLocalRead(
 	return nil
 }
 
-func (t Algo) validateBackendRead(
-	ctx context.Context,
-	item *pathState,
-	tx *Handle,
-) error {
+func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
 	if item.NotFound {
-		return t.validateBackendReadNotFound(ctx, item, tx)
+		return t.validateBackendReadNotFound(ctx, item)
 	}
 	// Here the item was found.
 	// We need the freshest possible meta, because we don't have a lock.
@@ -501,11 +493,7 @@ func (t Algo) validateBackendRead(
 	return nil
 }
 
-func (t Algo) validateBackendReadNotFound(
-	ctx context.Context,
-	item *pathState,
-	tx *Handle,
-) error {
+func (t Algo) validateBackendReadNotFound(ctx context.Context, item *pathState) error {
 	meta, err := t.global.GetMetadata(ctx, item.Path)
 	if errors.Is(err, backend.ErrNotFound) {
 		// All good here, the item is still not found now.

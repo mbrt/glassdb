@@ -263,7 +263,7 @@ func TestLongPendingTx(t *testing.T) {
 	tx := data.TxID("tx1")
 	mon1.BeginTx(ctx, tx)
 	t.Cleanup(func() {
-		mon1.AbortTx(ctx, tx)
+		_ = mon1.AbortTx(ctx, tx)
 	})
 	mon1.RefreshTx(ctx, tx)
 

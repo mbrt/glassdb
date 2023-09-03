@@ -270,7 +270,7 @@ func overlappingMultiRMW(b *benchmarker, db *glassdb.DB, nWriters, nKeysPerWrite
 
 	// Initialize all keys beforehand.
 	coll := db.Collection([]byte("omrmw"))
-	coll.Create(ctx)
+	_ = coll.Create(ctx)
 
 	nKeys := nWriters*nKeysPerWriter - nOverlap
 	allKeys := make([]glassdb.FQKey, nKeys)
@@ -366,7 +366,7 @@ func runReadWrite9010() error {
 	}
 
 	// Deterministic random source. Helps with reproducibility.
-	rnd := mrand.New(mrand.NewSource(42))
+	rnd := mrand.New(mrand.NewSource(42)) // #nosec
 
 	for i := 0; i <= readWrite9010MaxDBs; i += 5 {
 		numdb := max(1, i)
@@ -576,8 +576,8 @@ func writeTx(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) error {
 
 	return db.Tx(ctx, func(tx *glassdb.Tx) error {
 		ks := []glassdb.FQKey{
-			{Collection: coll, Key: keys[mrand.Intn(len(keys))]},
-			{Collection: coll, Key: keys[mrand.Intn(len(keys))]},
+			{Collection: coll, Key: keys[rnd.Intn(len(keys))]},
+			{Collection: coll, Key: keys[rnd.Intn(len(keys))]},
 		}
 		res := tx.ReadMulti(ks)
 		for _, r := range res {
@@ -585,8 +585,8 @@ func writeTx(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) error {
 				return r.Err
 			}
 		}
-		tx.Write(coll, ks[0].Key, res[1].Value)
-		tx.Write(coll, ks[1].Key, res[0].Value)
+		_ = tx.Write(coll, ks[0].Key, res[1].Value)
+		_ = tx.Write(coll, ks[1].Key, res[0].Value)
 		return nil
 	})
 }
@@ -597,8 +597,8 @@ func readTx(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) error {
 
 	return db.Tx(ctx, func(tx *glassdb.Tx) error {
 		ks := []glassdb.FQKey{
-			{Collection: coll, Key: keys[mrand.Intn(len(keys))]},
-			{Collection: coll, Key: keys[mrand.Intn(len(keys))]},
+			{Collection: coll, Key: keys[rnd.Intn(len(keys))]},
+			{Collection: coll, Key: keys[rnd.Intn(len(keys))]},
 		}
 		res := tx.ReadMulti(ks)
 		for _, r := range res {
@@ -613,7 +613,7 @@ func readTx(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) error {
 func weakReadTx(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) error {
 	ctx := context.Background()
 	coll := db.Collection([]byte(readWrite9010Cname))
-	k := keys[mrand.Intn(len(keys))]
+	k := keys[rnd.Intn(len(keys))]
 	_, err := coll.ReadWeak(ctx, k, 10*time.Second)
 	return err
 }
@@ -640,7 +640,9 @@ func initKeys(b backend.Backend, num int) ([][]byte, error) {
 			for j := 0; j < 100; j++ {
 				k := []byte(fmt.Sprintf("key%d", i+j))
 				keys[i+j] = k
-				tx.Write(coll, k, rand1K())
+				if err := tx.Write(coll, k, rand1K()); err != nil {
+					return err
+				}
 			}
 			return nil
 		})

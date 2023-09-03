@@ -195,7 +195,7 @@ func (b Backend) writeTo(
 	writer.ObjectAttrs.Metadata = t
 	writer.ContentType = "application/octet-stream"
 
-	meta, err = b.writeWith(ctx, writer, value, t)
+	meta, err = b.writeWith(writer, value)
 	if err == nil || !errors.Is(err, errRateLimited) {
 		return meta, err
 	}
@@ -206,14 +206,12 @@ func (b Backend) writeTo(
 	writer.ChunkSize = len(value) + 100
 	writer.ObjectAttrs.Metadata = t
 	writer.ContentType = "application/octet-stream"
-	return b.writeWith(ctx, writer, value, t)
+	return b.writeWith(writer, value)
 }
 
 func (b Backend) writeWith(
-	ctx context.Context,
 	writer *storage.Writer,
 	value []byte,
-	t backend.Tags,
 ) (meta backend.Metadata, err error) {
 	_, err = writer.Write(value)
 	if err != nil {

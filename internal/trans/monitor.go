@@ -76,7 +76,7 @@ type Monitor struct {
 	m          sync.Mutex
 }
 
-func (m *Monitor) BeginTx(ctx context.Context, tid data.TxID) {
+func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
 	m.m.Lock()
 	m.localTx[string(tid)] = txStatus{
 		Status:       storage.TxCommitStatusPending,
@@ -560,10 +560,10 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
 	}
 
 	for ctx.Err() == nil {
-		now := m.clock.Now()
+		startT := m.clock.Now()
 		tl := storage.TxLog{
 			ID:        tid,
-			Timestamp: now,
+			Timestamp: startT,
 			Status:    storage.TxCommitStatusPending,
 		}
 		if lastVersion.IsNull() {
@@ -587,7 +587,7 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-m.clock.After(nextTxTimeout(now)):
+		case <-m.clock.After(nextTxTimeout(startT, m.clock.Now())):
 		}
 	}
 }
@@ -624,12 +624,13 @@ type txDeadline struct {
 	RefreshCtx context.Context
 }
 
-func nextTxTimeout(lastRefresh time.Time) time.Duration {
-	return time.Duration(float64(pendingTxTimeout) * refreshMultiplier)
+func nextTxTimeout(lastRefresh, now time.Time) time.Duration {
+	elapsed := now.Sub(lastRefresh)
+	return time.Duration(float64(pendingTxTimeout)*refreshMultiplier) - elapsed
 }
 
 func newTxDeadline(now time.Time) time.Time {
-	return now.Add(nextTxTimeout(now))
+	return now.Add(nextTxTimeout(now, now))
 }
 
 func isExpired(lastRefresh, now time.Time) bool {

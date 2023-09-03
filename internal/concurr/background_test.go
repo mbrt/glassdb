@@ -88,7 +88,8 @@ func TestBackgroundCancel(t *testing.T) {
 }
 
 func TestNestedBackground(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 	b := NewBackground()
 	done := make(chan struct{})
 
@@ -98,6 +99,10 @@ func TestNestedBackground(t *testing.T) {
 		})
 	})
 
-	<-done
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Errorf("should have reached done before")
+	}
 	b.Close()
 }

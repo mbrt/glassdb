@@ -38,12 +38,12 @@ func env(k string) (string, error) {
 func initStorage(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating client: %v", err)
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
 	return client, nil
 }
 
-func initBackend(ctx context.Context, client *storage.Client) (backend.Backend, error) {
+func initBackend(client *storage.Client) (backend.Backend, error) {
 	bucket, err := env("BUCKET")
 	if err != nil {
 		return nil, err
@@ -57,13 +57,13 @@ func do() error {
 	if err != nil {
 		return err
 	}
-	b, err := initBackend(ctx, client)
+	b, err := initBackend(client)
 	if err != nil {
 		return err
 	}
 	db, err := glassdb.Open("example", b)
 	if err != nil {
-		return fmt.Errorf("opening db: %v", err)
+		return fmt.Errorf("opening db: %w", err)
 	}
 	defer db.Close(ctx)
 

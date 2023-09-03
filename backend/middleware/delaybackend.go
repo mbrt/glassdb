@@ -59,7 +59,7 @@ func NewDelayBackend(
 		objWrite:  lognormalDelay(opts.ObjWrite, opts.StdDevPerc),
 		list:      lognormalDelay(opts.List, opts.StdDevPerc),
 		rlimit: rateLimiter{
-			tokensPerSec: int(opts.SameObjWritePs),
+			tokensPerSec: opts.SameObjWritePs,
 			clock:        clock,
 			buckets:      map[string]bucketState{},
 		},
@@ -114,7 +114,9 @@ func (b *DelayBackend) SetTagsIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return backend.Metadata{}, err
+	}
 	r, err := b.inner.SetTagsIf(ctx, path, expected, t)
 	b.delay(b.metaWrite)
 	return r, err
@@ -126,7 +128,9 @@ func (b *DelayBackend) Write(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return backend.Metadata{}, err
+	}
 	r, err := b.inner.Write(ctx, path, value, t)
 	b.delay(b.objWrite)
 	return r, err
@@ -139,7 +143,9 @@ func (b *DelayBackend) WriteIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return backend.Metadata{}, err
+	}
 	r, err := b.inner.WriteIf(ctx, path, value, expected, t)
 	if errors.Is(err, backend.ErrPrecondition) {
 		b.delay(b.metaRead)
@@ -155,7 +161,9 @@ func (b *DelayBackend) WriteIfNotExists(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return backend.Metadata{}, err
+	}
 	r, err := b.inner.WriteIfNotExists(ctx, path, value, t)
 	if errors.Is(err, backend.ErrPrecondition) {
 		b.delay(b.metaRead)
@@ -166,7 +174,9 @@ func (b *DelayBackend) WriteIfNotExists(
 }
 
 func (b *DelayBackend) Delete(ctx context.Context, path string) error {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return err
+	}
 	err := b.inner.Delete(ctx, path)
 	b.delay(b.objWrite)
 	return err
@@ -177,7 +187,9 @@ func (b *DelayBackend) DeleteIf(
 	path string,
 	expected backend.Version,
 ) error {
-	b.backoff(ctx, path)
+	if err := b.backoff(ctx, path); err != nil {
+		return err
+	}
 	err := b.inner.DeleteIf(ctx, path, expected)
 	if errors.Is(err, backend.ErrPrecondition) {
 		b.delay(b.metaRead)
