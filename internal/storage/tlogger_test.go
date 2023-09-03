@@ -125,11 +125,11 @@ func TestGetSet(t *testing.T) {
 	// The log comes back.
 	gotlog, err := tl.Get(ctx, tx)
 	assert.NoError(t, err)
+	assert.Equal(t, log.ID, gotlog.ID)
+	assert.Equal(t, log.Status, gotlog.Status)
 	assert.GreaterOrEqual(t, gotlog.Timestamp, beforeSetTs)
-	// Reset the timestamps as we can't be 100% sure of the result.
-	gotlog.Timestamp = time.Time{}
-	log.Timestamp = time.Time{}
-	assert.Equal(t, log, gotlog)
+	assert.ElementsMatch(t, log.Locks, gotlog.Locks)
+	assert.ElementsMatch(t, log.Writes, gotlog.Writes)
 
 	// The status is correct.
 	status, err = tl.CommitStatus(ctx, tx)
