@@ -38,8 +38,8 @@ func (ConsoleLogger) Tracef(format string, v ...any) {
 
 type NoLogger struct{}
 
-func (NoLogger) Logf(format string, v ...any)   {}
-func (NoLogger) Tracef(format string, v ...any) {}
+func (NoLogger) Logf(string, ...any)   {}
+func (NoLogger) Tracef(string, ...any) {}
 
 type algoLogger struct {
 	logger Logger

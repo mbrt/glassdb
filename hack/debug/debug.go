@@ -351,7 +351,7 @@ func parseLogEvents(args []string) error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.Contains(string(line), "event=") {
+		if !strings.Contains(line, "event=") {
 			continue
 		}
 		match := re.FindAllStringSubmatch(line, -1)

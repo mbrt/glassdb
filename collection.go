@@ -96,21 +96,21 @@ func (c Collection) Update(
 	key []byte,
 	f func(old []byte) ([]byte, error),
 ) ([]byte, error) {
-	var new []byte
+	var newb []byte
 
 	err := c.db.Tx(ctx, func(tx *Tx) error {
 		old, err := tx.Read(c, key)
 		if err != nil {
 			return err
 		}
-		new, err = f(old)
+		newb, err = f(old)
 		if err != nil {
 			return err
 		}
-		return tx.Write(c, key, new)
+		return tx.Write(c, key, newb)
 	})
 
-	return new, err
+	return newb, err
 }
 
 func (c Collection) Collection(name []byte) Collection {

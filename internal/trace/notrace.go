@@ -18,7 +18,7 @@ package trace
 
 import "context"
 
-func NewTask(ctx context.Context, n string) (context.Context, Task) {
+func NewTask(ctx context.Context, _ string) (context.Context, Task) {
 	return ctx, Task{}
 }
 
@@ -26,7 +26,7 @@ type Task struct{}
 
 func (Task) End() {}
 
-func WithRegion(ctx context.Context, n string, fn func()) {
+func WithRegion(_ context.Context, _ string, fn func()) {
 	fn()
 }
 

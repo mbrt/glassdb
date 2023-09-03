@@ -47,7 +47,7 @@ func RetryOptions(initial, max time.Duration, c clockwork.Clock) Retrier {
 	b := backoff.NewExponentialBackOff()
 	b.Clock = c
 	b.InitialInterval = initial
-	b.MaxInterval = maxInterval
+	b.MaxInterval = max
 	b.MaxElapsedTime = 0
 	return Retrier{b, c}
 }

@@ -376,7 +376,7 @@ func parseLogTags(t backend.Tags) (TxStatus, error) {
 	if !ok {
 		return TxStatus{}, errors.New("commit-status tag not found in tx log")
 	}
-	status := TxCommitStatusUnknown
+	var status TxCommitStatus
 	switch st {
 	case commitStatusOK:
 		status = TxCommitStatusOK

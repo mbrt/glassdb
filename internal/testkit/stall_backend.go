@@ -87,7 +87,7 @@ func (b *StallBackend) SetTagsIf(
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.SetTagsIf(ctx, path, expected, t)
+		_, _ = b.Backend.SetTagsIf(ctx, path, expected, t)
 	})
 	return backend.Metadata{}, context.Canceled
 }
@@ -109,7 +109,7 @@ func (b *StallBackend) Write(
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.Write(ctx, path, value, t)
+		_, _ = b.Backend.Write(ctx, path, value, t)
 	})
 	return backend.Metadata{}, context.Canceled
 }
@@ -132,7 +132,7 @@ func (b *StallBackend) WriteIf(
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.WriteIf(ctx, path, value, expected, t)
+		_, _ = b.Backend.WriteIf(ctx, path, value, expected, t)
 	})
 	return backend.Metadata{}, context.Canceled
 }
@@ -154,7 +154,7 @@ func (b *StallBackend) WriteIfNotExists(
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.WriteIfNotExists(ctx, path, value, t)
+		_, _ = b.Backend.WriteIfNotExists(ctx, path, value, t)
 	})
 	return backend.Metadata{}, context.Canceled
 }
@@ -171,7 +171,7 @@ func (b *StallBackend) Delete(ctx context.Context, path string) error {
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.Delete(ctx, path)
+		_ = b.Backend.Delete(ctx, path)
 	})
 	return context.Canceled
 }
@@ -192,7 +192,7 @@ func (b *StallBackend) DeleteIf(
 			b.cond.Wait()
 		}
 		b.m.Unlock()
-		b.Backend.DeleteIf(ctx, path, expected)
+		_ = b.Backend.DeleteIf(ctx, path, expected)
 	})
 	return context.Canceled
 }

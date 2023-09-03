@@ -69,7 +69,7 @@ func initBackend() (backend.Backend, error) {
 func initGCSBackend(ctx context.Context) (backend.Backend, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating client: %v", err)
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
 	bucket, err := env("BUCKET")
 	if err != nil {
@@ -140,7 +140,7 @@ func benchWriteFailPre(b backend.Backend, ben *bench.Bench) error {
 	count := 0
 
 	expected := meta.Version
-	expected.Meta += 1
+	expected.Meta++
 
 	for !ben.IsTestFinished() {
 		err := ben.Measure(func() error {
@@ -280,13 +280,43 @@ func do() error {
 	if err != nil {
 		return err
 	}
-	runBench("WriteSame", b, benchWriteSame)
-	runBench("WriteFailPre", b, benchWriteFailPre)
-	runBench("Read", b, benchRead)
-	runBench("ReadUnchanged", b, benchReadUnchanged)
-	runBench("SetMetaSame", b, benchSetMetaSame)
-	runBench("GetMeta", b, benchGetMeta)
+	tests := []struct {
+		name string
+		fn   func(backend.Backend, *bench.Bench) error
+	}{
+		{
+			name: "WriteSame",
+			fn:   benchWriteSame,
+		},
+		{
+			name: "WriteFailPre",
+			fn:   benchWriteFailPre,
+		},
+		{
+			name: "Read",
+			fn:   benchRead,
+		},
+		{
+			name: "ReadUnchanged",
+			fn:   benchReadUnchanged,
+		},
+		{
+			name: "SetMetaSame",
+			fn:   benchSetMetaSame,
+		},
+		{
+			name: "GetMeta",
+			fn:   benchGetMeta,
+		},
+	}
+
+	for _, test := range tests {
+		if err := runBench(test.name, b, test.fn); err != nil {
+			return err
+		}
+	}
 	return nil
+
 }
 
 func main() {
