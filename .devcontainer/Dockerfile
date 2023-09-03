@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VARIANT=1.20
+ARG VARIANT=1.21
 FROM mcr.microsoft.com/vscode/devcontainers/go:0-${VARIANT}
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
