@@ -77,7 +77,7 @@ func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
 		opts.Logger = glassdb.NoLogger{}
 		opts.Tracer = glassdb.NoLogger{}
 	}
-	db, err := glassdb.OpenWith("example", b, opts)
+	db, err := glassdb.OpenWith(ctx, "example", b, opts)
 	if err != nil {
 		t.Fatalf("Failed creating DB: %v", err)
 	}

@@ -61,7 +61,7 @@ func do() error {
 	if err != nil {
 		return err
 	}
-	db, err := glassdb.Open("example", b)
+	db, err := glassdb.Open(ctx, "example", b)
 	if err != nil {
 		return fmt.Errorf("opening db: %w", err)
 	}
