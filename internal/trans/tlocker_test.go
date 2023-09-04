@@ -321,11 +321,10 @@ func TestWaitForTx(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	// Lock in read.
-	// TODO: Fix bug. Without this sleep, this can happen before the async
-	//       unlock for txr above finishes updating the local cache, causing
-	//       this to not run at all.
-	time.Sleep(time.Millisecond)
+	// Lock in read. First make sure that the unlock read is finished.
+	// Locking / Unlocking the same object concurrently with the same tx id is
+	// not safe.
+	wg.Wait()
 	err = locker.LockRead(ctx, key, txr)
 	assert.NoError(t, err)
 
@@ -333,7 +332,6 @@ func TestWaitForTx(t *testing.T) {
 		Type:     storage.LockTypeRead,
 		LockedBy: []data.TxID{txr},
 	})
-	wg.Wait()
 }
 
 func TestQueueUp(t *testing.T) {
