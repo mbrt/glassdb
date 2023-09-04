@@ -104,7 +104,7 @@ func initGCS(ctx context.Context) (backend.Backend, error) {
 }
 
 func initDB(b backend.Backend) *glassdb.DB {
-	db, err := glassdb.Open("bench", b)
+	db, err := glassdb.Open(context.Background(), "bench", b)
 	if err != nil {
 		panic(err)
 	}

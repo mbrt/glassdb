@@ -55,13 +55,16 @@ type Options struct {
 	Tracer Tracer
 }
 
-func Open(name string, b backend.Backend) (*DB, error) {
-	return OpenWith(name, b, DefaultOptions())
+func Open(ctx context.Context, name string, b backend.Backend) (*DB, error) {
+	return OpenWith(ctx, name, b, DefaultOptions())
 }
 
-func OpenWith(name string, b backend.Backend, opts Options) (*DB, error) {
+func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options) (*DB, error) {
 	if !nameRegexp.MatchString(name) {
 		return nil, fmt.Errorf("name must be alphanumeric, got %q", name)
+	}
+	if err := checkOrCreateDBMeta(ctx, b, name); err != nil {
+		return nil, err
 	}
 
 	cache := cache.New(cacheSize)
