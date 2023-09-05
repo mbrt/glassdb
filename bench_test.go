@@ -36,7 +36,7 @@ func initMemoryBackend(t testing.TB) backend.Backend {
 	t.Helper()
 	backend := memory.New()
 	if *debugBackend {
-		return middleware.NewBackendLogger(backend, "Backend", glassdb.ConsoleLogger{})
+		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
 	}
 	return backend
 }

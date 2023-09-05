@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sync"
 
@@ -41,8 +42,7 @@ var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 func DefaultOptions() Options {
 	return Options{
 		Clock:  clockwork.NewRealClock(),
-		Logger: ConsoleLogger{},
-		Tracer: NoLogger{},
+		Logger: slog.Default(),
 	}
 }
 
@@ -51,8 +51,7 @@ func DefaultOptions() Options {
 // TODO: Add cache size and retry timing options.
 type Options struct {
 	Clock  clockwork.Clock
-	Logger Logger
-	Tracer Tracer
+	Logger *slog.Logger
 }
 
 func Open(ctx context.Context, name string, b backend.Backend) (*DB, error) {
@@ -83,10 +82,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 		locker,
 		tmon,
 		bg,
-		algoLogger{
-			logger: opts.Logger,
-			tracer: opts.Tracer,
-		},
+		opts.Logger,
 	)
 
 	res := &DB{
@@ -112,7 +108,7 @@ type DB struct {
 	tmon       *trans.Monitor
 	algo       trans.Algo
 	clock      clockwork.Clock
-	logger     Logger
+	logger     *slog.Logger
 	root       Collection
 	stats      Stats
 	statsM     sync.Mutex
