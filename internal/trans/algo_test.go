@@ -17,6 +17,7 @@ package trans
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -43,10 +44,14 @@ const (
 
 var collInfoContents = []byte("__foo__")
 
-type noLogger struct{}
+type nilHandler struct{}
 
-func (noLogger) Logf(string, ...any)   {}
-func (noLogger) Tracef(string, ...any) {}
+func (nilHandler) Enabled(context.Context, slog.Level) bool {
+	return false
+}
+func (nilHandler) Handle(context.Context, slog.Record) error  { return nil }
+func (h nilHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
+func (h nilHandler) WithGroup(name string) slog.Handler       { return h }
 
 type testContext struct {
 	backend backend.Backend
@@ -88,7 +93,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	_, err := global.Write(ctx, paths.CollectionInfo(testCollName), collInfoContents, nil)
 	require.NoError(t, err)
 
-	tm := NewAlgo(clock, global, local, locker, tmon, background, noLogger{})
+	tm := NewAlgo(clock, global, local, locker, tmon, background, slog.New(nilHandler{}))
 	return tm, testContext{
 		backend: b,
 		clock:   clock,

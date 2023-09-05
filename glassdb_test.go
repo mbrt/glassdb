@@ -20,7 +20,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"math/rand"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -49,6 +51,10 @@ var (
 	debugLogs    = flag.Bool("debug-logs", false, "debug db logs")
 )
 
+var debugLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	Level: slog.LevelDebug,
+}))
+
 func initGCSBackend(t testing.TB) backend.Backend {
 	t.Helper()
 	ctx := context.Background()
@@ -59,7 +65,7 @@ func initGCSBackend(t testing.TB) backend.Backend {
 	}
 	backend := gcs.New(bucket)
 	if *debugBackend {
-		return middleware.NewBackendLogger(backend, "Backend", glassdb.ConsoleLogger{})
+		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
 	}
 	return backend
 }
@@ -67,15 +73,12 @@ func initGCSBackend(t testing.TB) backend.Backend {
 func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
 	t.Helper()
 	ctx := context.Background()
-	opts := glassdb.Options{
-		Clock: c,
-	}
+	opts := glassdb.DefaultOptions()
+	opts.Clock = c
 	if *debugLogs {
-		opts.Logger = glassdb.ConsoleLogger{}
-		opts.Tracer = glassdb.ConsoleLogger{}
+		opts.Logger = debugLogger
 	} else {
-		opts.Logger = glassdb.NoLogger{}
-		opts.Tracer = glassdb.NoLogger{}
+		opts.Logger = slog.New(nilHandler{})
 	}
 	db, err := glassdb.OpenWith(ctx, "example", b, opts)
 	if err != nil {
@@ -852,3 +855,12 @@ func requireAllEqual(t *testing.T, ks [][]byte, vals []int64) {
 	}
 	t.Fatalf("for paths %v, got distinct elements: %v, expected all to be equal", ps, vs)
 }
+
+type nilHandler struct{}
+
+func (nilHandler) Enabled(context.Context, slog.Level) bool {
+	return false
+}
+func (nilHandler) Handle(context.Context, slog.Record) error  { return nil }
+func (h nilHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
+func (h nilHandler) WithGroup(name string) slog.Handler       { return h }

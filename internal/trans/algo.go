@@ -17,6 +17,7 @@ package trans
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -73,7 +74,7 @@ func NewAlgo(
 	locker *Locker,
 	mon *Monitor,
 	bg *concurr.Background,
-	log Logger,
+	log *slog.Logger,
 ) Algo {
 	return Algo{
 		clock:      c,
@@ -95,14 +96,16 @@ type Algo struct {
 	locker     *Locker
 	mon        *Monitor
 	background *concurr.Background
-	log        Logger
+	log        *slog.Logger
 }
 
 func (t Algo) Begin(d Data) *Handle {
+	tid := data.NewTId()
 	return &Handle{
-		id:     data.NewTId(),
+		id:     tid,
 		data:   d,
 		status: statusNew,
+		log:    t.log.With("tx", txLog(tid)),
 	}
 }
 
@@ -112,12 +115,11 @@ func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 		tx.status = statusValidating
 	}
 	vstate := initValidation(tx)
-	t.traceVstate(*vstate, tx)
 
 	for {
-		t.log.Tracef("tx=%v, event=Commit round BEGIN", tx.id)
+		tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit round BEGIN")
 		err := t.validateRound(ctx, vstate, tx)
-		t.log.Tracef("tx=%v, event=Commit round END, err=%v", tx.id, err)
+		tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit round END", errAttr(err))
 
 		if err == nil {
 			// Committed.
@@ -197,7 +199,7 @@ func (t Algo) End(ctx context.Context, tx *Handle) error {
 	}
 	// Release all the locks and abort.
 	if err := t.mon.AbortTx(ctx, tx.id); err != nil {
-		t.log.Logf("tx=%v, event=Commit End, err=%v", tx.id, err)
+		tx.log.LogAttrs(ctx, slog.LevelError, "Commit End", errAttr(err))
 		// Schedule follow-up cleanup.
 		t.asyncCleanup(ctx, tx)
 		return err
@@ -222,7 +224,7 @@ func (t Algo) validateReadWrite(ctx context.Context, vstate *validationState, tx
 }
 
 func (t Algo) commitSingleRW(ctx context.Context, tx *Handle) error {
-	t.log.Tracef("tx=%v, event=Commit single RW BEGIN", tx.id)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit single RW BEGIN")
 	read := tx.data.Reads[0]
 	write := tx.data.Writes[0]
 
@@ -283,7 +285,7 @@ func (t Algo) commitSingleRW(ctx context.Context, tx *Handle) error {
 }
 
 func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx *Handle) error {
-	t.log.Tracef("tx=%v, event=Commit readonly BEGIN", tx.id)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit readonly BEGIN")
 	// We can validate that the read is consistent (i.e. not modified by anyone
 	// since, nor locked by others) and avoid any locking.
 	err := t.fanout(ctx, len(vstate.Paths), func(ctx context.Context, i int) error {
@@ -561,7 +563,7 @@ func (t Algo) checkReadVersionUnlocked(rv ReadVersion, meta backend.Metadata) er
 }
 
 func (t Algo) parallelValidate(ctx context.Context, vstate *validationState, tx *Handle) error {
-	t.log.Tracef("tx=%v, event=Commit parallel BEGIN", tx.id)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit parallel BEGIN")
 	// Parallel locking may lead to deadlock. Make sure we detect those
 	// through a timeout and resort to serial locking and validation instead.
 	ctx, cancel := concurr.ContextWithTimeout(ctx, t.clock, lockTimeout)
@@ -595,7 +597,7 @@ func (t Algo) lockCollections(ctx context.Context, vstate *validationState, tx *
 	}
 
 	err = t.fanout(ctx, len(colocks), func(ctx context.Context, i int) error {
-		err := t.lockPath(ctx, colocks[i].Path, colocks[i].Type, tx.id)
+		err := t.lockPath(ctx, colocks[i].Path, colocks[i].Type, tx)
 		if err != nil {
 			return fmt.Errorf("locking collection %q: %w", colocks[i].Path, err)
 		}
@@ -606,7 +608,7 @@ func (t Algo) lockCollections(ctx context.Context, vstate *validationState, tx *
 }
 
 func (t Algo) serialValidate(ctx context.Context, vstate *validationState, tx *Handle) error {
-	t.log.Tracef("tx=%v, event=Commit serial BEGIN", tx.id)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit serial BEGIN")
 	if !t.alreadyLocked(vstate, tx) {
 		// If we need to lock anything, we need to do it in the right order.
 		// To do that we need to first unlock.
@@ -633,7 +635,7 @@ func (t Algo) serialValidate(ctx context.Context, vstate *validationState, tx *H
 			return colocks[i].Path < colocks[j].Path
 		})
 		for _, cl := range colocks {
-			if err := t.lockPath(ctx, cl.Path, cl.Type, tx.id); err != nil {
+			if err := t.lockPath(ctx, cl.Path, cl.Type, tx); err != nil {
 				return fmt.Errorf("locking collection %q: %w", cl.Path, err)
 			}
 		}
@@ -709,9 +711,9 @@ func (t Algo) lockValidateFoundKey(ctx context.Context, item *pathState, tx *Han
 	// First thing, lock.
 	var err error
 	if item.Write {
-		err = t.lockWrite(ctx, item.Path, tx.id)
+		err = t.lockWrite(ctx, item.Path, tx)
 	} else if item.Read {
-		err = t.lockRead(ctx, item.Path, tx.id)
+		err = t.lockRead(ctx, item.Path, tx)
 	}
 
 	if err != nil {
@@ -758,7 +760,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 		// The item was read, not found and written to. We need to lock it
 		// in write and check that it's still not found afterwards.
 		// Lock create will do exactly that.
-		err := t.lockCreate(ctx, item.Path, tx.id)
+		err := t.lockCreate(ctx, item.Path, tx)
 		if err != nil {
 			if errors.Is(err, backend.ErrPrecondition) {
 				// The item is there now, so the read is stale.
@@ -786,7 +788,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 		}
 		// There's no error so the item is there now!
 		// We may have a local read that was a delete. Just lock read now and validate.
-		err = t.lockRead(ctx, item.Path, tx.id)
+		err = t.lockRead(ctx, item.Path, tx)
 		if errors.Is(err, backend.ErrNotFound) {
 			// All good. The item disappeared.
 			item.Result = vResultOK
@@ -803,7 +805,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 	if item.Write {
 		// The item was written to, not read and it turned out to be not
 		// found while locking it. We need to lock-create it.
-		err := t.lockCreate(ctx, item.Path, tx.id)
+		err := t.lockCreate(ctx, item.Path, tx)
 		if err == nil {
 			// All good.
 			item.Result = vResultOK
@@ -813,7 +815,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 			return err
 		}
 		// The item was found now, so we should lock it in write normally instead.
-		err = t.lockWrite(ctx, item.Path, tx.id)
+		err = t.lockWrite(ctx, item.Path, tx)
 		if err != nil {
 			return err
 		}
@@ -828,17 +830,17 @@ func (t Algo) lockPath(
 	ctx context.Context,
 	path string,
 	lt storage.LockType,
-	tid data.TxID,
+	tx *Handle,
 ) error {
 	var err error
 
 	switch lt {
 	case storage.LockTypeRead:
-		err = t.lockRead(ctx, path, tid)
+		err = t.lockRead(ctx, path, tx)
 	case storage.LockTypeWrite:
-		err = t.lockWrite(ctx, path, tid)
+		err = t.lockWrite(ctx, path, tx)
 	case storage.LockTypeCreate:
-		err = t.lockCreate(ctx, path, tid)
+		err = t.lockCreate(ctx, path, tx)
 	default:
 		return fmt.Errorf("unsupported lock type %v", lt)
 	}
@@ -852,56 +854,56 @@ func (t Algo) lockPath(
 func (t Algo) lockRead(
 	ctx context.Context,
 	key string,
-	tid data.TxID,
+	tx *Handle,
 ) error {
-	t.log.Tracef("tx=%v, path=%s, event=LockRead BEGIN", tid, key)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockRead BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-create", func() {
-		err = t.locker.LockRead(ctx, key, tid)
+		err = t.locker.LockRead(ctx, key, tx.id)
 	})
-	t.log.Tracef("tx=%v, path=%s, event=LockRead END, err=%v", tid, key, err)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockRead END", pathAttr(key), errAttr(err))
 	return err
 }
 
 func (t Algo) lockWrite(
 	ctx context.Context,
 	key string,
-	tid data.TxID,
+	tx *Handle,
 ) error {
-	t.log.Tracef("tx=%v, path=%s, event=LockWrite BEGIN", tid, key)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockWrite BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-write", func() {
-		err = t.locker.LockWrite(ctx, key, tid)
+		err = t.locker.LockWrite(ctx, key, tx.id)
 	})
-	t.log.Tracef("tx=%v, path=%s, event=LockWrite END, err=%v", tid, key, err)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockWrite END", pathAttr(key), errAttr(err))
 	return err
 }
 
 func (t Algo) lockCreate(
 	ctx context.Context,
 	key string,
-	tid data.TxID,
+	tx *Handle,
 ) error {
-	t.log.Tracef("tx=%v, path=%s, event=LockCreate BEGIN", tid, key)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-create", func() {
-		err = t.locker.LockCreate(ctx, key, tid)
+		err = t.locker.LockCreate(ctx, key, tx.id)
 	})
-	t.log.Tracef("tx=%v, path=%s, event=LockCreate END, err=%v", tid, key, err)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate END", pathAttr(key), errAttr(err))
 	return err
 }
 
 func (t Algo) unlock(
 	ctx context.Context,
 	key string,
-	tid data.TxID,
+	tx *Handle,
 ) error {
-	t.log.Tracef("tx=%v, path=%s, event=Unlock BEGIN", tid, key)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Unlock BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-create", func() {
-		err = t.locker.Unlock(ctx, key, tid)
+		err = t.locker.Unlock(ctx, key, tx.id)
 	})
-	t.log.Tracef("tx=%v, path=%s, event=Unlock END, err=%v", tid, key, err)
+	tx.log.LogAttrs(ctx, slog.LevelDebug, "Unlock END", pathAttr(key), errAttr(err))
 	return err
 }
 
@@ -937,12 +939,11 @@ func (t Algo) updateLocal(w WriteAccess, tid data.TxID) {
 	}
 }
 
-func (t Algo) unlockAll(ctx context.Context, h *Handle) error {
-	ps := t.locker.LockedPaths(h.id)
+func (t Algo) unlockAll(ctx context.Context, tx *Handle) error {
+	ps := t.locker.LockedPaths(tx.id)
 	if len(ps) == 0 {
 		return nil
 	}
-	tid := h.id
 	// Collect the errors here so that we don't stop the fanout even if some
 	// unlocks fail.
 	errs := make([]error, len(ps))
@@ -950,26 +951,25 @@ func (t Algo) unlockAll(ctx context.Context, h *Handle) error {
 	// Unlock everything synchronously, but in parallel.
 	_ = t.fanout(ctx, len(ps), func(ctx context.Context, i int) error {
 		pl := ps[i]
-		if err := t.unlock(ctx, pl.Path, tid); err != nil {
+		if err := t.unlock(ctx, pl.Path, tx); err != nil {
 			errs[i] = fmt.Errorf("unlocking %q: %w", pl, err)
 		}
 		return nil
 	})
 
 	if err := errors.Combine(errs...); err != nil {
-		return fmt.Errorf("unlocking all for tx %q: %v", tid, err)
+		return fmt.Errorf("unlocking all for tx %q: %v", tx.id, err)
 	}
 	return nil
 }
 
-func (t Algo) asyncCleanup(ctx context.Context, h *Handle) {
+func (t Algo) asyncCleanup(ctx context.Context, tx *Handle) {
 	if t.background == nil {
 		// Background tasks are disabled.
 		return
 	}
 
-	ps := t.locker.LockedPaths(h.id)
-	tid := h.id
+	ps := t.locker.LockedPaths(tx.id)
 
 	if len(ps) == 0 {
 		return
@@ -989,7 +989,7 @@ func (t Algo) asyncCleanup(ctx context.Context, h *Handle) {
 
 		w := f.Spawn(ctx, len(ps), func(ctx context.Context, i int) error {
 			pl := ps[i]
-			if err := t.unlock(ctx, pl.Path, tid); err != nil {
+			if err := t.unlock(ctx, pl.Path, tx); err != nil {
 				errs[i] = fmt.Errorf("unlocking %q: %w", pl, err)
 			}
 			return nil
@@ -999,7 +999,7 @@ func (t Algo) asyncCleanup(ctx context.Context, h *Handle) {
 			// Something went wrong during some unlocking. Skip the next phase.
 			// Avoid logging if we are shutting down.
 			if ctx.Err() == nil {
-				t.log.Logf("tx=%v, event=AsyncCleanup, err=%v", tid, err)
+				tx.log.LogAttrs(ctx, slog.LevelError, "AsyncCleanup END", errAttr(err))
 			}
 			return
 		}
@@ -1027,18 +1027,6 @@ func (t Algo) isKeyCollectionLocked(key string, expected storage.LockType, h *Ha
 	cpath := paths.CollectionInfo(pr.Prefix)
 	got := t.locker.LockType(cpath, h.id)
 	return got == expected
-}
-
-func (t Algo) traceVstate(vstate validationState, h *Handle) {
-	for _, p := range vstate.Paths {
-		t.log.Tracef("tx=%v, path=%s, event=NewVstate, extra=readv:%+v;atype:%s",
-			h.id, p.Path, p.ReadVersion, p.AccessType())
-	}
-}
-
-type Logger interface {
-	Logf(format string, v ...any)
-	Tracef(format string, v ...any)
 }
 
 type Data struct {
@@ -1080,6 +1068,7 @@ type Handle struct {
 	id            data.TxID
 	requireLocks  bool
 	serialLocking bool
+	log           *slog.Logger
 }
 
 type validationState struct {
@@ -1280,4 +1269,27 @@ func collectionsLocks(vstate *validationState) ([]storage.PathLock, error) {
 		})
 	}
 	return res, nil
+}
+
+func errAttr(err error) slog.Attr {
+	if err == nil {
+		return slog.Attr{}
+	}
+	return slog.Attr{
+		Key:   "err",
+		Value: slog.StringValue(err.Error()),
+	}
+}
+
+func pathAttr(p string) slog.Attr {
+	return slog.Attr{
+		Key:   "path",
+		Value: slog.StringValue(p),
+	}
+}
+
+type txLog data.TxID
+
+func (t txLog) LogValue() slog.Value {
+	return slog.StringValue(data.TxID(t).String())
 }
