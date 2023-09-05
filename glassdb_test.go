@@ -136,8 +136,7 @@ func TestDelete(t *testing.T) {
 	stats := db.Stats()
 	assert.Equal(t, 3, stats.TxN)
 	assert.Equal(t, 2, stats.TxWrites)
-	// TODO: Get rid of this retry by caching deletes locally.
-	assert.LessOrEqual(t, stats.TxRetries, 2)
+	assert.LessOrEqual(t, stats.TxRetries, 1)
 }
 
 func TestReadFromAnother(t *testing.T) {
