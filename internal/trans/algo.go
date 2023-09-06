@@ -952,7 +952,7 @@ func (t Algo) unlockAll(ctx context.Context, tx *Handle) error {
 	_ = t.fanout(ctx, len(ps), func(ctx context.Context, i int) error {
 		pl := ps[i]
 		if err := t.unlock(ctx, pl.Path, tx); err != nil {
-			errs[i] = fmt.Errorf("unlocking %q: %w", pl, err)
+			errs[i] = fmt.Errorf("unlocking %q: %w", pl.Path, err)
 		}
 		return nil
 	})
