@@ -41,24 +41,14 @@ const (
 
 var backendType = flag.String("backend", "memory", "select backend type [memory|gcs]")
 
-// TODO: Put this in common with all other duplicates.
-var gcsDelays = middleware.DelayOptions{
-	MetaRead:       22 * time.Millisecond,
-	MetaWrite:      31 * time.Millisecond,
-	ObjRead:        57 * time.Millisecond,
-	ObjWrite:       70 * time.Millisecond,
-	List:           10 * time.Millisecond,
-	SameObjWritePs: 1,
-	StdDevPerc:     0.15,
-}
-
 func initBackend() (backend.Backend, error) {
 	ctx := context.Background()
 
 	switch *backendType {
 	case "memory":
 		backend := memory.New()
-		return middleware.NewDelayBackend(backend, clockwork.NewRealClock(), gcsDelays), nil
+		clock := clockwork.NewRealClock()
+		return middleware.NewDelayBackend(backend, clock, middleware.GCSDelays), nil
 	case "gcs":
 		return initGCSBackend(ctx)
 	}
