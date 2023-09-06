@@ -48,16 +48,6 @@ const (
 	readWrite9010NumKeys      = 50000
 )
 
-var gcsDelays = middleware.DelayOptions{
-	MetaRead:       22 * time.Millisecond,
-	MetaWrite:      31 * time.Millisecond,
-	ObjRead:        57 * time.Millisecond,
-	ObjWrite:       70 * time.Millisecond,
-	List:           10 * time.Millisecond,
-	SameObjWritePs: 1,
-	StdDevPerc:     0.15,
-}
-
 var (
 	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs]")
 	enableThrottling = flag.Bool("enable-throttling", true, "enable throttling with memory backend")
@@ -72,11 +62,12 @@ func initBackend() (backend.Backend, error) {
 	switch *backendType {
 	case "memory":
 		backend := memory.New()
+		delays := middleware.GCSDelays
 		if !*enableThrottling {
 			// Effectively disable throttling.
-			gcsDelays.SameObjWritePs = 100000
+			delays.SameObjWritePs = 100000
 		}
-		return middleware.NewDelayBackend(backend, clockwork.NewRealClock(), gcsDelays), nil
+		return middleware.NewDelayBackend(backend, clockwork.NewRealClock(), delays), nil
 	case "gcs":
 		return initGCS(ctx)
 	}
