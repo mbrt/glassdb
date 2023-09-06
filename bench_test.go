@@ -38,8 +38,8 @@ func BenchmarkSingleRMW(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			db := initDB(b, tb.B, clock)
 
+			db := initDB(b, tb.B, clock)
 			collName := []byte("single-rmw")
 			key := []byte("key")
 
@@ -77,6 +77,7 @@ func Benchmark10RMW(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			db := initDB(b, tb.B, clock)
 			collName := []byte("rmw-mb")
 
@@ -131,6 +132,7 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			db1 := initDB(b, tb.B, clock)
 			db2 := initDB(b, tb.B, clock)
 
@@ -142,8 +144,8 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 			err := db1.Collection(collName).Create(ctx)
 			require.NoError(b, err)
 
-			updateF := func(db *glassdb.DB, c glassdb.Collection) {
-				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+			updateF := func(db *glassdb.DB, c glassdb.Collection) error {
+				return db.Tx(ctx, func(tx *glassdb.Tx) error {
 					num, err := readIntFromT(tx, c, key1)
 					if err != nil {
 						return err
@@ -157,20 +159,24 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 					}
 					return tx.Write(c, key2, writeInt(num+1))
 				})
-				require.NoError(b, err)
 			}
 
 			var wg conc.WaitGroup
 			wg.Go(func() {
 				for ctx.Err() == nil {
-					updateF(db1, db1.Collection(collName))
+					// We need to ignore context cancel errors, because we
+					// rely on that to stop the test.
+					if err := updateF(db1, db1.Collection(collName)); err != nil && ctx.Err() == nil {
+						b.Fatal(b, err)
+					}
 				}
 			})
 
 			istat := db2.Stats()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				updateF(db2, db2.Collection(collName))
+				err := updateF(db2, db2.Collection(collName))
+				require.NoError(b, err)
 			}
 			b.StopTimer()
 
@@ -192,6 +198,7 @@ func Benchmark10R(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			db := initDB(b, tb.B, clock)
 			collName := []byte("rmw-mb")
 
@@ -268,28 +275,32 @@ func BenchmarkSharedR(b *testing.B) {
 			})
 			require.NoError(b, err)
 
-			updateF := func(keyW []byte) {
-				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+			updateF := func(keyW []byte) error {
+				return db.Tx(ctx, func(tx *glassdb.Tx) error {
 					num, err := readIntFromT(tx, coll, keyR)
 					if err != nil {
 						return err
 					}
 					return tx.Write(coll, keyW, writeInt(num+1))
 				})
-				require.NoError(b, err)
 			}
 
 			var wg conc.WaitGroup
 			wg.Go(func() {
 				for ctx.Err() == nil {
-					updateF(keyW2)
+					// We need to ignore context cancel errors, because we
+					// rely on that to stop the test.
+					if err := updateF(keyW2); err != nil && ctx.Err() == nil {
+						b.Fatal(err)
+					}
 				}
 			})
 
 			istat := db.Stats()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				updateF(keyW1)
+				err := updateF(keyW1)
+				require.NoError(b, err)
 			}
 			b.StopTimer()
 
@@ -311,6 +322,7 @@ func Benchmark100W(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			db := initDB(b, tb.B, clock)
 			collName := []byte("mw")
 
