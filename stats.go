@@ -41,7 +41,7 @@ type Stats struct {
 // Sub calculates and returns the difference between two sets of transaction
 // stats. This is useful when obtaining stats at two different points and time
 // and you need the performance counters that occurred within that time span.
-func (s *Stats) Sub(other Stats) Stats {
+func (s Stats) Sub(other Stats) Stats {
 	return Stats{
 		TxN:       s.TxN - other.TxN,
 		TxTime:    s.TxTime - other.TxTime,

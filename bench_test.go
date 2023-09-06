@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/sourcegraph/conc"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
@@ -45,9 +46,7 @@ func BenchmarkSingleRMW(b *testing.B) {
 			// Initialize.
 			coll := db.Collection(collName)
 			err := coll.Create(ctx)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			istat := db.Stats()
 			b.ResetTimer()
@@ -59,13 +58,11 @@ func BenchmarkSingleRMW(b *testing.B) {
 					}
 					return tx.Write(coll, key, writeInt(num+1))
 				})
-				if err != nil {
-					b.Fatal(err)
-				}
+				require.NoError(b, err)
 			}
 			b.StopTimer()
 
-			benchStats(b, istat, db.Stats())
+			benchStats(b, db.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db.Stats())
 			}
@@ -84,11 +81,9 @@ func Benchmark10RMW(b *testing.B) {
 			collName := []byte("rmw-mb")
 
 			// Initialize.
-			err := db.Collection(collName).Create(ctx)
 			coll := db.Collection(collName)
-			if err != nil {
-				b.Fatal(err)
-			}
+			err := coll.Create(ctx)
+			require.NoError(b, err)
 
 			keys := make([]glassdb.FQKey, 10)
 			for i := 0; i < 10; i++ {
@@ -116,13 +111,11 @@ func Benchmark10RMW(b *testing.B) {
 					}
 					return nil
 				})
-				if err != nil {
-					b.Fatal(err)
-				}
+				require.NoError(b, err)
 			}
 			b.StopTimer()
 
-			benchStats(b, istat, db.Stats())
+			benchStats(b, db.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db.Stats())
 			}
@@ -147,9 +140,7 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 
 			// Initialize.
 			err := db1.Collection(collName).Create(ctx)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			updateF := func(db *glassdb.DB, c glassdb.Collection) {
 				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
@@ -166,9 +157,7 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 					}
 					return tx.Write(c, key2, writeInt(num+1))
 				})
-				if err != nil {
-					b.Fatal(err)
-				}
+				require.NoError(b, err)
 			}
 
 			var wg conc.WaitGroup
@@ -188,13 +177,12 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 			cancel()
 			wg.Wait()
 
-			benchStats(b, istat, db2.Stats())
+			benchStats(b, db2.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db2.Stats())
 			}
 		})
 	}
-
 }
 
 func Benchmark10R(b *testing.B) {
@@ -210,9 +198,7 @@ func Benchmark10R(b *testing.B) {
 			// Initialize.
 			err := db.Collection(collName).Create(ctx)
 			coll := db.Collection(collName)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			keys := make([]glassdb.FQKey, 10)
 			for i := 0; i < 10; i++ {
@@ -231,9 +217,7 @@ func Benchmark10R(b *testing.B) {
 				}
 				return nil
 			})
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			istat := db.Stats()
 			b.ResetTimer()
@@ -250,7 +234,7 @@ func Benchmark10R(b *testing.B) {
 			}
 			b.StopTimer()
 
-			benchStats(b, istat, db.Stats())
+			benchStats(b, db.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db.Stats())
 			}
@@ -265,6 +249,7 @@ func BenchmarkSharedR(b *testing.B) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			db := initDB(b, tb.B, clock)
 			keyR := []byte("key-r")
 			keyW1 := []byte("key-w1")
@@ -273,18 +258,15 @@ func BenchmarkSharedR(b *testing.B) {
 			// Initialize.
 			coll := db.Collection([]byte("shr-b"))
 			err := coll.Create(ctx)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
+
 			err = db.Tx(ctx, func(tx *glassdb.Tx) error {
 				_ = tx.Write(coll, keyR, writeInt(1))
 				_ = tx.Write(coll, keyW1, writeInt(0))
 				_ = tx.Write(coll, keyW2, writeInt(0))
 				return nil
 			})
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			updateF := func(keyW []byte) {
 				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
@@ -294,9 +276,7 @@ func BenchmarkSharedR(b *testing.B) {
 					}
 					return tx.Write(coll, keyW, writeInt(num+1))
 				})
-				if err != nil {
-					b.Fatal(err)
-				}
+				require.NoError(b, err)
 			}
 
 			var wg conc.WaitGroup
@@ -316,13 +296,12 @@ func BenchmarkSharedR(b *testing.B) {
 			cancel()
 			wg.Wait()
 
-			benchStats(b, istat, db.Stats())
+			benchStats(b, db.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db.Stats())
 			}
 		})
 	}
-
 }
 
 func Benchmark100W(b *testing.B) {
@@ -338,9 +317,7 @@ func Benchmark100W(b *testing.B) {
 			// Initialize.
 			err := db.Collection(collName).Create(ctx)
 			coll := db.Collection(collName)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			istat := db.Stats()
 			b.ResetTimer()
@@ -355,23 +332,19 @@ func Benchmark100W(b *testing.B) {
 					}
 					return nil
 				})
-				if err != nil {
-					b.Fatal(err)
-				}
+				require.NoError(b, err)
 			}
 			b.StopTimer()
 
-			benchStats(b, istat, db.Stats())
+			benchStats(b, db.Stats().Sub(istat))
 			if b.N > 1 && *printStats {
 				b.Logf("Stats: %+v", db.Stats())
 			}
 		})
 	}
-
 }
 
-func benchStats(b *testing.B, before, after glassdb.Stats) {
-	stats := after.Sub(before)
+func benchStats(b *testing.B, stats glassdb.Stats) {
 	b.ReportMetric(float64(stats.TxTime)/float64(b.N), "txns/op")
 	b.ReportMetric(float64(stats.TxRetries)/float64(b.N), "retries/op")
 	b.ReportMetric(float64(stats.ObjWriteN)/float64(b.N), "w/op")
