@@ -1,9 +1,10 @@
 # Glass DB
 
-Glass DB is a pure Go key/value store on top of object storage (e.g. Amazon S3
-or Google GCS) that is _stateless_ and supports _ACID transactions_. Clients
-import Glass DB as a library and don't need to deploy, nor depend on any
-additional services. Everything is built on top of object storage.
+Glass DB is a pure Go key/value store on top of object storage (e.g. Google
+Cloud Storage or Azure Blob Service) that is _stateless_ and supports _ACID
+transactions_. Clients import Glass DB as a library and don't need to deploy,
+nor depend on any additional services. Everything is built on top of object
+storage.
 
 The interface is inspired by [BoltDB](https://github.com/boltdb/bolt) and
 Apple's [FoundationDB](https://github.com/apple/foundationdb).
@@ -19,7 +20,10 @@ soon.
 
 Note also that currently we only support
 [Google GCS](https://cloud.google.com/storage/), but adding
-[Amazon S3](https://aws.amazon.com/s3/) should be very easy.
+[Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs/)
+should be very easy. Different is the story for
+[Amazon S3](https://aws.amazon.com/s3/) which lacks request preconditions on
+uploads.[^1]
 
 ## Usage example
 
@@ -29,9 +33,20 @@ key atomically. The function also returns the value read before the change.
 ```go
 import (
     "context"
+    "os"
 
+	  "cloud.google.com/go/storage"
     "github.com/mbrt/glassdb"
 )
+
+func openDB(ctx context.Context, bucket, name string) (*glassdb.DB, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	backend := gcs.New(client.Bucket(bucket))
+  return glassDB.Open(ctx, name, backend)
+}
 
 func example(db *glassdb.DB) (string, error) {
     ctx := context.Background()
@@ -255,3 +270,11 @@ See [`LICENSE`](LICENSE) for details.
 This project is not an official Google project. It is not supported by Google
 and Google specifically disclaims all warranties as to its quality,
 merchantability, or fitness for a particular purpose.
+
+## Footnotes
+
+[^1]: Even though S3
+  [is strongly consistent](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html#ConsistencyModel),
+  it doesn't support `If-` headers on
+  [PUT operations](https://s3.amazonaws.com/doc/s3-developer-guide/RESTObjectPUT.html)
+  like it does on [GET](https://s3.amazonaws.com/doc/s3-developer-guide/RESTObjectGET.html).
