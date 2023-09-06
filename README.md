@@ -37,6 +37,7 @@ import (
 
 	  "cloud.google.com/go/storage"
     "github.com/mbrt/glassdb"
+    "github.com/mbrt/glassdb/backend"
 )
 
 func openDB(ctx context.Context, bucket, name string) (*glassdb.DB, error) {
@@ -55,7 +56,9 @@ func example(db *glassdb.DB) (string, error) {
 
     err := db.Tx(ctx, func(tx *glassdb.Tx) error {
         b, err := tx.Read(coll, []byte("key"))
-        if err != nil {
+        // The first time around there's no key, so here we would get an error.
+        // In that case we continue below and just write the first 'Hello'.
+        if err != nil && !errors.Is(err, backend.ErrNotFound) {
             return err
         }
         res = string(b)
