@@ -35,6 +35,7 @@ import (
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/backend/gcs"
+	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/internal/stringset"
 	"github.com/mbrt/glassdb/internal/testkit"
@@ -64,6 +65,15 @@ func initGCSBackend(t testing.TB) backend.Backend {
 		t.Fatalf("creating 'test' bucket: %v", err)
 	}
 	backend := gcs.New(bucket)
+	if *debugBackend {
+		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
+	}
+	return backend
+}
+
+func initMemoryBackend(t testing.TB) backend.Backend {
+	t.Helper()
+	backend := memory.New()
 	if *debugBackend {
 		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
 	}

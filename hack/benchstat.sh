@@ -17,6 +17,7 @@
 # See https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
 
 set -e
+set -o pipefail
 
 PATTERN=${1:-.}
 

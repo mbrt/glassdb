@@ -30,6 +30,16 @@ import (
 
 var errBackoff = errors.New("rate limited")
 
+var GCSDelays = DelayOptions{
+	MetaRead:       22 * time.Millisecond,
+	MetaWrite:      31 * time.Millisecond,
+	ObjRead:        57 * time.Millisecond,
+	ObjWrite:       70 * time.Millisecond,
+	List:           10 * time.Millisecond,
+	SameObjWritePs: 1,
+	StdDevPerc:     0.15,
+}
+
 type DelayOptions struct {
 	MetaRead  time.Duration
 	MetaWrite time.Duration
