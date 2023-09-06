@@ -21,35 +21,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/sourcegraph/conc"
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
-	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/internal/testkit"
 )
 
 var printStats = flag.Bool("print-stats", false, "print DB stats after benchmarking")
-
-func allBackends(t testing.TB, clock clockwork.Clock) []testBackend {
-	t.Helper()
-	return []testBackend{
-		{
-			Name: "memory",
-			B:    initMemoryBackend(t),
-		},
-		{
-			Name: "gcs",
-			B:    middleware.NewDelayBackend(initMemoryBackend(t), clock, middleware.GCSDelays),
-		},
-	}
-}
-
-type testBackend struct {
-	Name string
-	B    backend.Backend
-}
 
 func BenchmarkSingleRMW(b *testing.B) {
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
