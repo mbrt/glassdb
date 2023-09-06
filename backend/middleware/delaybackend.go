@@ -31,28 +31,28 @@ import (
 var errBackoff = errors.New("rate limited")
 
 var GCSDelays = DelayOptions{
-	MetaRead:       22 * time.Millisecond,
-	MetaWrite:      31 * time.Millisecond,
-	ObjRead:        57 * time.Millisecond,
-	ObjWrite:       70 * time.Millisecond,
-	List:           10 * time.Millisecond,
+	MetaRead:       Latency{22 * time.Millisecond, 7 * time.Millisecond},
+	MetaWrite:      Latency{31 * time.Millisecond, 8 * time.Millisecond},
+	ObjRead:        Latency{57 * time.Millisecond, 7 * time.Millisecond},
+	ObjWrite:       Latency{70 * time.Millisecond, 15 * time.Millisecond},
+	List:           Latency{10 * time.Millisecond, 3 * time.Millisecond},
 	SameObjWritePs: 1,
-	StdDevPerc:     0.15,
 }
 
 type DelayOptions struct {
-	MetaRead  time.Duration
-	MetaWrite time.Duration
-	ObjRead   time.Duration
-	ObjWrite  time.Duration
-	List      time.Duration
+	MetaRead  Latency
+	MetaWrite Latency
+	ObjRead   Latency
+	ObjWrite  Latency
+	List      Latency
 	// How many writes per second to the same object before being
 	// rate limited?
 	SameObjWritePs int
-	// TODO: Use actual std deviation of type duration for each op.
-	// StdDevPerc is the ratio between standard deviation and mean
-	// for each measure: stddev(d) / mean(d).
-	StdDevPerc float64
+}
+
+type Latency struct {
+	Mean   time.Duration
+	StdDev time.Duration
 }
 
 func NewDelayBackend(
@@ -63,17 +63,17 @@ func NewDelayBackend(
 	return &DelayBackend{
 		inner:     inner,
 		clock:     clock,
-		metaRead:  lognormalDelay(opts.MetaRead, opts.StdDevPerc),
-		metaWrite: lognormalDelay(opts.MetaWrite, opts.StdDevPerc),
-		objRead:   lognormalDelay(opts.ObjRead, opts.StdDevPerc),
-		objWrite:  lognormalDelay(opts.ObjWrite, opts.StdDevPerc),
-		list:      lognormalDelay(opts.List, opts.StdDevPerc),
+		metaRead:  lognormalDelay(opts.MetaRead),
+		metaWrite: lognormalDelay(opts.MetaWrite),
+		objRead:   lognormalDelay(opts.ObjRead),
+		objWrite:  lognormalDelay(opts.ObjWrite),
+		list:      lognormalDelay(opts.List),
 		rlimit: rateLimiter{
 			tokensPerSec: opts.SameObjWritePs,
 			clock:        clock,
 			buckets:      map[string]bucketState{},
 		},
-		retryDelay: opts.ObjWrite * 2,
+		retryDelay: opts.ObjWrite.Mean * 2,
 	}
 }
 
@@ -231,9 +231,9 @@ func (b *DelayBackend) delay(ln lognormal) {
 	b.clock.Sleep(d)
 }
 
-func lognormalDelay(mean time.Duration, stdPerc float64) lognormal {
-	m64 := float64(mean) / float64(time.Millisecond)
-	s64 := m64 * stdPerc
+func lognormalDelay(l Latency) lognormal {
+	m64 := float64(l.Mean) / float64(time.Millisecond)
+	s64 := float64(l.StdDev) / float64(time.Millisecond)
 	return newLognormalWith(m64, s64)
 }
 
