@@ -351,7 +351,7 @@ func TestRMW(t *testing.T) {
 			// Only one read, because the rest were cached.
 			// It may be that we have a second read, because the first transaction
 			// unlock is done asynchronously w.r.t. the second transaction.
-			assert.LessOrEqual(t, stats.ObjReadN, 2)
+			assert.LessOrEqual(t, stats.ObjReads, 2)
 
 			// Read the final result.
 			val, err := db.Collection(coll).ReadStrong(ctx, key)
@@ -678,7 +678,7 @@ func TestListKeys(t *testing.T) {
 
 			// Check statistics.
 			stats := db.Stats()
-			assert.Equal(t, 101, stats.ObjListN)
+			assert.Equal(t, 101, stats.ObjLists)
 		})
 	}
 }
@@ -761,7 +761,7 @@ func TestListCollections(t *testing.T) {
 
 			// Check statistics.
 			stats := db.Stats()
-			assert.Equal(t, 101, stats.ObjListN)
+			assert.Equal(t, 101, stats.ObjLists)
 		})
 	}
 }
