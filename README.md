@@ -1,5 +1,9 @@
 # Glass DB
 
+[![GoDoc](https://pkg.go.dev/badge/github.com/mbrt/glassdb)](https://pkg.go.dev/github.com/mbrt/glassdb)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mbrt/glassdb)](https://goreportcard.com/report/github.com/mbrt/glassdb)
+![Build](https://github.com/mbrt/glassdb/workflows/Build/badge.svg)
+
 Glass DB is a pure Go key/value store on top of object storage (e.g. Google
 Cloud Storage or Azure Blob Service) that is _stateless_ and supports _ACID
 transactions_. Clients import Glass DB as a library and don't need to deploy,
