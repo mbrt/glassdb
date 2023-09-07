@@ -35,14 +35,14 @@ func TestGetSet(t *testing.T) {
 	got, ok := c.Get("a")
 	assert.True(t, ok)
 	assert.Equal(t, got, testEntry("foo"))
-	assert.Equal(t, int64(3), c.SizeB())
+	assert.Equal(t, 3, c.SizeB())
 
 	// Modify and get again.
 	c.Set("a", testEntry("barbaz"))
 	got, ok = c.Get("a")
 	assert.True(t, ok)
 	assert.Equal(t, got, testEntry("barbaz"))
-	assert.Equal(t, int64(6), c.SizeB())
+	assert.Equal(t, 6, c.SizeB())
 }
 
 func TestDelete(t *testing.T) {
@@ -57,7 +57,7 @@ func TestDelete(t *testing.T) {
 		_, ok := c.Get(key)
 		assert.True(t, ok)
 	}
-	assert.Equal(t, int64(4), c.SizeB())
+	assert.Equal(t, 4, c.SizeB())
 
 	// Delete one key.
 	c.Delete(keys[0])
@@ -66,13 +66,13 @@ func TestDelete(t *testing.T) {
 	assert.False(t, ok)
 	_, ok = c.Get(keys[1])
 	assert.True(t, ok)
-	assert.Equal(t, int64(2), c.SizeB())
+	assert.Equal(t, 2, c.SizeB())
 }
 
 func TestUpdate(t *testing.T) {
 	c := New(100)
 	c.Set("a", testEntry("foo"))
-	assert.Equal(t, int64(3), c.SizeB())
+	assert.Equal(t, 3, c.SizeB())
 
 	c.Update("a", func(old Value) Value {
 		return testEntry("barbaz")
@@ -80,7 +80,7 @@ func TestUpdate(t *testing.T) {
 	got, ok := c.Get("a")
 	assert.True(t, ok)
 	assert.Equal(t, got, testEntry("barbaz"))
-	assert.Equal(t, int64(6), c.SizeB())
+	assert.Equal(t, 6, c.SizeB())
 }
 
 func TestUpdateNew(t *testing.T) {
@@ -92,13 +92,13 @@ func TestUpdateNew(t *testing.T) {
 	got, ok := c.Get("a")
 	assert.True(t, ok)
 	assert.Equal(t, got, testEntry("bar"))
-	assert.Equal(t, int64(3), c.SizeB())
+	assert.Equal(t, 3, c.SizeB())
 }
 
 func TestUpdateDelete(t *testing.T) {
 	c := New(100)
 	c.Set("a", testEntry("foo"))
-	assert.Equal(t, int64(3), c.SizeB())
+	assert.Equal(t, 3, c.SizeB())
 
 	c.Update("a", func(old Value) Value {
 		return nil
