@@ -101,7 +101,7 @@ This project makes the following specific tradeoffs:
 * Values are in the range 1KB to 1MB.
 
 Glass DB makes sense in contexts where there are many writers that rarely write
-to the same keys or reads more frequently than writes.
+to the same keys or reads are more frequent than writes.
 
 ### Example 1: User settings
 
