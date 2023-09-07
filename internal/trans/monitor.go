@@ -31,8 +31,9 @@ import (
 
 const (
 	pendingTxTimeout  = 15 * time.Second
-	refreshMultiplier = 0.5
 	maxClockSkew      = 30 * time.Second
+	refreshMultiplier = 0.5
+	refreshChanCap    = 10 // TODO: Compute a better default capacity.
 )
 
 var ErrAlreadyFinalized = errors.New("transaction was already finalized")
@@ -97,7 +98,7 @@ func (m *Monitor) RefreshTx(ctx context.Context, tid data.TxID) {
 	}
 	m.m.Unlock()
 
-	if needStart {
+	if needStart && !m.background.Closed() {
 		m.refreshCh <- txDeadline{
 			ID:         tid,
 			Deadline:   newTxDeadline(m.clock.Now()),
@@ -467,8 +468,7 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 }
 
 func (m *Monitor) spawnPendingRefresher() {
-	// TODO: Compute a better default capacity.
-	out, in := concurr.MakeChanInfCap[txDeadline](10)
+	out, in := concurr.MakeChanInfCap[txDeadline](refreshChanCap)
 	m.refreshCh = in
 
 	// Yes, background context is enough. We are not making any network calls with it.
