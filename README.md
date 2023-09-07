@@ -25,7 +25,7 @@ soon.
 Note also that currently we only support
 [Google GCS](https://cloud.google.com/storage/), but adding
 [Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs/)
-should be very easy. Different is the story for
+should be very easy. More work is required for
 [Amazon S3](https://aws.amazon.com/s3/) which lacks request preconditions on
 uploads.[^1]
 
