@@ -36,43 +36,47 @@ key atomically. The function also returns the value read before the change.
 
 ```go
 import (
-    "context"
-    "os"
+	"context"
+	"errors"
 
-	  "cloud.google.com/go/storage"
-    "github.com/mbrt/glassdb"
-    "github.com/mbrt/glassdb/backend"
+	"cloud.google.com/go/storage"
+	"github.com/mbrt/glassdb"
+	"github.com/mbrt/glassdb/backend"
+	"github.com/mbrt/glassdb/backend/gcs"
 )
 
-func openDB(ctx context.Context, bucket, name string) (*glassdb.DB, error) {
+func openDB(ctx context.Context, bucket, dbName string) (*glassdb.DB, error) {
+	// See https://pkg.go.dev/cloud.google.com/go/storage for how to initialize
+	// a Google Cloud Storage client.
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 	backend := gcs.New(client.Bucket(bucket))
-  return glassDB.Open(ctx, name, backend)
+	return glassdb.Open(ctx, dbName, backend)
 }
 
 func example(db *glassdb.DB) (string, error) {
-    ctx := context.Background()
-    coll := db.Collection([]byte("my-collection"))
-    var res string
+	ctx := context.Background()
+	coll := db.Collection([]byte("my-collection"))
+	key := []byte("key")
+	var res string
 
-    err := db.Tx(ctx, func(tx *glassdb.Tx) error {
-        b, err := tx.Read(coll, []byte("key"))
-        // The first time around there's no key, so here we would get an error.
-        // In that case we continue below and just write the first 'Hello'.
-        if err != nil && !errors.Is(err, backend.ErrNotFound) {
-            return err
-        }
-        res = string(b)
-        if string(b) == "Hello" {
-            return tx.Write(coll, []byte("world!"))
-        }
-        return tx.Write(coll, []byte("Hello"))
-    })
+	err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+		b, err := tx.Read(coll, key)
+		// The first time around there's no key, so here we would get an error.
+		// In that case we continue below and just write the first 'Hello'.
+		if err != nil && !errors.Is(err, backend.ErrNotFound) {
+			return err
+		}
+		res = string(b)
+		if string(b) == "Hello" {
+			return tx.Write(coll, key, []byte("world!"))
+		}
+		return tx.Write(coll, key, []byte("Hello"))
+	})
 
-    return res, err
+	return res, err
 }
 ```
 
