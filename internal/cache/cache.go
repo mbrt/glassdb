@@ -19,7 +19,7 @@ import (
 	"sync"
 )
 
-func New(maxSizeB int64) *Cache {
+func New(maxSizeB int) *Cache {
 	return &Cache{
 		maxSizeB: maxSizeB,
 		entries:  make(map[string]*list.Element),
@@ -28,13 +28,13 @@ func New(maxSizeB int64) *Cache {
 }
 
 type Value interface {
-	SizeB() int64
+	SizeB() int
 }
 
 type Cache struct {
 	m         sync.Mutex
-	maxSizeB  int64
-	currSizeB int64
+	maxSizeB  int
+	currSizeB int
 	entries   map[string]*list.Element
 	evicts    *list.List
 }
@@ -96,7 +96,7 @@ func (c *Cache) Delete(key string) {
 	}
 }
 
-func (c *Cache) SizeB() int64 {
+func (c *Cache) SizeB() int {
 	c.m.Lock()
 	defer c.m.Unlock()
 	return c.currSizeB

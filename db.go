@@ -33,25 +33,28 @@ import (
 	"github.com/mbrt/glassdb/internal/trans"
 )
 
-const cacheSize = 512 * 1024 * 1024 // 512 MiB
-
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 
 // DefaultOptions provides the options used by `Open`. They should be a good
 // middle ground for a production deployment.
 func DefaultOptions() Options {
 	return Options{
-		Clock:  clockwork.NewRealClock(),
-		Logger: slog.Default(),
+		Clock:     clockwork.NewRealClock(),
+		Logger:    slog.Default(),
+		CacheSize: 5012 * 1024 * 1024, // 512 MiB
 	}
 }
 
 // Options makes it possible to tweak a client DB.
 //
-// TODO: Add cache size and retry timing options.
+// TODO: Add retry timing options.
 type Options struct {
 	Clock  clockwork.Clock
 	Logger *slog.Logger
+	// Cache size is the number of bytes dedicated to caching objects and
+	// and metadata. Setting this too small may impact performance, as
+	// more calls to the backend would be necessary.
+	CacheSize int
 }
 
 func Open(ctx context.Context, name string, b backend.Backend) (*DB, error) {
@@ -66,7 +69,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 		return nil, err
 	}
 
-	cache := cache.New(cacheSize)
+	cache := cache.New(opts.CacheSize)
 	bg := concurr.NewBackground()
 
 	backend := &statsBackend{inner: b}
@@ -135,6 +138,11 @@ func (d *DB) Tx(ctx context.Context, f func(tx *Tx) error) error {
 	return err
 }
 
+// Stats retrieves ongoing performance stats for the database. This is only
+// updated when a transaction closes.
+//
+// Counters only increase over time and are never reset. If you need to measure
+// a specific interval only, please see Stats.Sub.
 func (d *DB) Stats() Stats {
 	d.statsM.Lock()
 	defer d.statsM.Unlock()
