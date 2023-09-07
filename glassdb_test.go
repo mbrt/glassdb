@@ -678,7 +678,7 @@ func TestListKeys(t *testing.T) {
 
 			// Check statistics.
 			stats := db.Stats()
-			assert.Equal(t, 101, stats.ObjLists)
+			assert.Equal(t, 1, stats.ObjLists)
 		})
 	}
 }
@@ -761,7 +761,7 @@ func TestListCollections(t *testing.T) {
 
 			// Check statistics.
 			stats := db.Stats()
-			assert.Equal(t, 101, stats.ObjLists)
+			assert.Equal(t, 1, stats.ObjLists)
 		})
 	}
 }
