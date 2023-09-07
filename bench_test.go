@@ -359,8 +359,8 @@ func Benchmark100W(b *testing.B) {
 func benchStats(b *testing.B, stats glassdb.Stats) {
 	b.ReportMetric(float64(stats.TxTime)/float64(b.N), "txns/op")
 	b.ReportMetric(float64(stats.TxRetries)/float64(b.N), "retries/op")
-	b.ReportMetric(float64(stats.ObjWriteN)/float64(b.N), "w/op")
-	b.ReportMetric(float64(stats.ObjReadN)/float64(b.N), "r/op")
-	b.ReportMetric(float64(stats.MetaWriteN)/float64(b.N), "metaw/op")
-	b.ReportMetric(float64(stats.MetaReadN)/float64(b.N), "metar/op")
+	b.ReportMetric(float64(stats.ObjWrites)/float64(b.N), "w/op")
+	b.ReportMetric(float64(stats.ObjReads)/float64(b.N), "r/op")
+	b.ReportMetric(float64(stats.MetaWrites)/float64(b.N), "metaw/op")
+	b.ReportMetric(float64(stats.MetaReads)/float64(b.N), "metar/op")
 }

@@ -412,10 +412,10 @@ func dumpStats(out io.Writer, results []dbResults, numdb int) error {
 		_, err := fmt.Fprintf(out, "%d,%d,%d,%d,%d,%d,%d,%d\n",
 			numdb, i,
 			res.Stats.TxN, res.Stats.TxRetries,
-			res.Stats.ObjWriteN,
-			res.Stats.ObjReadN,
-			res.Stats.MetaWriteN,
-			res.Stats.MetaReadN,
+			res.Stats.ObjWrites,
+			res.Stats.ObjReads,
+			res.Stats.MetaWrites,
+			res.Stats.MetaReads,
 		)
 		if err != nil {
 			return err
