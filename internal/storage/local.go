@@ -191,14 +191,14 @@ type cacheEntry struct {
 	M *cacheMeta
 }
 
-func (c cacheEntry) SizeB() int64 {
-	var res int64
+func (c cacheEntry) SizeB() int {
+	var res int
 	if c.V != nil {
-		res += int64(len(c.V.Value) + len(c.V.Version.Writer))
+		res += len(c.V.Value) + len(c.V.Version.Writer)
 	}
 	if c.M != nil {
 		// Estimate 16 bytes per tag.
-		res += int64(len(c.M.Meta.Tags)) * 16
+		res += len(c.M.Meta.Tags) * 16
 	}
 	return res
 }

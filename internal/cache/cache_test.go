@@ -22,8 +22,8 @@ import (
 
 type testEntry string
 
-func (e testEntry) SizeB() int64 {
-	return int64(len(e))
+func (e testEntry) SizeB() int {
+	return len(e)
 }
 
 func TestGetSet(t *testing.T) {
