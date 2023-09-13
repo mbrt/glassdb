@@ -108,11 +108,11 @@ func (t atimer) Reset(d time.Duration) bool {
 
 func NewSimulatedClock() *SimulatedClock {
 	// Just to avoid having a random epoch nor unix zero.
-	simNow, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z00:00")
+	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z00:00")
 
 	c := &SimulatedClock{
 		waitSlot: time.Millisecond,
-		now:      simNow,
+		epoch:    epoch,
 		stop:     make(chan token),
 	}
 	go c.runLoop()
@@ -123,11 +123,13 @@ func NewSimulatedClock() *SimulatedClock {
 type SimulatedClock struct {
 	// We will wait for this duration for new waiters. If none arrive int this
 	// interval, we will advance 'now' until the earliest sleeper.
-	waitSlot time.Duration
-	now      time.Time
-	q        timePQ
-	stop     chan token
-	m        sync.Mutex
+	waitSlot   time.Duration
+	resolution time.Duration
+	epoch      time.Time
+	nowTicks   int64
+	q          timePQ
+	stop       chan token
+	m          sync.Mutex
 }
 
 func (c *SimulatedClock) Close() {
@@ -137,30 +139,41 @@ func (c *SimulatedClock) Close() {
 	defer c.m.Unlock()
 
 	// Unblock all waiters.
+	now := c.Now()
 	for _, item := range c.q {
-		item.waiter <- c.now
+		item.waiter <- now
 	}
 }
 
 func (c *SimulatedClock) After(d time.Duration) <-chan time.Time {
-	now := c.Now()
-	return c.waitUntil(now.Add(d))
+	// Never wait less than 1 tick.
+	dTicks := max(durationTicks(d, c.resolution), 1)
+
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	ch := make(chan time.Time, 1)
+	item := waitItem{
+		t:      c.nowTicks + dTicks,
+		waiter: ch,
+	}
+	heap.Push(&c.q, item)
+	return ch
 }
 
 func (c *SimulatedClock) Sleep(d time.Duration) {
-	now := c.Now()
-	<-c.waitUntil(now.Add(d))
+	<-c.After(d)
 }
 
 func (c *SimulatedClock) Now() time.Time {
 	c.m.Lock()
-	defer c.m.Unlock()
-	return c.now
+	ticks := c.nowTicks
+	c.m.Unlock()
+	return c.ticksToTime(ticks)
 }
 
 func (c *SimulatedClock) Since(t time.Time) time.Duration {
-	now := c.Now()
-	return now.Sub(t)
+	return c.Now().Sub(t)
 }
 
 func (c *SimulatedClock) NewTicker(d time.Duration) clockwork.Ticker {
@@ -171,42 +184,34 @@ func (c *SimulatedClock) NewTimer(d time.Duration) clockwork.Timer {
 	return newSimulatedTimer(c, d)
 }
 
-func (c *SimulatedClock) waitUntil(t time.Time) <-chan time.Time {
-	ch := make(chan time.Time, 1)
-	item := waitItem{
-		t:      t,
-		waiter: ch,
-	}
-	heap.Push(&c.q, item)
-	return ch
+func (c *SimulatedClock) ticksToTime(ticks int64) time.Time {
+	return c.epoch.Add(c.resolution * time.Duration(ticks))
 }
 
 func (c *SimulatedClock) runLoop() {
 	for {
-		if !c.waitForWaiters() {
+		if !c.waitForNext() {
 			return
 		}
 
 		// Advance the clock until the earliest sleeper and notify it.
 		c.m.Lock()
-		top := heap.Pop(&c.q).(waitItem)
-		invalidTime := false
-		if top.t.Before(c.now) {
-			invalidTime = true
+
+		for len(c.q) > 0 {
+			top := heap.Pop(&c.q).(waitItem)
+			if top.t > c.nowTicks {
+				break
+			}
+			top.waiter <- c.ticksToTime(c.nowTicks)
 		}
-		c.now = top.t
 		c.m.Unlock()
-
-		top.waiter <- top.t
-
-		if invalidTime {
-			panic("Simulated clock decremented")
-		}
 	}
 }
 
-func (c *SimulatedClock) waitForWaiters() bool {
+func (c *SimulatedClock) waitForNext() bool {
 	for {
+		time.Sleep(c.waitSlot)
+
 		select {
 		case <-c.stop:
 			return false
@@ -214,23 +219,23 @@ func (c *SimulatedClock) waitForWaiters() bool {
 		}
 
 		c.m.Lock()
-		waitSize1 := c.q.Len()
-		c.m.Unlock()
-
-		time.Sleep(c.waitSlot)
-
-		c.m.Lock()
-		waitSize2 := c.q.Len()
-		c.m.Unlock()
-
-		if waitSize1 == waitSize2 && waitSize2 > 0 {
-			return true
+		if len(c.q) == 0 {
+			c.m.Unlock()
+			continue
 		}
+
+		// Advance the clock to the top element.
+		top := c.q[0]
+		if top.t < c.nowTicks {
+			panic("Clock moved too fast")
+		}
+		c.nowTicks = top.t
+		c.m.Unlock()
 	}
 }
 
 type waitItem struct {
-	t      time.Time
+	t      int64
 	waiter chan<- time.Time
 }
 
@@ -241,7 +246,7 @@ type timePQ []waitItem
 func (q timePQ) Len() int { return len(q) }
 
 func (q timePQ) Less(i, j int) bool {
-	return q[i].t.Before(q[j].t)
+	return q[i].t < q[j].t
 }
 
 func (q timePQ) Swap(i, j int) {
@@ -272,8 +277,8 @@ func newSimulatedTicker(c *SimulatedClock, d time.Duration) *simulatedTicker {
 
 	go func() {
 		for {
-			next, ok := st.nextTick()
-			if !ok {
+			next := st.nextTick()
+			if next == 0 {
 				return
 			}
 
@@ -282,7 +287,7 @@ func newSimulatedTicker(c *SimulatedClock, d time.Duration) *simulatedTicker {
 				return
 			case <-st.changeCh:
 				continue
-			case now := <-c.waitUntil(next):
+			case now := <-c.After(d):
 				st.c <- now
 			}
 		}
@@ -314,14 +319,11 @@ func (t *simulatedTicker) Stop() {
 	t.Reset(0)
 }
 
-func (t *simulatedTicker) nextTick() (time.Time, bool) {
+func (t *simulatedTicker) nextTick() time.Duration {
 	t.m.Lock()
-	defer t.m.Unlock()
-
-	if t.interval == 0 {
-		return time.Time{}, false
-	}
-	return t.clock.Now().Add(t.interval), true
+	res := t.interval
+	t.m.Unlock()
+	return res
 }
 
 func newSimulatedTimer(c *SimulatedClock, d time.Duration) *simulatedTimer {
@@ -362,9 +364,17 @@ func (t *simulatedTimer) run(d time.Duration) {
 		select {
 		case <-t.clock.stop:
 		case <-t.stop:
-		case now := <-t.clock.waitUntil(t.clock.Now().Add(d)):
+		case now := <-t.clock.After(d):
 			t.fired.Store(true)
 			t.ch <- now
 		}
 	}()
+}
+
+func durationTicks(d, res time.Duration) int64 {
+	// If duration is not exact multiple of resolution, round it up.
+	if d%res == 0 {
+		return int64(d / res)
+	}
+	return int64(d/res + 1)
 }
