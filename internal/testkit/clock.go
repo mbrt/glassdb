@@ -106,14 +106,15 @@ func (t atimer) Reset(d time.Duration) bool {
 	return t.Timer.Reset(d / time.Duration(t.multiplier))
 }
 
-func NewSimulatedClock() *SimulatedClock {
+func NewSimulatedClock(resolution, rtResolution time.Duration) *SimulatedClock {
 	// Just to avoid having a random epoch nor unix zero.
 	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z00:00")
 
 	c := &SimulatedClock{
-		waitSlot: time.Millisecond,
-		epoch:    epoch,
-		stop:     make(chan token),
+		rtResolution: rtResolution,
+		resolution:   resolution,
+		epoch:        epoch,
+		stop:         make(chan token),
 	}
 	go c.runLoop()
 
@@ -123,13 +124,13 @@ func NewSimulatedClock() *SimulatedClock {
 type SimulatedClock struct {
 	// We will wait for this duration for new waiters. If none arrive int this
 	// interval, we will advance 'now' until the earliest sleeper.
-	waitSlot   time.Duration
-	resolution time.Duration
-	epoch      time.Time
-	nowTicks   int64
-	q          timePQ
-	stop       chan token
-	m          sync.Mutex
+	rtResolution time.Duration
+	resolution   time.Duration
+	epoch        time.Time
+	nowTicks     int64
+	q            timePQ
+	stop         chan token
+	m            sync.Mutex
 }
 
 func (c *SimulatedClock) Close() {
@@ -139,9 +140,9 @@ func (c *SimulatedClock) Close() {
 	defer c.m.Unlock()
 
 	// Unblock all waiters.
-	now := c.Now()
+	now := c.nowTicks
 	for _, item := range c.q {
-		item.waiter <- now
+		item.waiter <- c.ticksToTime(now)
 	}
 }
 
@@ -198,10 +199,11 @@ func (c *SimulatedClock) runLoop() {
 		c.m.Lock()
 
 		for len(c.q) > 0 {
-			top := heap.Pop(&c.q).(waitItem)
+			top := c.q[0]
 			if top.t > c.nowTicks {
 				break
 			}
+			heap.Pop(&c.q)
 			top.waiter <- c.ticksToTime(c.nowTicks)
 		}
 		c.m.Unlock()
@@ -210,7 +212,7 @@ func (c *SimulatedClock) runLoop() {
 
 func (c *SimulatedClock) waitForNext() bool {
 	for {
-		time.Sleep(c.waitSlot)
+		time.Sleep(c.rtResolution)
 
 		select {
 		case <-c.stop:
@@ -231,6 +233,8 @@ func (c *SimulatedClock) waitForNext() bool {
 		}
 		c.nowTicks = top.t
 		c.m.Unlock()
+
+		return true
 	}
 }
 

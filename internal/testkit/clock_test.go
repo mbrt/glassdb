@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sourcegraph/conc"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,4 +55,35 @@ func assertAround(t *testing.T, expected, got time.Duration) {
 	t.Helper()
 	assert.Less(t, got, expected*4)
 	assert.Greater(t, got, expected/4)
+}
+
+func TestSimulatedSleep(t *testing.T) {
+	c := NewSimulatedClock(10*time.Millisecond, 250*time.Microsecond)
+	defer c.Close()
+
+	start := c.Now()
+	c.Sleep(10 * time.Millisecond)
+	assert.Equal(t, c.Since(start), 10*time.Millisecond)
+
+	// Always sleep to the next round tick.
+	start = c.Now()
+	c.Sleep(12 * time.Millisecond)
+	assert.Equal(t, 20*time.Millisecond, c.Since(start))
+
+	start = c.Now()
+
+	// Make sure the execution is
+	nowCh := make(chan time.Time, 2)
+
+	var wg conc.WaitGroup
+	wg.Go(func() {
+		c.Sleep(100 * time.Millisecond)
+		nowCh <- c.Now()
+	})
+	c.Sleep(time.Minute)
+	nowCh <- c.Now()
+
+	wg.Wait()
+	assert.Equal(t, 100*time.Millisecond, (<-nowCh).Sub(start))
+	assert.Equal(t, time.Minute, (<-nowCh).Sub(start))
 }
