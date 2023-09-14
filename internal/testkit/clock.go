@@ -25,6 +25,12 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+var timeChPool = sync.Pool{
+	New: func() any {
+		return make(chan time.Time, 1)
+	},
+}
+
 func NewSelfAdvanceClock(t *testing.T) clockwork.Clock {
 	c := clockwork.NewFakeClock()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,7 +114,7 @@ func (t atimer) Reset(d time.Duration) bool {
 
 func NewSimulatedClock(resolution, rtResolution time.Duration) *SimulatedClock {
 	// Just to avoid having a random epoch nor unix zero.
-	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z00:00")
+	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z")
 
 	c := &SimulatedClock{
 		rtResolution: rtResolution,
@@ -147,23 +153,18 @@ func (c *SimulatedClock) Close() {
 }
 
 func (c *SimulatedClock) After(d time.Duration) <-chan time.Time {
-	// Never wait less than 1 tick.
-	dTicks := max(durationTicks(d, c.resolution), 1)
-
-	c.m.Lock()
-	defer c.m.Unlock()
-
 	ch := make(chan time.Time, 1)
-	item := waitItem{
-		t:      c.nowTicks + dTicks,
-		waiter: ch,
-	}
-	heap.Push(&c.q, item)
+	c.afterChan(d, ch)
 	return ch
 }
 
 func (c *SimulatedClock) Sleep(d time.Duration) {
-	<-c.After(d)
+	// The channel never leaves this function. Save some GC rounds by reusing
+	// them in a pool.
+	ch := timeChPool.Get().(chan time.Time)
+	defer timeChPool.Put(ch)
+	c.afterChan(d, ch)
+	<-ch
 }
 
 func (c *SimulatedClock) Now() time.Time {
@@ -187,6 +188,20 @@ func (c *SimulatedClock) NewTimer(d time.Duration) clockwork.Timer {
 
 func (c *SimulatedClock) ticksToTime(ticks int64) time.Time {
 	return c.epoch.Add(c.resolution * time.Duration(ticks))
+}
+
+func (c *SimulatedClock) afterChan(d time.Duration, ch chan time.Time) {
+	// Never wait less than 1 tick.
+	dTicks := max(durationTicks(d, c.resolution), 1)
+
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	item := waitItem{
+		t:      c.nowTicks + dTicks,
+		waiter: ch,
+	}
+	heap.Push(&c.q, item)
 }
 
 func (c *SimulatedClock) runLoop() {
@@ -276,7 +291,7 @@ func newSimulatedTicker(c *SimulatedClock, d time.Duration) *simulatedTicker {
 		clock:    c,
 		interval: d,
 		c:        make(chan time.Time, 1),
-		changeCh: make(chan token),
+		changeCh: make(chan token, 1),
 	}
 
 	go func() {
@@ -315,8 +330,8 @@ func (t *simulatedTicker) Chan() <-chan time.Time {
 func (t *simulatedTicker) Reset(d time.Duration) {
 	t.m.Lock()
 	t.interval = d
-	t.changeCh <- token{}
 	t.m.Unlock()
+	t.changeCh <- token{}
 }
 
 func (t *simulatedTicker) Stop() {
@@ -342,7 +357,6 @@ func newSimulatedTimer(c *SimulatedClock, d time.Duration) *simulatedTimer {
 type simulatedTimer struct {
 	clock *SimulatedClock
 	ch    chan time.Time
-	stop  chan token
 	fired atomic.Bool
 }
 
@@ -350,27 +364,29 @@ func (t *simulatedTimer) Chan() <-chan time.Time {
 	return t.ch
 }
 
+// Reset changes the timer to expire after duration d. It returns true if the
+// timer had been active, false if the timer had expired or been stopped.
 func (t *simulatedTimer) Reset(d time.Duration) bool {
 	wasRunning := t.fired.Swap(false)
 	t.run(d)
-	return !wasRunning
+	return wasRunning
 }
 
+// Stop prevents the Timer from firing. It returns true if the call stops the
+// timer, false if the timer has already expired or been stopped. Stop does not
+// close the channel, to prevent a read from the channel succeeding incorrectly.
 func (t *simulatedTimer) Stop() bool {
-	close(t.stop)
-	return t.fired.Load()
+	return !t.fired.Swap(true)
 }
 
 func (t *simulatedTimer) run(d time.Duration) {
-	t.stop = make(chan token)
-
 	go func() {
 		select {
 		case <-t.clock.stop:
-		case <-t.stop:
 		case now := <-t.clock.After(d):
-			t.fired.Store(true)
-			t.ch <- now
+			if !t.fired.Swap(true) {
+				t.ch <- now
+			}
 		}
 	}()
 }

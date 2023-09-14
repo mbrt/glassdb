@@ -57,9 +57,14 @@ func assertAround(t *testing.T, expected, got time.Duration) {
 	assert.Greater(t, got, expected/4)
 }
 
-func TestSimulatedSleep(t *testing.T) {
+func newTestSimClock(t *testing.T) *SimulatedClock {
 	c := NewSimulatedClock(10*time.Millisecond, 250*time.Microsecond)
-	defer c.Close()
+	t.Cleanup(c.Close)
+	return c
+}
+
+func TestSimulatedSleep(t *testing.T) {
+	c := newTestSimClock(t)
 
 	start := c.Now()
 	c.Sleep(10 * time.Millisecond)
@@ -72,7 +77,7 @@ func TestSimulatedSleep(t *testing.T) {
 
 	start = c.Now()
 
-	// Make sure the execution is
+	// Make sure the execution is ordered correctly.
 	nowCh := make(chan time.Time, 2)
 
 	var wg conc.WaitGroup
@@ -86,4 +91,67 @@ func TestSimulatedSleep(t *testing.T) {
 	wg.Wait()
 	assert.Equal(t, 100*time.Millisecond, (<-nowCh).Sub(start))
 	assert.Equal(t, time.Minute, (<-nowCh).Sub(start))
+}
+
+func TestSimulatedTicker(t *testing.T) {
+	c := newTestSimClock(t)
+	start := c.Now()
+
+	ticker := c.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	stopCh := c.After(10*time.Second + 50*time.Millisecond)
+	timeoutCh := c.After(12 * time.Second)
+	var results []time.Time
+
+loop:
+	for {
+		select {
+		case <-stopCh:
+			ticker.Stop()
+		case <-timeoutCh:
+			break loop
+		case now := <-ticker.Chan():
+			results = append(results, now)
+		}
+	}
+
+	assert.Len(t, results, 10)
+	for i := 0; i < len(results); i++ {
+		assert.Equal(t, time.Duration(i+1)*time.Second, results[i].Sub(start))
+	}
+}
+
+func assertEmptyCh(t *testing.T, ch <-chan time.Time) {
+	select {
+	case <-ch:
+		t.Error("expected timer to fire after 1s")
+	default:
+	}
+}
+
+func TestSimulatedTimer(t *testing.T) {
+	c := newTestSimClock(t)
+	start := c.Now()
+
+	timer := c.NewTimer(time.Second)
+	defer timer.Stop()
+
+	select {
+	case now := <-timer.Chan():
+		assert.Equal(t, time.Second, c.Since(start))
+		assert.Equal(t, time.Second, now.Sub(start))
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("deadlocked timer")
+	}
+
+	// New run.
+	timer.Reset(time.Second)
+
+	c.Sleep(500 * time.Millisecond)
+	assertEmptyCh(t, timer.Chan())
+	// Stop before the timer should fire.
+	timer.Stop()
+	c.Sleep(time.Second)
+	assertEmptyCh(t, timer.Chan())
 }
