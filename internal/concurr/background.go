@@ -42,12 +42,6 @@ func (b *Background) Close() {
 	b.wg.Wait()
 }
 
-func (b *Background) Closed() bool {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.closed
-}
-
 func (b *Background) Go(ctx context.Context, fn func(context.Context)) bool {
 	b.m.Lock()
 	defer b.m.Unlock()

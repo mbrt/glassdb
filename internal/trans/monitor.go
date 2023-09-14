@@ -98,7 +98,7 @@ func (m *Monitor) RefreshTx(ctx context.Context, tid data.TxID) {
 	}
 	m.m.Unlock()
 
-	if needStart && !m.background.Closed() {
+	if needStart && ctx.Err() == nil {
 		m.refreshCh <- txDeadline{
 			ID:         tid,
 			Deadline:   newTxDeadline(m.clock.Now()),
@@ -504,17 +504,19 @@ func (m *Monitor) spawnPendingRefresher() {
 
 			// Spawn the refresh as a new background task.
 			// This allows parallel refreshes when several have very close deadlines.
-			// TODO: Is background spawn from background allowed? RWLock recursive?
 			m.background.Go(txd.RefreshCtx, func(ctx context.Context) {
 				m.refreshPending(ctx, txd.ID)
 			})
 		}
 
-		// Close the input and consume the whole output chan.
-		// This should free up resources quickly.
-		close(in)
-		for range out {
-		}
+		// There's a race condition between closing the input channel and having
+		// backround tasks locking / unlocking paths. Here we basically leak
+		// the goroutine between (in, out).
+		// TODO: Fix the race condition and close the channel.
+
+		// close(in)
+		// for range out {
+		// }
 	})
 }
 
