@@ -569,7 +569,7 @@ func TestSerialValidate(t *testing.T) {
 		// Start the commit only after the timeout for serial locking expired.
 		// This makes sure t1 will win over t2 in the commit race, making the
 		// test deterministic.
-		tctx2.clock.Sleep(lockTimeout * 3)
+		tctx2.clock.Sleep(10 * time.Second)
 
 		tm2.Reset(h2, Data{
 			Reads: r023,

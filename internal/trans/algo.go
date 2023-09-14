@@ -57,7 +57,7 @@ const (
 )
 
 const (
-	lockTimeout      = 30 * time.Second
+	lockLatency      = 90 * time.Millisecond
 	bgCleanupTimeout = time.Minute
 )
 
@@ -567,7 +567,7 @@ func (t Algo) parallelValidate(ctx context.Context, vstate *validationState, tx 
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit parallel BEGIN")
 	// Parallel locking may lead to deadlock. Make sure we detect those
 	// through a timeout and resort to serial locking and validation instead.
-	ctx, cancel := concurr.ContextWithTimeout(ctx, t.clock, lockTimeout)
+	ctx, cancel := t.deadlockTimeoutCtx(ctx, *vstate)
 	defer cancel()
 
 	err := func() error {
@@ -1028,6 +1028,25 @@ func (t Algo) isKeyCollectionLocked(key string, expected storage.LockType, h *Ha
 	cpath := paths.CollectionInfo(pr.Prefix)
 	got := t.locker.LockType(cpath, h.id)
 	return got == expected
+}
+
+func (t Algo) deadlockTimeoutCtx(
+	ctx context.Context,
+	vstate validationState,
+) (context.Context, context.CancelFunc) {
+	if len(vstate.Paths) <= 1 {
+		// There's no possibility of deadlocks. This can happen only if there
+		// are multiple resources taken out of order. Even if we were to lock
+		// the collection of this path, we would do it in a specific order (i.e.
+		// collection first, key after).
+		return ctx, func() {}
+	}
+	// Let's try to compute a reasonable timeout here. The balance is between
+	// timing out too early (so there was no deadlock, just strong contention)
+	// and too late, wasting a lot of time. We give more time to transactions
+	// locking many keys. This is because restarting those can be expensive.
+	timeout := 4 * lockLatency * time.Duration(len(vstate.Paths))
+	return concurr.ContextWithTimeout(ctx, t.clock, timeout)
 }
 
 type Data struct {
