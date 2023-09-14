@@ -54,6 +54,8 @@ func MakeChanInfCap[T any](expectedCap int) (<-chan T, chan<- T) {
 					}
 					queue = append(queue, v)
 				case out <- queue[0]:
+					var empty T
+					queue[0] = empty // Avoid possible leaks.
 					queue = queue[1:]
 				}
 			}
