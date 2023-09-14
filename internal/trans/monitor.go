@@ -509,14 +509,16 @@ func (m *Monitor) spawnPendingRefresher() {
 			})
 		}
 
-		// There's a race condition between closing the input channel and having
-		// backround tasks locking / unlocking paths. Here we basically leak
-		// the goroutine between (in, out).
-		// TODO: Fix the race condition and close the channel.
-
-		// close(in)
-		// for range out {
-		// }
+		// We close and consume the channel to free up resources and avoid a
+		// goroutine leak. We can only do that after all background tasks
+		// completed, because there could be a race condition between closing
+		// the `in` channel and other background tasks locking / unlocking
+		// paths.
+		m.background.OnClose(func() {
+			close(in)
+			for range out {
+			}
+		})
 	})
 }
 
