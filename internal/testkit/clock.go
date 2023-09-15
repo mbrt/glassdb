@@ -55,28 +55,28 @@ func NewSelfAdvanceClock(t *testing.T) clockwork.Clock {
 func NewAcceleratedClock(multiplier int) clockwork.Clock {
 	c := clockwork.NewRealClock()
 	return aclock{
-		Clock:      c,
+		inner:      c,
 		multiplier: multiplier,
 		epoch:      c.Now(),
 	}
 }
 
 type aclock struct {
-	clockwork.Clock
+	inner      clockwork.Clock
 	multiplier int
 	epoch      time.Time
 }
 
 func (c aclock) After(d time.Duration) <-chan time.Time {
-	return c.Clock.After(c.compress(d))
+	return c.inner.After(c.compress(d))
 }
 
 func (c aclock) Sleep(d time.Duration) {
-	c.Clock.Sleep(c.compress(d))
+	c.inner.Sleep(c.compress(d))
 }
 
 func (c aclock) Now() time.Time {
-	since := c.Clock.Since(c.epoch)
+	since := c.inner.Since(c.epoch)
 	return c.epoch.Add(c.expand(since))
 }
 
@@ -85,12 +85,21 @@ func (c aclock) Since(t time.Time) time.Duration {
 }
 
 func (c aclock) NewTicker(d time.Duration) clockwork.Ticker {
-	return c.Clock.NewTicker(c.compress(d))
+	return c.inner.NewTicker(c.compress(d))
 }
 
 func (c aclock) NewTimer(d time.Duration) clockwork.Timer {
 	return atimer{
-		Timer:      c.Clock.NewTimer(c.compress(d)),
+		Timer:      c.inner.NewTimer(c.compress(d)),
+		multiplier: c.multiplier,
+	}
+}
+
+func (c aclock) AfterFunc(d time.Duration, fn func()) clockwork.Timer {
+	d = c.compress(d)
+	t := c.inner.AfterFunc(d, fn)
+	return atimer{
+		Timer:      t,
 		multiplier: c.multiplier,
 	}
 }
@@ -113,7 +122,7 @@ func (t atimer) Reset(d time.Duration) bool {
 }
 
 func NewSimulatedClock(resolution, rtResolution time.Duration) *SimulatedClock {
-	// Just to avoid having a random epoch nor unix zero.
+	// Deterministic epoch different than zero.
 	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z")
 
 	c := &SimulatedClock{
@@ -183,7 +192,11 @@ func (c *SimulatedClock) NewTicker(d time.Duration) clockwork.Ticker {
 }
 
 func (c *SimulatedClock) NewTimer(d time.Duration) clockwork.Timer {
-	return newSimulatedTimer(c, d)
+	return newSimulatedTimer(c, d, func() {})
+}
+
+func (c *SimulatedClock) AfterFunc(d time.Duration, fn func()) clockwork.Timer {
+	return newSimulatedTimer(c, d, fn)
 }
 
 func (c *SimulatedClock) ticksToTime(ticks int64) time.Time {
@@ -345,10 +358,11 @@ func (t *simulatedTicker) nextTick() time.Duration {
 	return res
 }
 
-func newSimulatedTimer(c *SimulatedClock, d time.Duration) *simulatedTimer {
+func newSimulatedTimer(c *SimulatedClock, d time.Duration, fn func()) *simulatedTimer {
 	t := &simulatedTimer{
 		clock: c,
 		ch:    make(chan time.Time, 1),
+		fn:    fn,
 	}
 	t.run(d)
 	return t
@@ -357,6 +371,7 @@ func newSimulatedTimer(c *SimulatedClock, d time.Duration) *simulatedTimer {
 type simulatedTimer struct {
 	clock *SimulatedClock
 	ch    chan time.Time
+	fn    func()
 	fired atomic.Bool
 }
 
@@ -384,9 +399,11 @@ func (t *simulatedTimer) run(d time.Duration) {
 		select {
 		case <-t.clock.stop:
 		case now := <-t.clock.After(d):
-			if !t.fired.Swap(true) {
-				t.ch <- now
+			if t.fired.Swap(true) {
+				return
 			}
+			t.ch <- now
+			t.fn()
 		}
 	}()
 }
@@ -398,3 +415,9 @@ func durationTicks(d, res time.Duration) int64 {
 	}
 	return int64(d/res + 1)
 }
+
+// Make sure the Clock interface is implemented correctly.
+var (
+	_ clockwork.Clock = (*aclock)(nil)
+	_ clockwork.Clock = (*SimulatedClock)(nil)
+)
