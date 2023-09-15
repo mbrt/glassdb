@@ -258,14 +258,14 @@ func TestLongPendingTx(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mon1, tctx := initMonTest(t)
+	mon, tctx := initMonTest(t)
 
 	tx := data.TxID("tx1")
-	mon1.BeginTx(ctx, tx)
+	mon.BeginTx(ctx, tx)
 	t.Cleanup(func() {
-		_ = mon1.AbortTx(ctx, tx)
+		_ = mon.AbortTx(ctx, tx)
 	})
-	mon1.RefreshTx(ctx, tx)
+	mon.StartRefreshTx(ctx, tx)
 
 	start := tctx.Clock.Now()
 	// Wait until we know the transaction should be considered pending.
@@ -282,6 +282,31 @@ func TestLongPendingTx(t *testing.T) {
 		assert.Less(t, now.Sub(tl.Timestamp), pendingTxTimeout*2) // Give some headroom on slow machines :/
 		t.Logf("Timestamp: %v, updated %v ago", tl.Timestamp, now.Sub(tl.Timestamp))
 	}
+}
+
+func TestRefreshCtxShouldNotCancel(t *testing.T) {
+	ctx := context.Background()
+	mon, tctx := initMonTest(t)
+
+	tx := data.TxID("tx1")
+	mon.BeginTx(ctx, tx)
+	t.Cleanup(func() {
+		_ = mon.AbortTx(ctx, tx)
+	})
+
+	// Refresh with a context that is canceled.
+	// The refresh should continue anyway.
+	ctxr, cancel := context.WithCancel(ctx)
+	mon.StartRefreshTx(ctxr, tx)
+	cancel()
+
+	// Wait until we know the transaction should be considered pending.
+	tctx.Clock.Sleep(pendingTxTimeout)
+
+	// Verify that this is actually pending.
+	tl, err := tctx.TLogger.Get(ctx, tx)
+	assert.NoError(t, err)
+	assert.Equal(t, tl.Status, storage.TxCommitStatusPending)
 }
 
 func assertNoWaitTxResult(t *testing.T, ch <-chan WaitTxResult) {

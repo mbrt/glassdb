@@ -86,7 +86,7 @@ func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
 	m.m.Unlock()
 }
 
-func (m *Monitor) RefreshTx(ctx context.Context, tid data.TxID) {
+func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 	needStart := false
 
 	m.m.Lock()
@@ -98,7 +98,7 @@ func (m *Monitor) RefreshTx(ctx context.Context, tid data.TxID) {
 	}
 	m.m.Unlock()
 
-	if needStart && ctx.Err() == nil {
+	if needStart {
 		m.refreshCh <- txDeadline{
 			ID:         tid,
 			Deadline:   newTxDeadline(m.clock.Now()),
