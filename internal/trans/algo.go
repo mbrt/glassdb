@@ -125,13 +125,14 @@ func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 			// Committed.
 			break
 		}
-		if !errors.Is(err, errValidateRetry) {
-			// Other errors.
-			// Before retrying, update possible stale values.
-			t.updateLocalCache(*vstate)
-			return err
+		if errors.Is(err, errValidateRetry) {
+			// Retry the validation without retrying the transaction.
+			continue
 		}
-		// Retry the validation without retrying the transaction.
+		// Other errors.
+		// Before retrying, update possible stale values.
+		t.updateLocalCache(*vstate)
+		return err
 	}
 
 	// Validation succeeded.
