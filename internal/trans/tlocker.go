@@ -153,7 +153,7 @@ func (v *Locker) pushRequest(ctx context.Context, key string, lt storage.LockTyp
 	if txs == txStateUnknown {
 		// Notify TxMonitor that we're going to start locking from this tx.
 		// We'll need refresh logs to keep the locks alive from now on.
-		v.tmon.RefreshTx(ctx, tid)
+		v.tmon.StartRefreshTx(ctx, tid)
 	}
 
 	var (
