@@ -33,7 +33,6 @@ const (
 	pendingTxTimeout  = 15 * time.Second
 	maxClockSkew      = 30 * time.Second
 	refreshMultiplier = 0.5
-	refreshChanCap    = 10 // TODO: Compute a better default capacity.
 )
 
 var ErrAlreadyFinalized = errors.New("transaction was already finalized")
@@ -52,7 +51,7 @@ func NewMonitor(
 	tl storage.TLogger,
 	b *concurr.Background,
 ) *Monitor {
-	m := &Monitor{
+	return &Monitor{
 		clock:      c,
 		local:      l,
 		tl:         tl,
@@ -61,8 +60,6 @@ func NewMonitor(
 		waiters:    make(map[string][]waitRequest),
 		unknownTx:  make(map[string]txUnknown),
 	}
-	m.spawnPendingRefresher()
-	return m
 }
 
 type Monitor struct {
@@ -73,7 +70,6 @@ type Monitor struct {
 	localTx    map[string]txStatus
 	waiters    map[string][]waitRequest
 	unknownTx  map[string]txUnknown
-	refreshCh  chan<- txDeadline
 	m          sync.Mutex
 }
 
@@ -99,18 +95,17 @@ func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 	m.m.Unlock()
 
 	if needStart {
-		m.refreshCh <- txDeadline{
-			ID:         tid,
-			Deadline:   newTxDeadline(m.clock.Now()),
-			RefreshCtx: ctx,
-		}
+		m.background.Go(ctx, func(ctx context.Context) {
+			ticker := m.clock.NewTicker(refreshTimeout())
+			// Make sure we always stop the timer at the end of the refresh.
+			defer ticker.Stop()
+			m.refreshPending(ctx, tid, ticker)
+		})
 	}
 }
 
 func (m *Monitor) CommitTx(ctx context.Context, tl storage.TxLog) error {
-	m.m.Lock()
 	m.stopTxRefresh(tl.ID)
-	m.m.Unlock()
 
 	// We can optimize here. If nothing was locked (i.e. RO or single-W tx), we
 	// can avoid to write the transaction log.
@@ -142,9 +137,7 @@ func (m *Monitor) CommitTx(ctx context.Context, tl storage.TxLog) error {
 }
 
 func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
-	m.m.Lock()
 	m.stopTxRefresh(tid)
-	m.m.Unlock()
 
 	err := m.setFinalLog(ctx, storage.TxLog{
 		ID:     tid,
@@ -467,61 +460,6 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 	return err
 }
 
-func (m *Monitor) spawnPendingRefresher() {
-	out, in := concurr.MakeChanInfCap[txDeadline](refreshChanCap)
-	m.refreshCh = in
-
-	// Yes, background context is enough. We are not making any network calls with it.
-	// Cancellation is completely managed through m.background.
-	m.background.Go(context.Background(), func(ctx context.Context) {
-	loop:
-		for ctx.Err() == nil {
-			var txd txDeadline
-
-			select {
-			case txd = <-out:
-			case <-ctx.Done():
-				break loop
-			}
-
-			if !m.shouldRefresh(txd.ID) {
-				continue
-			}
-
-			// Sleep until it's time to refresh.
-			now := m.clock.Now()
-			if now.Before(txd.Deadline) {
-				select {
-				case <-ctx.Done():
-					break loop
-				case <-m.clock.After(txd.Deadline.Sub(now)):
-					// Check again if we should refresh, after sleeping.
-					if !m.shouldRefresh(txd.ID) {
-						continue loop
-					}
-				}
-			}
-
-			// Spawn the refresh as a new background task.
-			// This allows parallel refreshes when several have very close deadlines.
-			m.background.Go(txd.RefreshCtx, func(ctx context.Context) {
-				m.refreshPending(ctx, txd.ID)
-			})
-		}
-	})
-
-	// We close and consume the channel to free up resources and avoid a
-	// goroutine leak. We can only do that after all background tasks
-	// completed, because there could be a race condition between closing
-	// the `in` channel and other background tasks locking / unlocking
-	// paths.
-	m.background.OnClose(func() {
-		close(in)
-		for range out {
-		}
-	})
-}
-
 func (m *Monitor) shouldRefresh(tid data.TxID) bool {
 	m.m.Lock()
 	defer m.m.Unlock()
@@ -530,20 +468,19 @@ func (m *Monitor) shouldRefresh(tid data.TxID) bool {
 }
 
 func (m *Monitor) stopTxRefresh(tid data.TxID) bool {
+	m.m.Lock()
+	defer m.m.Unlock()
+
 	s, ok := m.localTx[string(tid)]
-	if !ok {
+	if !ok || s.RefreshState != refreshStateRunning {
 		return false
 	}
-	if s.CancelRefresh != nil {
-		s.CancelRefresh()
-	}
 	s.RefreshState = refreshStateStopped
-	s.CancelRefresh = nil
 	m.localTx[string(tid)] = s
 	return true
 }
 
-func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
+func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, ticker clockwork.Ticker) {
 	var (
 		err           error
 		lastVersion   backend.Version
@@ -554,7 +491,6 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
 	st, ok := m.localTx[string(tid)]
 	if ok && st.RefreshState == refreshStateRunning {
 		shouldRefresh = true
-		ctx, st.CancelRefresh = context.WithCancel(ctx)
 		m.localTx[string(tid)] = st
 	}
 	m.m.Unlock()
@@ -563,7 +499,17 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
 		return
 	}
 
-	for ctx.Err() == nil {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.Chan():
+		}
+
+		if !m.shouldRefresh(tid) {
+			return
+		}
+
 		startT := m.clock.Now()
 		tl := storage.TxLog{
 			ID:        tid,
@@ -586,13 +532,6 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID) {
 			m.localTx[string(tid)] = st
 		}
 		m.m.Unlock()
-
-		// Wait for the next refresh.
-		select {
-		case <-ctx.Done():
-			return
-		case <-m.clock.After(nextTxTimeout(startT, m.clock.Now())):
-		}
 	}
 }
 
@@ -612,31 +551,18 @@ type waitRequest struct {
 }
 
 type txStatus struct {
-	Status        storage.TxCommitStatus
-	LastVersion   backend.Version
-	RefreshState  refreshState
-	CancelRefresh context.CancelFunc
+	Status       storage.TxCommitStatus
+	LastVersion  backend.Version
+	RefreshState refreshState
 }
 
 type txUnknown struct {
 	FirstCheck time.Time
 }
 
-type txDeadline struct {
-	ID         data.TxID
-	Deadline   time.Time
-	RefreshCtx context.Context
+func refreshTimeout() time.Duration {
+	return time.Duration(float64(pendingTxTimeout) * refreshMultiplier)
 }
-
-func nextTxTimeout(lastRefresh, now time.Time) time.Duration {
-	elapsed := now.Sub(lastRefresh)
-	return time.Duration(float64(pendingTxTimeout)*refreshMultiplier) - elapsed
-}
-
-func newTxDeadline(now time.Time) time.Time {
-	return now.Add(nextTxTimeout(now, now))
-}
-
 func isExpired(lastRefresh, now time.Time) bool {
 	return now.Sub(lastRefresh.Add(maxClockSkew)) > pendingTxTimeout
 }

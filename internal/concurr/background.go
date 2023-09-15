@@ -28,11 +28,10 @@ func NewBackground() *Background {
 }
 
 type Background struct {
-	wg         conc.WaitGroup
-	done       chan struct{}
-	closed     bool
-	finalizers []func()
-	m          sync.Mutex
+	wg     conc.WaitGroup
+	done   chan struct{}
+	closed bool
+	m      sync.Mutex
 }
 
 func (b *Background) Close() {
@@ -46,11 +45,6 @@ func (b *Background) Close() {
 	b.closed = true
 	b.m.Unlock()
 	b.wg.Wait()
-
-	// Run finalizers in backward order.
-	for i := len(b.finalizers) - 1; i >= 0; i-- {
-		b.finalizers[i]()
-	}
 }
 
 func (b *Background) Go(ctx context.Context, fn func(context.Context)) bool {
@@ -64,13 +58,4 @@ func (b *Background) Go(ctx context.Context, fn func(context.Context)) bool {
 		fn(ContextWithNewCancel(ctx, b.done))
 	})
 	return true
-}
-
-func (b *Background) OnClose(fn func()) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	if b.closed {
-		return
-	}
-	b.finalizers = append(b.finalizers, fn)
 }
