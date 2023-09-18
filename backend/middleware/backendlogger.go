@@ -173,7 +173,7 @@ func pathAttr(p string) slog.Attr {
 
 func argsAttr(format string, v ...any) slog.Attr {
 	return slog.Attr{
-		Key:   "path",
+		Key:   "args",
 		Value: slog.StringValue(fmt.Sprintf(format, v...)),
 	}
 }
