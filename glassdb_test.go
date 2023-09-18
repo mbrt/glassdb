@@ -52,7 +52,7 @@ var (
 	debugLogs    = flag.Bool("debug-logs", false, "debug db logs")
 )
 
-var debugLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+var debugLogger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 	Level: slog.LevelDebug,
 }))
 
