@@ -30,6 +30,11 @@ import (
 	"github.com/mbrt/glassdb/internal/errors"
 )
 
+// TODO: Reimplement by using GCS REST APIs. The Go client is inefficient.
+// See https://cloud.google.com/storage/docs/uploading-objects#uploading-an-object
+// Even better, we can use GRPC only. See e.g.
+// https://github.com/fsouza/fake-gcs-server/blob/4d841124144532e140ac3c3261d4a87593b6e3c1/main.go#L91-L93
+
 var errRateLimited = errors.New("rate limited")
 
 func New(bucket *storage.BucketHandle) Backend {
@@ -215,7 +220,6 @@ func (b Backend) writeWith(
 ) (meta backend.Metadata, err error) {
 	_, err = writer.Write(value)
 	if err != nil {
-		writer.Close()
 		return backend.Metadata{}, annotate(err)
 	}
 	if err := writer.Close(); err != nil {
