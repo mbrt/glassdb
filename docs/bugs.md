@@ -220,3 +220,44 @@ created by github.com/mbrt/glassdb_test.BenchmarkSharedR
 
 This happens because transactions run after `db.Close()`. We need to make sure
 we wait for goroutines doing transactions, before closing.
+
+## Truncated objects on context cancellation
+
+The GCS client is bugged and sometimes sends truncated objects on uploads when
+the context is cancelled. The bad part of this is that the request is completely
+valid (i.e. the multipart request has correct boundaries).
+
+For example, see this valid request for an empty object:
+
+```
+--aaccafdc8317d6a4188884ac408a4340098c98e92255d9e356d476cadf02
+Content-Type: application/json
+
+{"bucket":"test","contentType":"application/octet-stream","metadata":{"version":"v0"},"name":"example/glassdb"}
+
+--aaccafdc8317d6a4188884ac408a4340098c98e92255d9e356d476cadf02
+Content-Type: application/octet-stream
+
+
+--aaccafdc8317d6a4188884ac408a4340098c98e92255d9e356d476cadf02--
+```
+
+And this is an invalid one:
+
+```
+--d87765176f7f38893708a80d88ca609b6a89a89df86a974a9fd9eff55e8a
+Content-Type: application/json
+
+{"bucket":"test","contentType":"application/octet-stream","metadata":{"last-writer":"dwvFcuzuwDPwwgteAmFfpQ==","lock-type":"w","locked-by":"xAlD8zfOPL8cJUjq02tV1g=="},"name":"example/_c/RaprALB/_k/PqKtBV"}
+
+--d87765176f7f38893708a80d88ca609b6a89a89df86a974a9fd9eff55e8a
+Content-Type: application/octet-stream
+
+
+--d87765176f7f38893708a80d88ca609b6a89a89df86a974a9fd9eff55e8a--
+```
+
+Completely indistinguishable.
+
+As the client is very complicated, a quick fix for this was to just always send
+the CRC32 field along with every upload.
