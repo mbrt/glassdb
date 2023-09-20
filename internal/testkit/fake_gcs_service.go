@@ -15,7 +15,11 @@
 package testkit
 
 import (
+	"encoding/base64"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"hash/crc32"
 	"net/http"
 	"strings"
 	"sync"
@@ -90,6 +94,11 @@ func (g *gcs) ListObjects(req listObjectsRequest) (listObjectsResponse, error) {
 }
 
 func (g *gcs) UploadObject(req uploadObjectRequest) (uploadObjectResponse, error) {
+	if !g.verifyChecksum(req.Data, req.Metadata.Crc32) {
+		return uploadObjectResponse{},
+			withStatus(errors.New("wrong checksum"), http.StatusBadRequest)
+	}
+
 	g.m.Lock()
 	defer g.m.Unlock()
 
@@ -226,6 +235,21 @@ func (g *gcs) checkConditionsForNewObject(c objectConditions) error {
 	}
 
 	return nil
+}
+
+func (g *gcs) verifyChecksum(data []byte, crc32c string) bool {
+	if crc32c == "" {
+		return true
+	}
+	// CRC32c checksum, encoded using base64 in big-endian byte order.
+	// See https://cloud.google.com/storage/docs/json_api/v1/objects/insert
+	buf, err := base64.StdEncoding.DecodeString(crc32c)
+	if err != nil {
+		return false
+	}
+	want := binary.BigEndian.Uint32(buf)
+	got := crc32.Checksum(data, crc32.MakeTable(crc32.Castagnoli))
+	return want == got
 }
 
 func (g *gcs) getObject(bucketName, name string) (*bucket, *bucketObject, error) {
