@@ -200,15 +200,13 @@ func (b Backend) writeTo(
 	writer.ChunkSize = 0
 	writer.ObjectAttrs.Metadata = t
 	writer.ContentType = "application/octet-stream"
-	if len(value) == 0 {
-		// The GCS client has a race condition on context cancellation. The object
-		// is sent only partially but the request looks 100% the same as a legit
-		// one. This is visible when the cancellation happens between metadata and
-		// object data being sent. If this happens, the result is an empty object.
-		// TODO: Fix this somehow.
-		writer.SendCRC32C = true
-		writer.CRC32C = crc32.Checksum(value, crc32.MakeTable(crc32.Castagnoli))
-	}
+	// The GCS client has a race condition on context cancellation. The object
+	// is sent only partially but the request looks 100% the same as a legit
+	// one. This is visible when the cancellation happens between metadata and
+	// object data being sent. If this happens, the result is an empty object.
+	// TODO: Fix this somehow.
+	writer.SendCRC32C = true
+	writer.CRC32C = crc32.Checksum(value, crc32.MakeTable(crc32.Castagnoli))
 
 	meta, err = b.writeWith(writer, value)
 	if err == nil || !errors.Is(err, errRateLimited) {
