@@ -257,11 +257,10 @@ In this example, 5 parallel workers keep competing for the same keys (between 1
 and 6), with varying degrees of overlap (up to 100%).
 
 As you can see, it's very easy for transactions to deadlock in this situation,
-resulting in delays of even 1-2 minutes in the worst case.
+resulting in delays of tens of seconds in the worst case.
 
 This is mostly due to a few factors:
 
-* Timeouts are currently very large (60 seconds).
 * Glass DB is not optimized for deadlocks, nor makes sure deadlocked
   transactions can always make progress.
 * GCS throttles writes when they happen to the same object multiple times per
