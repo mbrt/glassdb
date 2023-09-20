@@ -108,6 +108,7 @@ type uploadMetadata struct {
 	Bucket   string            `json:"bucket"`
 	Name     string            `json:"name"`
 	Metadata map[string]string `json:"metadata"`
+	Crc32    string            `json:"crc32c"`
 }
 
 func parseRequestConditions(req *http.Request) (objectConditions, error) {
