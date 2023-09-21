@@ -27,13 +27,11 @@ func ContextWithTimeout(
 	timeout time.Duration,
 ) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
-	go func() {
-		select {
-		case <-clock.After(timeout):
+	clock.AfterFunc(timeout, func() {
+		if ctx.Err() == nil {
 			cancel()
-		case <-ctx.Done():
 		}
-	}()
+	})
 	return ctx, cancel
 }
 
