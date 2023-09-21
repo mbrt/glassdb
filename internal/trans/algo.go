@@ -57,8 +57,9 @@ const (
 )
 
 const (
-	lockLatency      = 90 * time.Millisecond
-	bgCleanupTimeout = time.Minute
+	lockLatency        = 90 * time.Millisecond
+	maxDeadlockTimeout = 5 * time.Second
+	bgCleanupTimeout   = time.Minute
 )
 
 var (
@@ -1041,11 +1042,11 @@ func (t Algo) deadlockTimeoutCtx(
 		// collection first, key after).
 		return ctx, func() {}
 	}
-	// Let's try to compute a reasonable timeout here. The balance is between
+	// We try to compute a reasonable timeout here. The balance is between
 	// timing out too early (so there was no deadlock, just strong contention)
 	// and too late, wasting a lot of time. We give more time to transactions
 	// locking many keys. This is because restarting those can be expensive.
-	timeout := 4 * lockLatency * time.Duration(len(vstate.Paths))
+	timeout := min(4*lockLatency*time.Duration(len(vstate.Paths)), maxDeadlockTimeout)
 	return concurr.ContextWithTimeout(ctx, t.clock, timeout)
 }
 
