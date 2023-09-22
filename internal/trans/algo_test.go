@@ -111,7 +111,7 @@ func TestWriteNew(t *testing.T) {
 	keyp := paths.FromKey("testp", []byte("k"))
 	val := []byte("v")
 
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Writes: []WriteAccess{
 			{
 				Path: keyp,
@@ -166,7 +166,7 @@ func TestReadNotFoundWrite(t *testing.T) {
 
 	var txID data.TxID
 
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{
 			{
 				Path:  keyp,
@@ -215,7 +215,7 @@ func TestSingleReadWrite(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Then commit.
-	h = tm.Begin(Data{
+	h = tm.Begin(ctx, Data{
 		Reads: []ReadAccess{
 			{
 				Path:    keyp,
@@ -263,7 +263,7 @@ func TestReadWriteWhileLockCreate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Then commit.
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{
 			{
 				Path:    keyp,
@@ -342,7 +342,7 @@ func TestReadonly(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Then commit.
-	h = tm.Begin(Data{
+	h = tm.Begin(ctx, Data{
 		Reads: []ReadAccess{
 			{
 				Path:    keyp,
@@ -382,7 +382,7 @@ func TestReadonlyInLockCreate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Then commit.
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{r},
 	})
 	err = tm.Commit(ctx, h)
@@ -414,7 +414,7 @@ func TestReadonlyAfterDelete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Then commit.
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{r},
 	})
 	err = tm.Commit(ctx, h)
@@ -457,7 +457,7 @@ func TestReadonlyFromUncommitted(t *testing.T) {
 
 	// One transition tries to update the value starting from an old read.
 	// It should fail and leave the item locked in write.
-	h1 := tm.Begin(Data{
+	h1 := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{ra1},
 		Writes: []WriteAccess{
 			{Path: keyp, Val: []byte("tmpw")},
@@ -476,7 +476,7 @@ func TestReadonlyFromUncommitted(t *testing.T) {
 
 	// The readonly transition arrives now with an old read.
 	// And asks for a retry.
-	h2 := tm.Begin(Data{
+	h2 := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{ra1},
 	})
 	err = tm.Commit(ctx, h2)
@@ -522,7 +522,7 @@ func TestSerialValidate(t *testing.T) {
 	})
 
 	// Commit k0, k1 from tm1.
-	h1 := tm1.Begin(Data{
+	h1 := tm1.Begin(ctx, Data{
 		Reads: r01,
 		Writes: []WriteAccess{
 			{Path: keys[0], Val: []byte("1")},
@@ -533,7 +533,7 @@ func TestSerialValidate(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRetry)
 
 	// Commit k2, k3 from tm2.
-	h2 := tm2.Begin(Data{
+	h2 := tm2.Begin(ctx, Data{
 		Reads: r23,
 		Writes: []WriteAccess{
 			{Path: keys[2], Val: []byte("2")},
@@ -654,7 +654,7 @@ func TestCleanAbort(t *testing.T) {
 			for i, k := range keys {
 				writes[i] = WriteAccess{Path: k, Val: []byte("1")}
 			}
-			h = tm.Begin(Data{
+			h = tm.Begin(ctx, Data{
 				Reads:  reads,
 				Writes: writes,
 			})
@@ -710,7 +710,7 @@ func TestChangeWritesCleanAbort(t *testing.T) {
 	})
 
 	// Then commit updated value.
-	h = tm.Begin(Data{
+	h = tm.Begin(ctx, Data{
 		Reads: reads,
 		Writes: []WriteAccess{
 			{Path: keys[0], Val: []byte("1")},
@@ -792,7 +792,7 @@ func TestSingleRWRetry(t *testing.T) {
 	})
 
 	// Then commit.
-	h := tm.Begin(Data{
+	h := tm.Begin(ctx, Data{
 		Reads: []ReadAccess{ra},
 		Writes: []WriteAccess{
 			{
@@ -854,7 +854,7 @@ func TestExpiredTx(t *testing.T) {
 	})
 
 	// Try to commit the values (one read only and the other modified).
-	h1 := tm.Begin(Data{
+	h1 := tm.Begin(ctx, Data{
 		Reads: ra,
 		Writes: []WriteAccess{
 			{Path: key1, Val: []byte("v3")},
@@ -880,7 +880,7 @@ func TestExpiredTx(t *testing.T) {
 	ra, err = doReads(ctx, tctx, []string{key1, key2})
 	assert.NoError(t, err)
 
-	h2 := tm2.Begin(Data{
+	h2 := tm2.Begin(ctx, Data{
 		Reads: ra,
 		Writes: []WriteAccess{
 			{Path: key1, Val: []byte("v4")},
@@ -908,7 +908,7 @@ func TestExpiredTx(t *testing.T) {
 func commitAccess(t *testing.T, tm Algo, d Data) *Handle {
 	t.Helper()
 	ctx := context.Background()
-	h := tm.Begin(d)
+	h := tm.Begin(ctx, d)
 	err := tm.Commit(ctx, h)
 	require.NoError(t, err)
 	err = tm.End(ctx, h)

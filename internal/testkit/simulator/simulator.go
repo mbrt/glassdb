@@ -16,6 +16,7 @@ package simulator
 
 import (
 	"context"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,7 +34,12 @@ import (
 	"github.com/mbrt/glassdb/internal/storage"
 	"github.com/mbrt/glassdb/internal/stringset"
 	"github.com/mbrt/glassdb/internal/testkit"
+	"github.com/mbrt/glassdb/internal/trans"
 )
+
+var validNameRe = regexp.MustCompile(`a-zA-Z0-9_-`)
+
+type TestGoroutine func(context.Context, *glassdb.DB) error
 
 func New(t *testing.T, random []byte) *Sim {
 	clock := newClock(t, random)
@@ -47,6 +53,7 @@ func New(t *testing.T, random []byte) *Sim {
 type Sim struct {
 	clock   *clock
 	backend *simBackend
+	funcs   map[string]TestGoroutine
 	eg      *errgroup.Group
 }
 
@@ -66,11 +73,17 @@ func (s *Sim) DBInstance() *glassdb.DB {
 	return db
 }
 
-func (s *Sim) Run(fn func() error) {
+func (s *Sim) Run(t *testing.T, name string, db *glassdb.DB, fn TestGoroutine) {
+	if !validNameRe.MatchString(name) {
+		t.Fatalf("invalid name %q", name)
+	}
+	s.funcs[name] = fn
+	// Make tx ids deterministic by passing it through the context.
+	ctx := trans.CtxWithTxID(context.Background(), data.TxID(name))
 	s.eg.Go(func() error {
 		// Give the scheduler time to reorder this.
 		s.clock.Sleep(time.Millisecond)
-		return fn()
+		return fn(ctx, db)
 	})
 }
 

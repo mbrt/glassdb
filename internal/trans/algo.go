@@ -100,8 +100,8 @@ type Algo struct {
 	log        *slog.Logger
 }
 
-func (t Algo) Begin(d Data) *Handle {
-	tid := data.NewTId()
+func (t Algo) Begin(ctx context.Context, d Data) *Handle {
+	tid := newTxID(ctx)
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -1092,6 +1092,12 @@ type Handle struct {
 	log           *slog.Logger
 }
 
+var txIDKey = struct{}{}
+
+func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
+	return context.WithValue(ctx, txIDKey, id)
+}
+
 type validationState struct {
 	Paths []pathState
 }
@@ -1313,4 +1319,12 @@ type txLog data.TxID
 
 func (t txLog) LogValue() slog.Value {
 	return slog.StringValue(data.TxID(t).String())
+}
+
+func newTxID(ctx context.Context) data.TxID {
+	// Allow for deterministic transaction IDs (only in tests).
+	if id, ok := ctx.Value(txIDKey).(data.TxID); ok {
+		return id
+	}
+	return data.NewTId()
 }
