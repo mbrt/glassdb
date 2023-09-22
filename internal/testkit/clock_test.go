@@ -58,7 +58,7 @@ func assertAround(t *testing.T, expected, got time.Duration) {
 }
 
 func newTestSimClock(t *testing.T) *SimulatedClock {
-	c := NewSimulatedClock(10*time.Millisecond, 250*time.Microsecond)
+	c := NewSimulatedClock(10*time.Millisecond, 10*time.Microsecond)
 	t.Cleanup(c.Close)
 	return c
 }

@@ -17,6 +17,7 @@ package testkit
 import (
 	"container/heap"
 	"context"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -240,7 +241,7 @@ func (c *SimulatedClock) runLoop() {
 
 func (c *SimulatedClock) waitForNext() bool {
 	for {
-		time.Sleep(c.rtResolution)
+		c.waitRT()
 
 		select {
 		case <-c.stop:
@@ -263,6 +264,22 @@ func (c *SimulatedClock) waitForNext() bool {
 		c.m.Unlock()
 
 		return true
+	}
+}
+
+func (c *SimulatedClock) waitRT() {
+	if c.rtResolution >= 500*time.Microsecond {
+		time.Sleep(c.rtResolution)
+		return
+	}
+
+	// If we only relied on time.Sleep(), short sleeps would often result in 1ms
+	// sleep. Instead of that, we busy wait by handing it over to the go
+	// scheduler until the time has passed.
+	start := time.Now()
+	runtime.Gosched()
+	for time.Since(start) < c.rtResolution {
+		runtime.Gosched()
 	}
 }
 
