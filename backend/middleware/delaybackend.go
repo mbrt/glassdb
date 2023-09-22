@@ -94,18 +94,13 @@ func (b *DelayBackend) ReadIfModified(
 	path string,
 	version int64,
 ) (backend.ReadReply, error) {
-	r, err := b.inner.ReadIfModified(ctx, path, version)
-	if errors.Is(err, backend.ErrPrecondition) {
-		b.delay(b.metaRead)
-		return r, err
-	}
 	b.delay(b.objRead)
-	return r, err
+	return b.inner.ReadIfModified(ctx, path, version)
 }
 
 func (b *DelayBackend) Read(ctx context.Context, path string) (backend.ReadReply, error) {
-	r, err := b.inner.Read(ctx, path)
 	b.delay(b.objRead)
+	r, err := b.inner.Read(ctx, path)
 	return r, err
 }
 
@@ -113,8 +108,8 @@ func (b *DelayBackend) GetMetadata(
 	ctx context.Context,
 	path string,
 ) (backend.Metadata, error) {
-	r, err := b.inner.GetMetadata(ctx, path)
 	b.delay(b.metaRead)
+	r, err := b.inner.GetMetadata(ctx, path)
 	return r, err
 }
 
@@ -127,9 +122,8 @@ func (b *DelayBackend) SetTagsIf(
 	if err := b.backoff(ctx, path); err != nil {
 		return backend.Metadata{}, err
 	}
-	r, err := b.inner.SetTagsIf(ctx, path, expected, t)
 	b.delay(b.metaWrite)
-	return r, err
+	return b.inner.SetTagsIf(ctx, path, expected, t)
 }
 
 func (b *DelayBackend) Write(
@@ -141,8 +135,8 @@ func (b *DelayBackend) Write(
 	if err := b.backoff(ctx, path); err != nil {
 		return backend.Metadata{}, err
 	}
-	r, err := b.inner.Write(ctx, path, value, t)
 	b.delay(b.objWrite)
+	r, err := b.inner.Write(ctx, path, value, t)
 	return r, err
 }
 
@@ -156,13 +150,8 @@ func (b *DelayBackend) WriteIf(
 	if err := b.backoff(ctx, path); err != nil {
 		return backend.Metadata{}, err
 	}
-	r, err := b.inner.WriteIf(ctx, path, value, expected, t)
-	if errors.Is(err, backend.ErrPrecondition) {
-		b.delay(b.metaRead)
-		return r, err
-	}
 	b.delay(b.objWrite)
-	return r, err
+	return b.inner.WriteIf(ctx, path, value, expected, t)
 }
 
 func (b *DelayBackend) WriteIfNotExists(
@@ -174,21 +163,16 @@ func (b *DelayBackend) WriteIfNotExists(
 	if err := b.backoff(ctx, path); err != nil {
 		return backend.Metadata{}, err
 	}
-	r, err := b.inner.WriteIfNotExists(ctx, path, value, t)
-	if errors.Is(err, backend.ErrPrecondition) {
-		b.delay(b.metaRead)
-		return r, err
-	}
 	b.delay(b.objWrite)
-	return r, err
+	return b.inner.WriteIfNotExists(ctx, path, value, t)
 }
 
 func (b *DelayBackend) Delete(ctx context.Context, path string) error {
 	if err := b.backoff(ctx, path); err != nil {
 		return err
 	}
-	err := b.inner.Delete(ctx, path)
 	b.delay(b.objWrite)
+	err := b.inner.Delete(ctx, path)
 	return err
 }
 
@@ -200,18 +184,13 @@ func (b *DelayBackend) DeleteIf(
 	if err := b.backoff(ctx, path); err != nil {
 		return err
 	}
-	err := b.inner.DeleteIf(ctx, path, expected)
-	if errors.Is(err, backend.ErrPrecondition) {
-		b.delay(b.metaRead)
-		return err
-	}
 	b.delay(b.objWrite)
-	return err
+	return b.inner.DeleteIf(ctx, path, expected)
 }
 
 func (b *DelayBackend) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
-	r, err := b.inner.List(ctx, dirPath)
 	b.delay(b.list)
+	r, err := b.inner.List(ctx, dirPath)
 	return r, err
 }
 
