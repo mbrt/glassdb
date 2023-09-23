@@ -37,7 +37,7 @@ import (
 	"github.com/mbrt/glassdb/internal/trans"
 )
 
-var validNameRe = regexp.MustCompile(`a-zA-Z0-9_-`)
+var validNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 type TestGoroutine func(context.Context, *glassdb.DB) error
 
@@ -47,14 +47,17 @@ func New(t *testing.T, random []byte) *Sim {
 	return &Sim{
 		clock:   clock,
 		backend: backend,
+		t:       t,
+		funcs:   make(map[string]TestGoroutine),
 	}
 }
 
 type Sim struct {
 	clock   *clock
 	backend *simBackend
+	t       *testing.T
 	funcs   map[string]TestGoroutine
-	eg      *errgroup.Group
+	eg      errgroup.Group
 }
 
 func (s *Sim) Wait() error {
@@ -70,12 +73,15 @@ func (s *Sim) Verify(keys []glassdb.FQKey) error {
 
 func (s *Sim) DBInstance() *glassdb.DB {
 	db, _ := glassdb.Open(context.Background(), "sim", s.backend)
+	s.t.Cleanup(func() {
+		db.Close(context.Background())
+	})
 	return db
 }
 
-func (s *Sim) Run(t *testing.T, name string, db *glassdb.DB, fn TestGoroutine) {
+func (s *Sim) Run(name string, db *glassdb.DB, fn TestGoroutine) {
 	if !validNameRe.MatchString(name) {
-		t.Fatalf("invalid name %q", name)
+		s.t.Fatalf("invalid name %q", name)
 	}
 	s.funcs[name] = fn
 	// Make tx ids deterministic by passing it through the context.
@@ -85,15 +91,6 @@ func (s *Sim) Run(t *testing.T, name string, db *glassdb.DB, fn TestGoroutine) {
 		s.clock.Sleep(time.Millisecond)
 		return fn(ctx, db)
 	})
-}
-
-func newClock(t *testing.T, random []byte) *clock {
-	sc := testkit.NewSimulatedClock(time.Millisecond, 50*time.Microsecond)
-	t.Cleanup(sc.Close)
-	return &clock{
-		inner: sc,
-		rnd:   randomStream{source: random},
-	}
 }
 
 func newBackend(c *clock) *simBackend {
@@ -223,6 +220,15 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 	}
 	b.committedTx.Add(string(ti.LastWriter))
 	b.txOrder = append(b.txOrder, string(ti.LastWriter))
+}
+
+func newClock(t *testing.T, random []byte) *clock {
+	sc := testkit.NewSimulatedClock(time.Millisecond, 50*time.Microsecond)
+	t.Cleanup(sc.Close)
+	return &clock{
+		inner: sc,
+		rnd:   randomStream{source: random},
+	}
 }
 
 // clock is a simulated deterministic random clock.

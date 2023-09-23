@@ -42,7 +42,11 @@ func selectDB(dbs []*glassdb.DB, second bool) *glassdb.DB {
 }
 
 func FuzzReadWhileWrite(f *testing.F) {
-	f.Add(false, false, int8(1), deterministicRandBytes(1024))
+	rnd := deterministicRandBytes(1024 * 3)
+	f.Add(false, false, int8(1), rnd[:1024])
+	f.Add(false, true, int8(2), rnd[1024:2048])
+	f.Add(true, false, int8(2), rnd[2048:])
+
 	f.Fuzz(func(t *testing.T, rdb2, wdb2 bool, numKeys int8, rnd []byte) {
 		sim := simulator.New(t, rnd)
 		dbs := []*glassdb.DB{
@@ -63,7 +67,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 		}
 
 		// These will run in parallel pseudo-deterministically.
-		sim.Run(t, "init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run("init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				for _, k := range keys {
 					tx.Write(k.Collection, k.Key, []byte{0})
@@ -71,7 +75,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 				return nil
 			})
 		})
-		sim.Run(t, "rtx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run("rtx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for _, r := range res {
@@ -82,7 +86,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 				return nil
 			})
 		})
-		sim.Run(t, "w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run("w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for i, r := range res {
