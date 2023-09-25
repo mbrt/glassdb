@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/internal/testkit/simulator"
@@ -48,6 +49,10 @@ func FuzzReadWhileWrite(f *testing.F) {
 	f.Add(true, false, int8(2), rnd[2048:])
 
 	f.Fuzz(func(t *testing.T, rdb2, wdb2 bool, numKeys int8, rnd []byte) {
+		// The test should never last more than 500 ms in real time.
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
 		sim := simulator.New(t, rnd)
 		dbs := []*glassdb.DB{
 			sim.DBInstance(), sim.DBInstance(),
@@ -67,7 +72,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 		}
 
 		// These will run in parallel pseudo-deterministically.
-		sim.Run("init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run(ctx, "init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				for _, k := range keys {
 					tx.Write(k.Collection, k.Key, []byte{0})
@@ -75,7 +80,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 				return nil
 			})
 		})
-		sim.Run("rtx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run(ctx, "rtx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for _, r := range res {
@@ -86,7 +91,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 				return nil
 			})
 		})
-		sim.Run("w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run(ctx, "w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for i, r := range res {

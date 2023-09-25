@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -25,14 +26,15 @@ import (
 )
 
 func TestBase(t *testing.T) {
+	ctx := context.Background()
 	// The first sleeps more than the second (10 vs 5 ms).
 	sim := New(t, []byte{10, 5})
 	ch := make(chan int, 2)
-	sim.Run("one", nil, func(ctx context.Context, d *glassdb.DB) error {
+	sim.Run(ctx, "one", nil, func(ctx context.Context, d *glassdb.DB) error {
 		ch <- 0
 		return nil
 	})
-	sim.Run("two", nil, func(ctx context.Context, d *glassdb.DB) error {
+	sim.Run(ctx, "two", nil, func(ctx context.Context, d *glassdb.DB) error {
 		ch <- 1
 		return nil
 	})
@@ -42,9 +44,13 @@ func TestBase(t *testing.T) {
 }
 
 func TestDB(t *testing.T) {
+	// The test should never last more than 100 milliseconds in real time.
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
 	sim := New(t, []byte{1, 2, 3, 4})
 	db := sim.DBInstance()
-	sim.Run("one", db, func(ctx context.Context, db *glassdb.DB) error {
+	sim.Run(ctx, "one", db, func(ctx context.Context, db *glassdb.DB) error {
 		coll := db.Collection([]byte("foo"))
 		if err := coll.Create(ctx); err != nil {
 			return err

@@ -72,20 +72,22 @@ func (s *Sim) Verify(keys []glassdb.FQKey) error {
 }
 
 func (s *Sim) DBInstance() *glassdb.DB {
-	db, _ := glassdb.Open(context.Background(), "sim", s.backend)
+	opts := glassdb.DefaultOptions()
+	opts.Clock = s.clock
+	db, _ := glassdb.OpenWith(context.Background(), "sim", s.backend, opts)
 	s.t.Cleanup(func() {
 		db.Close(context.Background())
 	})
 	return db
 }
 
-func (s *Sim) Run(name string, db *glassdb.DB, fn TestGoroutine) {
+func (s *Sim) Run(ctx context.Context, name string, db *glassdb.DB, fn TestGoroutine) {
 	if !validNameRe.MatchString(name) {
 		s.t.Fatalf("invalid name %q", name)
 	}
 	s.funcs[name] = fn
 	// Make tx ids deterministic by passing it through the context.
-	ctx := trans.CtxWithTxID(context.Background(), data.TxID(name))
+	ctx = trans.CtxWithTxID(ctx, data.TxID(name))
 	s.eg.Go(func() error {
 		// Give the scheduler time to reorder this.
 		s.clock.Sleep(time.Millisecond)
@@ -97,11 +99,12 @@ func newBackend(c *clock) *simBackend {
 	// Actual latency doesn't matter, as we are using a random sleep.
 	latency := middleware.Latency{Mean: time.Millisecond}
 	b := middleware.NewDelayBackend(memory.New(), c, middleware.DelayOptions{
-		MetaRead:  latency,
-		MetaWrite: latency,
-		ObjRead:   latency,
-		ObjWrite:  latency,
-		List:      latency,
+		MetaRead:       latency,
+		MetaWrite:      latency,
+		ObjRead:        latency,
+		ObjWrite:       latency,
+		List:           latency,
+		SameObjWritePs: 100000, // Disable throttling.
 	})
 	return &simBackend{
 		Backend:     b,
@@ -203,7 +206,7 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 	}
 
 	if pi.Type == paths.TransactionType {
-		// TODO: Use some utility function in TLogger.
+		// TODO: Use some utility function in TLogger instead.
 		if st, ok := t["commit-status"]; !ok || st != "committed" {
 			return
 		}
