@@ -472,6 +472,9 @@ func (w *waitCtx) Timer() clockwork.Timer {
 		w.timer = w.clock.NewTimer(waitPollDuration)
 		return w.timer
 	}
+	if !w.timer.Stop() {
+		<-w.timer.Chan()
+	}
 	w.timer.Reset(waitPollDuration)
 	return w.timer
 }
