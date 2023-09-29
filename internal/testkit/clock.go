@@ -17,9 +17,9 @@ package testkit
 import (
 	"container/heap"
 	"context"
-	"log"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -207,7 +207,6 @@ func (c *SimulatedClock) ticksToTime(ticks int64) time.Time {
 func (c *SimulatedClock) afterChan(d time.Duration, ch chan time.Time) {
 	// Never wait less than 1 tick.
 	dTicks := max(durationTicks(d, c.resolution), 1)
-	log.Printf("duration: %v, ticks: %d", d, dTicks)
 
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -215,6 +214,20 @@ func (c *SimulatedClock) afterChan(d time.Duration, ch chan time.Time) {
 	item := waitItem{
 		t:      c.nowTicks + dTicks,
 		waiter: ch,
+	}
+	heap.Push(&c.q, item)
+}
+
+func (c *SimulatedClock) afterFuncOnScheduler(d time.Duration, fn func(time.Time)) {
+	// Never wait less than 1 tick.
+	dTicks := max(durationTicks(d, c.resolution), 1)
+
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	item := waitItem{
+		t:   c.nowTicks + dTicks,
+		run: fn,
 	}
 	heap.Push(&c.q, item)
 }
@@ -234,7 +247,13 @@ func (c *SimulatedClock) runLoop() {
 				break
 			}
 			heap.Pop(&c.q)
-			top.waiter <- c.ticksToTime(c.nowTicks)
+
+			t := c.ticksToTime(c.nowTicks)
+			if top.run != nil {
+				top.run(t)
+			} else {
+				top.waiter <- t
+			}
 		}
 		c.m.Unlock()
 	}
@@ -287,6 +306,7 @@ func (c *SimulatedClock) waitRT() {
 type waitItem struct {
 	t      int64
 	waiter chan<- time.Time
+	run    func(time.Time)
 }
 
 type token struct{}
@@ -319,22 +339,18 @@ func (q *timePQ) Pop() any {
 
 func newSimulatedTicker(c *SimulatedClock, d time.Duration) *simulatedTicker {
 	st := &simulatedTicker{
-		clock:    c,
-		c:        make(chan time.Time, 1),
-		changeCh: make(chan time.Duration, 1),
+		clock: c,
+		c:     make(chan time.Time, 1),
 	}
-	st.changeCh <- d
-	go st.run()
-
+	st.Reset(d)
 	return st
 }
 
 type simulatedTicker struct {
-	clock    *SimulatedClock
-	c        chan time.Time
-	changeCh chan time.Duration
-	stopped  bool
-	m        sync.Mutex
+	clock *SimulatedClock
+	c     chan time.Time
+	ctx   *tickerCtx
+	m     sync.Mutex
 }
 
 func (t *simulatedTicker) Chan() <-chan time.Time {
@@ -345,36 +361,39 @@ func (t *simulatedTicker) Reset(d time.Duration) {
 	t.m.Lock()
 	defer t.m.Unlock()
 
-	if t.stopped {
-		t.stopped = false
-		go t.run()
+	if t.ctx != nil {
+		t.ctx.stopped.Store(true)
 	}
-	t.changeCh <- d
+	t.ctx = &tickerCtx{
+		ticker: t,
+	}
+	go t.ctx.run(d)
 }
 
 func (t *simulatedTicker) Stop() {
 	t.m.Lock()
-	t.stopped = true
-	t.changeCh <- 0
+	if t.ctx != nil {
+		t.ctx.stopped.Store(true)
+	}
+	t.ctx = nil
 	t.m.Unlock()
 }
 
-func (t *simulatedTicker) run() {
-	duration := <-t.changeCh
+type tickerCtx struct {
+	ticker  *simulatedTicker
+	stopped atomic.Bool
+}
 
+func (c *tickerCtx) run(d time.Duration) {
 	for {
-		if duration == 0 {
-			return
-		}
-
 		select {
-		case <-t.clock.stop:
+		case <-c.ticker.clock.stop:
 			return
-		case d := <-t.changeCh:
-			duration = d
-			continue
-		case now := <-t.clock.After(duration):
-			t.c <- now
+		case t := <-c.ticker.clock.After(d):
+			if c.stopped.Load() {
+				return
+			}
+			c.ticker.c <- t
 		}
 	}
 }
@@ -385,17 +404,16 @@ func newSimulatedTimer(c *SimulatedClock, d time.Duration, fn func()) *simulated
 		ch:    make(chan time.Time, 1),
 		fn:    fn,
 	}
-	t.run(d, 0)
+	t.ctx = &timerCtx{timer: t}
+	t.run(d)
 	return t
 }
 
 type simulatedTimer struct {
-	clock   *SimulatedClock
-	ch      chan time.Time
-	fn      func()
-	stopped bool
-	version int
-	m       sync.Mutex
+	clock *SimulatedClock
+	ch    chan time.Time
+	fn    func()
+	ctx   *timerCtx
 }
 
 func (t *simulatedTimer) Chan() <-chan time.Time {
@@ -405,13 +423,9 @@ func (t *simulatedTimer) Chan() <-chan time.Time {
 // Reset changes the timer to expire after duration d. It returns true if the
 // timer had been active, false if the timer had expired or been stopped.
 func (t *simulatedTimer) Reset(d time.Duration) bool {
-	t.m.Lock()
-	t.version++
-	wasRunning := t.stopped
-	t.stopped = false
-	t.m.Unlock()
-
-	t.run(d, t.version)
+	wasRunning := !t.ctx.stopped.Swap(true)
+	t.ctx = &timerCtx{timer: t}
+	t.run(d)
 	return wasRunning
 }
 
@@ -419,38 +433,24 @@ func (t *simulatedTimer) Reset(d time.Duration) bool {
 // timer, false if the timer has already expired or been stopped. Stop does not
 // close the channel, to prevent a read from the channel succeeding incorrectly.
 func (t *simulatedTimer) Stop() bool {
-	t.m.Lock()
-	stopped := !t.stopped
-	t.stopped = true
-	t.m.Unlock()
-	return stopped
+	return !t.ctx.stopped.Swap(true)
 }
 
-func (t *simulatedTimer) run(d time.Duration, version int) {
-	go func() {
-		select {
-		case <-t.clock.stop:
-		case now := <-t.clock.After(d):
-			if !t.shouldFire(version) {
-				return
-			}
-			t.ch <- now
-			t.fn()
+func (t *simulatedTimer) run(d time.Duration) {
+	ctx := t.ctx
+	t.clock.afterFuncOnScheduler(d, func(time.Time) {
+		if ctx.stopped.Swap(true) {
+			return
 		}
-	}()
+		if fn := ctx.timer.fn; fn != nil {
+			go fn()
+		}
+	})
 }
 
-func (t *simulatedTimer) shouldFire(version int) bool {
-	t.m.Lock()
-	defer t.m.Unlock()
-	if t.version != version {
-		return false
-	}
-	if t.stopped {
-		return false
-	}
-	t.stopped = true
-	return true
+type timerCtx struct {
+	timer   *simulatedTimer
+	stopped atomic.Bool
 }
 
 func durationTicks(d, res time.Duration) int64 {
