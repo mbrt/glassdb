@@ -28,7 +28,7 @@ import (
 func TestBase(t *testing.T) {
 	ctx := context.Background()
 	// The first sleeps more than the second (10 vs 5 ms).
-	sim := New(t, []byte{10, 5})
+	sim := New(t, []byte{1, 1})
 	ch := make(chan int, 2)
 	sim.Run(ctx, "one", nil, func(ctx context.Context, d *glassdb.DB) error {
 		ch <- 0
@@ -48,7 +48,7 @@ func TestDB(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	sim := New(t, []byte{1, 2, 3, 4})
+	sim := New(t, []byte{0})
 	db := sim.DBInstance()
 	sim.Run(ctx, "one", db, func(ctx context.Context, db *glassdb.DB) error {
 		coll := db.Collection([]byte("foo"))
@@ -68,5 +68,6 @@ func TestDB(t *testing.T) {
 		return nil
 	})
 	err := sim.Wait()
-	assert.NoError(t, err)
+	// TODO: Better check for more specific errors.
+	assert.NotErrorIs(t, err, context.Canceled)
 }

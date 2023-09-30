@@ -173,10 +173,13 @@ func (c *SimulatedClock) Close() {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	// Unblock all waiters.
+	// Unblock all waiters if possible.
 	now := c.nowTicks
 	for _, item := range c.q.ToSlice() {
-		item.Ch <- c.ticksToTime(now)
+		select {
+		case item.Ch <- c.ticksToTime(now):
+		default:
+		}
 	}
 }
 
@@ -211,7 +214,7 @@ func (c *SimulatedClock) NewTicker(d time.Duration) clockwork.Ticker {
 }
 
 func (c *SimulatedClock) NewTimer(d time.Duration) clockwork.Timer {
-	return newSimulatedTimer(c, d, func() {})
+	return newSimulatedTimer(c, d, nil)
 }
 
 func (c *SimulatedClock) AfterFunc(d time.Duration, fn func()) clockwork.Timer {
@@ -477,10 +480,11 @@ func (t *simulatedTimer) Stop() bool {
 
 func (t *simulatedTimer) run(d time.Duration) {
 	ctx := t.ctx
-	t.clock.afterFuncOnScheduler(d, func(time.Time) {
+	t.clock.afterFuncOnScheduler(d, func(t time.Time) {
 		if ctx.stopped.Swap(true) {
 			return
 		}
+		ctx.timer.ch <- t
 		if fn := ctx.timer.fn; fn != nil {
 			go fn()
 		}

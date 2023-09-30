@@ -16,6 +16,7 @@ package testkit
 
 import (
 	"context"
+	"flag"
 	"io"
 	"net/http"
 	"strings"
@@ -29,9 +30,11 @@ import (
 
 const testBucketName = "glassdb-test"
 
+var debugBackend = flag.Bool("debug-backend", false, "debug backend requests")
+
 func testClient(t *testing.T) *storage.Client {
 	ctx := context.Background()
-	client := NewGCSClient(ctx, t, true)
+	client := NewGCSClient(ctx, t, *debugBackend)
 	if err := client.Bucket(testBucketName).Create(ctx, "test-prj", nil); err != nil {
 		t.Fatalf("creating test-bucket: %v", err)
 	}

@@ -58,7 +58,7 @@ func assertAround(t *testing.T, expected, got time.Duration) {
 }
 
 func newTestSimClock(t *testing.T) *SimulatedClock {
-	c := NewSimulatedClock(10*time.Millisecond, 10*time.Microsecond)
+	c := NewSimulatedClock(10*time.Millisecond, time.Millisecond)
 	t.Cleanup(c.Close)
 	return c
 }
@@ -125,7 +125,7 @@ loop:
 func assertEmptyCh(t *testing.T, ch <-chan time.Time) {
 	select {
 	case <-ch:
-		t.Error("expected timer to fire after 1s")
+		t.Error("expected timer not to fire")
 	default:
 	}
 }
