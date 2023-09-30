@@ -122,7 +122,24 @@ func (t atimer) Reset(d time.Duration) bool {
 	return t.Timer.Reset(d / time.Duration(t.multiplier))
 }
 
+type TimeQueue interface {
+	Push(i WaitItem)
+	Top() (WaitItem, bool)
+	Pop() (WaitItem, bool)
+	ToSlice() []WaitItem
+}
+
+type WaitItem struct {
+	Ticks int64
+	Ch    chan<- time.Time
+	Fn    func(time.Time)
+}
+
 func NewSimulatedClock(resolution, rtResolution time.Duration) *SimulatedClock {
+	return NewSimulatedClockWithQueue(resolution, rtResolution, &timePriorityQueue{})
+}
+
+func NewSimulatedClockWithQueue(resolution, rtResolution time.Duration, q TimeQueue) *SimulatedClock {
 	// Deterministic epoch different than zero.
 	epoch, _ := time.Parse(time.RFC3339, "2020-02-01T03:02:01Z")
 
@@ -130,6 +147,7 @@ func NewSimulatedClock(resolution, rtResolution time.Duration) *SimulatedClock {
 		rtResolution: rtResolution,
 		resolution:   resolution,
 		epoch:        epoch,
+		q:            q,
 		stop:         make(chan token),
 	}
 	go c.runLoop()
@@ -144,7 +162,7 @@ type SimulatedClock struct {
 	resolution   time.Duration
 	epoch        time.Time
 	nowTicks     int64
-	q            timePQ
+	q            TimeQueue
 	stop         chan token
 	m            sync.Mutex
 }
@@ -157,8 +175,8 @@ func (c *SimulatedClock) Close() {
 
 	// Unblock all waiters.
 	now := c.nowTicks
-	for _, item := range c.q {
-		item.waiter <- c.ticksToTime(now)
+	for _, item := range c.q.ToSlice() {
+		item.Ch <- c.ticksToTime(now)
 	}
 }
 
@@ -211,11 +229,11 @@ func (c *SimulatedClock) afterChan(d time.Duration, ch chan time.Time) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	item := waitItem{
-		t:      c.nowTicks + dTicks,
-		waiter: ch,
+	item := WaitItem{
+		Ticks: c.nowTicks + dTicks,
+		Ch:    ch,
 	}
-	heap.Push(&c.q, item)
+	c.q.Push(item)
 }
 
 func (c *SimulatedClock) afterFuncOnScheduler(d time.Duration, fn func(time.Time)) {
@@ -225,11 +243,11 @@ func (c *SimulatedClock) afterFuncOnScheduler(d time.Duration, fn func(time.Time
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	item := waitItem{
-		t:   c.nowTicks + dTicks,
-		run: fn,
+	item := WaitItem{
+		Ticks: c.nowTicks + dTicks,
+		Fn:    fn,
 	}
-	heap.Push(&c.q, item)
+	c.q.Push(item)
 }
 
 func (c *SimulatedClock) runLoop() {
@@ -241,18 +259,18 @@ func (c *SimulatedClock) runLoop() {
 		// Advance the clock until the earliest sleeper and notify it.
 		c.m.Lock()
 
-		for len(c.q) > 0 {
-			top := c.q[0]
-			if top.t > c.nowTicks {
+		top, ok := c.q.Top()
+		for ; ok; top, ok = c.q.Top() {
+			if top.Ticks > c.nowTicks {
 				break
 			}
-			heap.Pop(&c.q)
+			c.q.Pop()
 
 			t := c.ticksToTime(c.nowTicks)
-			if top.run != nil {
-				top.run(t)
+			if top.Fn != nil {
+				top.Fn(t)
 			} else {
-				top.waiter <- t
+				top.Ch <- t
 			}
 		}
 		c.m.Unlock()
@@ -270,17 +288,17 @@ func (c *SimulatedClock) waitForNext() bool {
 		}
 
 		c.m.Lock()
-		if len(c.q) == 0 {
+		top, ok := c.q.Top()
+		if !ok {
 			c.m.Unlock()
 			continue
 		}
 
 		// Advance the clock to the top element.
-		top := c.q[0]
-		if top.t < c.nowTicks {
+		if top.Ticks < c.nowTicks {
 			panic("Clock moved too fast")
 		}
-		c.nowTicks = top.t
+		c.nowTicks = top.Ticks
 		c.m.Unlock()
 
 		return true
@@ -303,36 +321,57 @@ func (c *SimulatedClock) waitRT() {
 	}
 }
 
-type waitItem struct {
-	t      int64
-	waiter chan<- time.Time
-	run    func(time.Time)
-}
-
 type token struct{}
 
-type timePQ []waitItem
-
-func (q timePQ) Len() int { return len(q) }
-
-func (q timePQ) Less(i, j int) bool {
-	return q[i].t < q[j].t
+type timePriorityQueue struct {
+	q timePQImpl
 }
 
-func (q timePQ) Swap(i, j int) {
+func (q *timePriorityQueue) Push(i WaitItem) {
+	heap.Push(&q.q, i)
+}
+
+func (q timePriorityQueue) Top() (WaitItem, bool) {
+	if len(q.q) == 0 {
+		return WaitItem{}, false
+	}
+	return q.q[0], true
+}
+
+func (q *timePriorityQueue) Pop() (WaitItem, bool) {
+	if len(q.q) == 0 {
+		return WaitItem{}, false
+	}
+	e := heap.Pop(&q.q)
+	return e.(WaitItem), true
+}
+
+func (q timePriorityQueue) ToSlice() []WaitItem {
+	return q.q
+}
+
+type timePQImpl []WaitItem
+
+func (q timePQImpl) Len() int { return len(q) }
+
+func (q timePQImpl) Less(i, j int) bool {
+	return q[i].Ticks < q[j].Ticks
+}
+
+func (q timePQImpl) Swap(i, j int) {
 	q[i], q[j] = q[j], q[i]
 }
 
-func (q *timePQ) Push(x any) {
-	item := x.(waitItem)
+func (q *timePQImpl) Push(x any) {
+	item := x.(WaitItem)
 	*q = append(*q, item)
 }
 
-func (q *timePQ) Pop() any {
+func (q *timePQImpl) Pop() any {
 	old := *q
 	n := len(old)
 	item := old[n-1]
-	old[n-1] = waitItem{} // Avoid memory leak.
+	old[n-1] = WaitItem{} // Avoid memory leak.
 	*q = old[0 : n-1]
 	return item
 }

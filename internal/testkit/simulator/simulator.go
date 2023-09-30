@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/mbrt/glassdb"
@@ -53,7 +52,7 @@ func New(t *testing.T, random []byte) *Sim {
 }
 
 type Sim struct {
-	clock   *clock
+	clock   *testkit.SimulatedClock
 	backend *simBackend
 	t       *testing.T
 	funcs   map[string]TestGoroutine
@@ -95,7 +94,7 @@ func (s *Sim) Run(ctx context.Context, name string, db *glassdb.DB, fn TestGorou
 	})
 }
 
-func newBackend(c *clock) *simBackend {
+func newBackend(c *testkit.SimulatedClock) *simBackend {
 	// Actual latency doesn't matter, as we are using a random sleep.
 	latency := middleware.Latency{Mean: time.Millisecond}
 	b := middleware.NewDelayBackend(memory.New(), c, middleware.DelayOptions{
@@ -225,51 +224,55 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 	b.txOrder = append(b.txOrder, string(ti.LastWriter))
 }
 
-func newClock(t *testing.T, random []byte) *clock {
-	sc := testkit.NewSimulatedClock(time.Millisecond, 50*time.Microsecond)
-	t.Cleanup(sc.Close)
-	return &clock{
-		inner: sc,
+func newClock(t *testing.T, random []byte) *testkit.SimulatedClock {
+	sc := testkit.NewSimulatedClockWithQueue(time.Millisecond, 50*time.Microsecond, &randomOrderQueue{
+		ticks: 1,
 		rnd:   randomStream{source: random},
-	}
+	})
+	t.Cleanup(sc.Close)
+	return sc
 }
 
-// clock is a simulated deterministic random clock.
-type clock struct {
-	inner clockwork.Clock
+type randomOrderQueue struct {
+	q     []testkit.WaitItem
+	ticks int64
 	rnd   randomStream
 }
 
-func (c *clock) After(time.Duration) <-chan time.Time {
-	return c.inner.After(c.rndDuration())
+func (q *randomOrderQueue) Push(i testkit.WaitItem) {
+	i.Ticks = 0 // Reset ticks. We updated them in Top() and Pop().
+	q.q = append(q.q, i)
+	if len(q.q) > 1 {
+		// Swap the new element with a random one in the queue.
+		victim := int(q.rnd.RandByte()) % len(q.q)
+		q.q[victim], q.q[len(q.q)-1] = q.q[len(q.q)-1], q.q[victim]
+	}
 }
 
-func (c *clock) Sleep(time.Duration) {
-	c.inner.Sleep(c.rndDuration())
+func (q *randomOrderQueue) Top() (testkit.WaitItem, bool) {
+	if len(q.q) == 0 {
+		return testkit.WaitItem{}, false
+	}
+	return testkit.WaitItem{
+		Ticks: q.ticks,
+		Ch:    q.q[0].Ch,
+		Fn:    q.q[0].Fn,
+	}, true
 }
 
-func (c *clock) Now() time.Time {
-	return c.inner.Now()
+func (q *randomOrderQueue) Pop() (testkit.WaitItem, bool) {
+	top, ok := q.Top()
+	if !ok {
+		return top, ok
+	}
+	q.ticks++
+	q.q[0] = testkit.WaitItem{} // Avoid memory leak.
+	q.q = q.q[1:]
+	return top, ok
 }
 
-func (c *clock) Since(t time.Time) time.Duration {
-	return c.inner.Since(t)
-}
-
-func (c *clock) NewTicker(time.Duration) clockwork.Ticker {
-	return c.inner.NewTicker(c.rndDuration())
-}
-
-func (c *clock) NewTimer(time.Duration) clockwork.Timer {
-	return c.inner.NewTimer(c.rndDuration())
-}
-
-func (c *clock) AfterFunc(_ time.Duration, fn func()) clockwork.Timer {
-	return c.inner.AfterFunc(c.rndDuration(), fn)
-}
-
-func (c *clock) rndDuration() time.Duration {
-	return time.Duration(c.rnd.RandByte()) * time.Millisecond
+func (q *randomOrderQueue) ToSlice() []testkit.WaitItem {
+	return q.q
 }
 
 type randomStream struct {
