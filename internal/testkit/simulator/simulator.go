@@ -281,6 +281,9 @@ type randomStream struct {
 }
 
 func (r *randomStream) RandByte() byte {
+	if len(r.source) == 0 {
+		return 0
+	}
 	next := atomic.AddInt64(&r.curr, 1)
 	return r.source[int(next)%len(r.source)]
 }

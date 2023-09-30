@@ -25,8 +25,8 @@ import (
 	"github.com/mbrt/glassdb/internal/testkit/simulator"
 )
 
-func deterministicRandBytes(n int) []byte {
-	r := rand.New(rand.NewSource(42))
+func deterministicRandBytes(seed int64, n int) []byte {
+	r := rand.New(rand.NewSource(seed))
 	res := make([]byte, n)
 	_, err := r.Read(res)
 	if err != nil {
@@ -43,12 +43,11 @@ func selectDB(dbs []*glassdb.DB, second bool) *glassdb.DB {
 }
 
 func FuzzReadWhileWrite(f *testing.F) {
-	rnd := deterministicRandBytes(1024 * 3)
-	f.Add(false, false, int8(1), rnd[:1024])
-	f.Add(false, true, int8(2), rnd[1024:2048])
-	f.Add(true, false, int8(2), rnd[2048:])
+	f.Add(false, false, uint8(1), deterministicRandBytes(42, 1024))
+	f.Add(false, true, uint8(2), deterministicRandBytes(3, 1024))
+	f.Add(true, false, uint8(2), deterministicRandBytes(666, 1024))
 
-	f.Fuzz(func(t *testing.T, rdb2, wdb2 bool, numKeys int8, rnd []byte) {
+	f.Fuzz(func(t *testing.T, rdb2, wdb2 bool, numKeys uint8, rnd []byte) {
 		// The test should never last more than 500 ms in real time.
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
