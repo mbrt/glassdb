@@ -67,6 +67,38 @@ func TestDeterministicTxID(t *testing.T) {
 	assert.Equal(t, []data.TxID{data.TxID([]byte("tx-id"))}, txs)
 }
 
+func TestVerify(t *testing.T) {
+	ctx := context.Background()
+	sim := New(t, []byte{0})
+	collName := []byte("coll")
+
+	err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection(collName)
+		return coll.Create(ctx)
+	})
+	assert.NoError(t, err)
+
+	testDB := sim.DBInstance()
+	sim.Run(ctx, "tx0", testDB, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection(collName)
+		coll.Write(ctx, []byte("key1"), []byte("val"))
+		return nil
+	})
+	sim.Run(ctx, "tx1", testDB, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection(collName)
+		coll.Write(ctx, []byte("key2"), []byte("val"))
+		return nil
+	})
+	err = sim.Wait()
+	assert.NoError(t, err)
+
+	err = sim.Verify(ctx, []CollectionKey{
+		{Collection: collName, Key: []byte("key1")},
+		{Collection: collName, Key: []byte("key2")},
+	})
+	assert.NoError(t, err)
+}
+
 func TestDB(t *testing.T) {
 	// The test should never last more than 100 milliseconds in real time.
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

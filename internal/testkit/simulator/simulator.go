@@ -68,12 +68,14 @@ func (s *Sim) Wait() error {
 
 func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
 	goldenDB := newTestDB(s.t, memory.New())
+	// Reuse the same backend of the tests, but use the inner backend.
+	// This way we avoid inserting new transactions in the sim backend.
 	testDB := newTestDB(s.t, s.backend.Backend)
 
 	// Run the same operations again in commit order and verify that the result
 	// is exactly the same as the observed one.
 	for i, fn := range s.initFuncs {
-		if err := fn(ctx, testDB); err != nil {
+		if err := fn(ctx, goldenDB); err != nil {
 			return fmt.Errorf("running #%d init func: %v", i, err)
 		}
 	}
@@ -82,7 +84,7 @@ func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
 	for i, tx := range order {
 		tf, ok := s.funcs[string(tx)]
 		if !ok {
-			continue
+			return fmt.Errorf("cannot find tx %q", string(tx))
 		}
 		err := tf(ctx, goldenDB)
 		if err != nil {
