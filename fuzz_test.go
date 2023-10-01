@@ -69,6 +69,13 @@ func FuzzReadWhileWrite(f *testing.F) {
 				Key:        []byte(fmt.Sprintf("key%d", i)),
 			}
 		}
+		keyNames := make([]simulator.CollectionKey, int(numKeys))
+		for i := 0; i < int(numKeys); i++ {
+			keyNames[i] = simulator.CollectionKey{
+				Collection: []byte("simc"),
+				Key:        keys[i].Key,
+			}
+		}
 
 		// These will run in parallel pseudo-deterministically.
 		sim.Run(ctx, "init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
@@ -105,7 +112,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 			})
 		})
 		sim.Wait()
-		if err := sim.Verify(keys); err != nil {
+		if err := sim.Verify(ctx, keyNames); err != nil {
 			f.Failed()
 		}
 	})

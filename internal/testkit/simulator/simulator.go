@@ -15,7 +15,9 @@
 package simulator
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"regexp"
 	"sync"
 	"sync/atomic"
@@ -63,10 +65,39 @@ func (s *Sim) Wait() error {
 	return s.eg.Wait()
 }
 
-func (s *Sim) Verify(keys []glassdb.FQKey) error {
-	// TODO
+func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
+	goldenDB := newTestDB(s.t, memory.New())
+	testDB := newTestDB(s.t, s.backend.Backend)
+
 	// Run the same operations again in commit order and verify that the result
 	// is exactly the same as the observed one.
+	order := s.backend.CommitOrder()
+	for i, tx := range order {
+		tf, ok := s.funcs[string(tx)]
+		if !ok {
+			continue
+		}
+		err := tf(ctx, goldenDB)
+		if err != nil {
+			return fmt.Errorf("executing func #%d (%s): %v", i, string(tx), err)
+		}
+	}
+
+	for _, k := range keys {
+		refC := goldenDB.Collection(k.Collection)
+		refB, refErr := refC.ReadStrong(ctx, k.Key)
+		testC := testDB.Collection(k.Collection)
+		testB, testErr := testC.ReadStrong(ctx, k.Key)
+		if (refErr == nil) != (testErr == nil) {
+			return fmt.Errorf("different errors for key %q: test (%v), ref (%v)",
+				string(k.Key), testErr, refErr)
+		}
+		if !bytes.Equal(refB, testB) {
+			return fmt.Errorf("different read for key %q: test (%s), ref (%s)",
+				string(k.Key), string(testB), string(refB))
+		}
+	}
+
 	return nil
 }
 
@@ -92,6 +123,21 @@ func (s *Sim) Run(ctx context.Context, name string, db *glassdb.DB, fn TestGorou
 		s.clock.Sleep(time.Millisecond)
 		return fn(ctx, db)
 	})
+}
+
+type CollectionKey struct {
+	Collection []byte
+	Key        []byte
+}
+
+func newTestDB(t *testing.T, b backend.Backend) *glassdb.DB {
+	opts := glassdb.DefaultOptions()
+	opts.Clock = testkit.NewAcceleratedClock(1000)
+	db, err := glassdb.OpenWith(context.Background(), "sim", b, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db
 }
 
 func newBackend(c *testkit.SimulatedClock) *simBackend {
