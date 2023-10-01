@@ -46,20 +46,23 @@ func New(t *testing.T, random []byte) *Sim {
 	clock := newClock(t, random)
 	backend := newBackend(clock)
 	return &Sim{
-		clock:   clock,
-		backend: backend,
-		t:       t,
-		funcs:   make(map[string]TestGoroutine),
+		clock:      clock,
+		backend:    backend,
+		t:          t,
+		funcs:      make(map[string]TestGoroutine),
+		readValues: make(map[string][]readValue),
 	}
 }
 
 type Sim struct {
-	clock     *testkit.SimulatedClock
-	backend   *simBackend
-	t         *testing.T
-	funcs     map[string]TestGoroutine
-	initFuncs []TestGoroutine
-	eg        errgroup.Group
+	clock      *testkit.SimulatedClock
+	backend    *simBackend
+	t          *testing.T
+	funcs      map[string]TestGoroutine
+	initFuncs  []TestGoroutine
+	readValues map[string][]readValue
+	onVerify   bool
+	eg         errgroup.Group
 }
 
 func (s *Sim) Wait() error {
@@ -67,6 +70,8 @@ func (s *Sim) Wait() error {
 }
 
 func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
+	s.onVerify = true
+
 	goldenDB := newTestDB(s.t, memory.New())
 	// Reuse the same backend of the tests, but use the inner backend.
 	// This way we avoid inserting new transactions in the sim backend.
@@ -89,6 +94,21 @@ func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
 		err := tf(ctx, goldenDB)
 		if err != nil {
 			return fmt.Errorf("executing func #%d (%s): %v", i, string(tx), err)
+		}
+		// Check the read values if any were given.
+		rvs, ok := s.readValues[string(tx)]
+		if !ok {
+			continue
+		}
+		for _, rv := range rvs {
+			got, err := goldenDB.Collection(rv.Key.Collection).ReadStrong(ctx, rv.Key.Key)
+			if err != nil {
+				return fmt.Errorf("read for func #%d (%s) failed: %v", i, string(tx), err)
+			}
+			if !bytes.Equal(got, rv.Value) {
+				return fmt.Errorf("different read for func #%d (%s), got: %q, want: %q",
+					i, string(tx), string(got), string(rv.Value))
+			}
 		}
 	}
 
@@ -142,9 +162,35 @@ func (s *Sim) Run(ctx context.Context, name string, db *glassdb.DB, fn TestGorou
 	})
 }
 
+// NotifyReadValue adds the read to the list of reads to check during `Verify`.
+//
+// Only call this after the transaction successfully committed; never before or
+// when a transaction failed.
+func (s *Sim) NotifyReadValue(ctx context.Context, k CollectionKey, val []byte) {
+	if s.onVerify {
+		// We don't use this during verify. The check is done afterwards.
+		return
+	}
+
+	id := trans.TxIDFromCtx(ctx)
+	if id == nil {
+		s.t.Fatal("NotifyReadValue from unknown context")
+	}
+	// If this is a readonly transaction, make sure we notify that it's already
+	// completed, as the backend doesn't know about it.
+	s.backend.NotifyCommitted(id)
+	rvs := s.readValues[string(id)]
+	s.readValues[string(id)] = append(rvs, readValue{Key: k, Value: val})
+}
+
 type CollectionKey struct {
 	Collection []byte
 	Key        []byte
+}
+
+type readValue struct {
+	Key   CollectionKey
+	Value []byte
 }
 
 func newTestDB(t *testing.T, b backend.Backend) *glassdb.DB {
@@ -247,6 +293,14 @@ func (b *simBackend) CommitOrder() []data.TxID {
 		res = append(res, data.TxID(str))
 	}
 	return res
+}
+
+func (b *simBackend) NotifyCommitted(txid data.TxID) {
+	stid := string(txid)
+	if !b.committedTx.Has(stid) {
+		b.committedTx.Add(stid)
+		b.txOrder = append(b.txOrder, stid)
+	}
 }
 
 func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {

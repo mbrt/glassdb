@@ -97,15 +97,28 @@ func FuzzReadWhileWrite(f *testing.F) {
 		})
 		sim.Run(ctx, "r-tx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
 			keys := toFQKey(db)
-			return db.Tx(ctx, func(tx *glassdb.Tx) error {
+			var readVals [][]byte
+
+			err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+				readVals = nil // Idempotence.
 				res := tx.ReadMulti(keys)
 				for _, r := range res {
 					if r.Err != nil {
 						return r.Err
 					}
+					readVals = append(readVals, r.Value)
 				}
 				return nil
 			})
+			if err != nil {
+				return err
+			}
+
+			// Notify the reads.
+			for i := 0; i < len(keyNames); i++ {
+				sim.NotifyReadValue(ctx, keyNames[i], readVals[i])
+			}
+			return nil
 		})
 		sim.Run(ctx, "w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
 			keys := toFQKey(db)

@@ -99,6 +99,39 @@ func TestVerify(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestVerifyRead(t *testing.T) {
+	ctx := context.Background()
+	sim := New(t, []byte{0})
+	collName := []byte("coll")
+
+	err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection(collName)
+		if err := coll.Create(ctx); err != nil {
+			return err
+		}
+		return coll.Write(ctx, []byte("key"), []byte("val"))
+	})
+	assert.NoError(t, err)
+
+	testDB := sim.DBInstance()
+	sim.Run(ctx, "tx-r", testDB, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection(collName)
+		val, err := coll.ReadStrong(ctx, []byte("key"))
+		if err != nil {
+			return err
+		}
+		sim.NotifyReadValue(ctx, CollectionKey{Collection: collName, Key: []byte("key")}, val)
+		return nil
+	})
+	err = sim.Wait()
+	assert.NoError(t, err)
+
+	err = sim.Verify(ctx, []CollectionKey{
+		{Collection: collName, Key: []byte("key")},
+	})
+	assert.NoError(t, err)
+}
+
 func TestDB(t *testing.T) {
 	// The test should never last more than 100 milliseconds in real time.
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

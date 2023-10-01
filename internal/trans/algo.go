@@ -1098,6 +1098,13 @@ func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
 	return context.WithValue(ctx, txIDKey, id)
 }
 
+func TxIDFromCtx(ctx context.Context) data.TxID {
+	if id, ok := ctx.Value(txIDKey).(data.TxID); ok {
+		return id
+	}
+	return nil
+}
+
 type validationState struct {
 	Paths []pathState
 }
@@ -1323,7 +1330,7 @@ func (t txLog) LogValue() slog.Value {
 
 func newTxID(ctx context.Context) data.TxID {
 	// Allow for deterministic transaction IDs (only in tests).
-	if id, ok := ctx.Value(txIDKey).(data.TxID); ok {
+	if id := TxIDFromCtx(ctx); id != nil {
 		return id
 	}
 	return data.NewTId()
