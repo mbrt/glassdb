@@ -28,9 +28,7 @@ func ContextWithTimeout(
 ) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 	clock.AfterFunc(timeout, func() {
-		if ctx.Err() == nil {
-			cancel()
-		}
+		cancel()
 	})
 	return ctx, cancel
 }

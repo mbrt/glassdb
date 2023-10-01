@@ -54,11 +54,12 @@ func New(t *testing.T, random []byte) *Sim {
 }
 
 type Sim struct {
-	clock   *testkit.SimulatedClock
-	backend *simBackend
-	t       *testing.T
-	funcs   map[string]TestGoroutine
-	eg      errgroup.Group
+	clock     *testkit.SimulatedClock
+	backend   *simBackend
+	t         *testing.T
+	funcs     map[string]TestGoroutine
+	initFuncs []TestGoroutine
+	eg        errgroup.Group
 }
 
 func (s *Sim) Wait() error {
@@ -71,6 +72,12 @@ func (s *Sim) Verify(ctx context.Context, keys []CollectionKey) error {
 
 	// Run the same operations again in commit order and verify that the result
 	// is exactly the same as the observed one.
+	for i, fn := range s.initFuncs {
+		if err := fn(ctx, testDB); err != nil {
+			return fmt.Errorf("running #%d init func: %v", i, err)
+		}
+	}
+
 	order := s.backend.CommitOrder()
 	for i, tx := range order {
 		tf, ok := s.funcs[string(tx)]
@@ -109,6 +116,14 @@ func (s *Sim) DBInstance() *glassdb.DB {
 		db.Close(context.Background())
 	})
 	return db
+}
+
+// Init runs before the start of the tests and is not fuzzed.
+func (s *Sim) Init(ctx context.Context, fn TestGoroutine) error {
+	// Use the inner backend to avoid keeping track of these transactions.
+	s.initFuncs = append(s.initFuncs, fn)
+	db := newTestDB(s.t, s.backend.Backend)
+	return fn(ctx, db)
 }
 
 func (s *Sim) Run(ctx context.Context, name string, db *glassdb.DB, fn TestGoroutine) {
@@ -255,7 +270,7 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 		if st, ok := t["commit-status"]; !ok || st != "committed" {
 			return
 		}
-		tx, err := paths.ToTransaction(pi.Suffix)
+		tx, err := paths.ToTransaction(string(pi.Type) + "/" + pi.Suffix)
 		if err != nil {
 			return
 		}
@@ -263,7 +278,7 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 		b.txOrder = append(b.txOrder, string(tx))
 		return
 	}
-	if pi.Type != paths.KeyType {
+	if pi.Type != paths.KeyType || len(ti.LastWriter) == 0 {
 		return
 	}
 	b.committedTx.Add(string(ti.LastWriter))

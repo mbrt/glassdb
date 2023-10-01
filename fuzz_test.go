@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/internal/testkit/simulator"
 )
@@ -56,37 +58,45 @@ func FuzzReadWhileWrite(f *testing.F) {
 		dbs := []*glassdb.DB{
 			sim.DBInstance(), sim.DBInstance(),
 		}
-
-		// This will always run before everything else.
-		initDB := dbs[0]
-		coll := initDB.Collection([]byte("simc"))
-		coll.Create(context.Background())
-
-		keys := make([]glassdb.FQKey, int(numKeys))
-		for i := 0; i < int(numKeys); i++ {
-			keys[i] = glassdb.FQKey{
-				Collection: coll,
-				Key:        []byte(fmt.Sprintf("key%d", i)),
-			}
-		}
+		collName := []byte("simc")
 		keyNames := make([]simulator.CollectionKey, int(numKeys))
 		for i := 0; i < int(numKeys); i++ {
 			keyNames[i] = simulator.CollectionKey{
-				Collection: []byte("simc"),
-				Key:        keys[i].Key,
+				Collection: collName,
+				Key:        []byte(fmt.Sprintf("key%d", i)),
 			}
 		}
+
+		toFQKey := func(db *glassdb.DB) []glassdb.FQKey {
+			res := make([]glassdb.FQKey, len(keyNames))
+			for i := 0; i < int(numKeys); i++ {
+				res[i] = glassdb.FQKey{
+					Collection: db.Collection(keyNames[i].Collection),
+					Key:        keyNames[i].Key,
+				}
+			}
+			return res
+		}
+
+		// This will always run before everything else.
+		err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+			coll := db.Collection(collName)
+			return coll.Create(context.Background())
+		})
+		assert.NoError(t, err)
 
 		// These will run in parallel pseudo-deterministically.
 		sim.Run(ctx, "init-tx", dbs[0], func(ctx context.Context, db *glassdb.DB) error {
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
-				for _, k := range keys {
-					tx.Write(k.Collection, k.Key, []byte{0})
+				coll := db.Collection(collName)
+				for _, k := range keyNames {
+					tx.Write(coll, k.Key, []byte{0})
 				}
 				return nil
 			})
 		})
-		sim.Run(ctx, "rtx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
+		sim.Run(ctx, "r-tx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
+			keys := toFQKey(db)
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for _, r := range res {
@@ -98,6 +108,7 @@ func FuzzReadWhileWrite(f *testing.F) {
 			})
 		})
 		sim.Run(ctx, "w-tx", selectDB(dbs, wdb2), func(ctx context.Context, db *glassdb.DB) error {
+			keys := toFQKey(db)
 			return db.Tx(ctx, func(tx *glassdb.Tx) error {
 				res := tx.ReadMulti(keys)
 				for i, r := range res {
@@ -111,7 +122,8 @@ func FuzzReadWhileWrite(f *testing.F) {
 				return nil
 			})
 		})
-		sim.Wait()
+		_ = sim.Wait() // The error here doesn't matter.
+
 		if err := sim.Verify(ctx, keyNames); err != nil {
 			f.Failed()
 		}

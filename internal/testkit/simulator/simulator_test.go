@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mbrt/glassdb"
+	"github.com/mbrt/glassdb/internal/data"
 )
 
 func TestBase(t *testing.T) {
@@ -43,6 +44,29 @@ func TestBase(t *testing.T) {
 	assert.Equal(t, []int{1, 0}, []int{<-ch, <-ch})
 }
 
+func TestDeterministicTxID(t *testing.T) {
+	ctx := context.Background()
+	sim := New(t, []byte{0})
+	db := sim.DBInstance()
+
+	err := sim.Init(ctx, func(ctx context.Context, d *glassdb.DB) error {
+		coll := db.Collection([]byte("foo"))
+		return coll.Create(ctx)
+	})
+	assert.NoError(t, err)
+
+	sim.Run(ctx, "tx-id", db, func(ctx context.Context, db *glassdb.DB) error {
+		coll := db.Collection([]byte("foo"))
+		coll.Write(ctx, []byte("key"), []byte("val"))
+		return nil
+	})
+	err = sim.Wait()
+	assert.NoError(t, err)
+
+	txs := sim.backend.CommitOrder()
+	assert.Equal(t, []data.TxID{data.TxID([]byte("tx-id"))}, txs)
+}
+
 func TestDB(t *testing.T) {
 	// The test should never last more than 100 milliseconds in real time.
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -50,11 +74,14 @@ func TestDB(t *testing.T) {
 
 	sim := New(t, []byte{0})
 	db := sim.DBInstance()
+	err := sim.Init(ctx, func(ctx context.Context, d *glassdb.DB) error {
+		coll := db.Collection([]byte("foo"))
+		return coll.Create(ctx)
+	})
+	assert.NoError(t, err)
+
 	sim.Run(ctx, "one", db, func(ctx context.Context, db *glassdb.DB) error {
 		coll := db.Collection([]byte("foo"))
-		if err := coll.Create(ctx); err != nil {
-			return err
-		}
 		if err := coll.Write(ctx, []byte("key"), []byte("val")); err != nil {
 			return err
 		}
@@ -67,7 +94,8 @@ func TestDB(t *testing.T) {
 		}
 		return nil
 	})
-	err := sim.Wait()
+	err = sim.Wait()
+
 	// TODO: Better check for more specific errors.
 	assert.NotErrorIs(t, err, context.Canceled)
 }
