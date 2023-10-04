@@ -200,6 +200,7 @@ func (t Algo) End(ctx context.Context, tx *Handle) error {
 		return nil
 	}
 	// Release all the locks and abort.
+	// TODO: This fails when the context was already canceled.
 	if err := t.mon.AbortTx(ctx, tx.id); err != nil {
 		tx.log.LogAttrs(ctx, slog.LevelError, "Commit End", errAttr(err))
 		// Schedule follow-up cleanup.
