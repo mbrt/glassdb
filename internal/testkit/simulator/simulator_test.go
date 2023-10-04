@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/internal/data"
@@ -163,4 +164,41 @@ func TestDB(t *testing.T) {
 
 	// TODO: Better check for more specific errors.
 	assert.NotErrorIs(t, err, context.Canceled)
+}
+
+func TestDeterminism(t *testing.T) {
+	ctx := context.Background()
+	var ops []BackendOp
+
+	for i := 0; i < 50; i++ {
+		sim := New(t, []byte{0})
+		collName := []byte("coll")
+
+		err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+			coll := db.Collection(collName)
+			return coll.Create(ctx)
+		})
+		assert.NoError(t, err)
+
+		testDB := sim.DBInstance()
+		sim.Run(ctx, "tx0", testDB, func(ctx context.Context, db *glassdb.DB) error {
+			coll := db.Collection(collName)
+			coll.Write(ctx, []byte("key1"), []byte("val"))
+			return nil
+		})
+		sim.Run(ctx, "tx1", testDB, func(ctx context.Context, db *glassdb.DB) error {
+			coll := db.Collection(collName)
+			coll.Write(ctx, []byte("key2"), []byte("val"))
+			return nil
+		})
+		err = sim.Wait()
+		assert.NoError(t, err)
+
+		newOps := sim.Ops()
+		if ops == nil {
+			ops = newOps
+			continue
+		}
+		require.Equal(t, ops, newOps, "iteration #%d", i)
+	}
 }

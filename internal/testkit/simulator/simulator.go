@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -183,9 +184,28 @@ func (s *Sim) NotifyReadValue(ctx context.Context, k CollectionKey, val []byte) 
 	s.readValues[string(id)] = append(rvs, readValue{Key: k, Value: val})
 }
 
+func (s *Sim) Ops() []BackendOp {
+	return s.backend.Ops()
+}
+
 type CollectionKey struct {
 	Collection []byte
 	Key        []byte
+}
+
+type BackendOpType int
+
+const (
+	BackendOpTypeUnknown BackendOpType = iota
+	BackendOpTypeSetTagsIf
+	BackendOpTypeWrite
+	BackendOpTypeWriteIf
+	BackendOpTypeWriteIfNotExists
+)
+
+type BackendOp struct {
+	Type BackendOpType
+	Path string
 }
 
 type readValue struct {
@@ -222,7 +242,8 @@ func newBackend(c *testkit.SimulatedClock) *simBackend {
 
 type simBackend struct {
 	backend.Backend
-	txOrder     []string
+	txOrder     []data.TxID
+	opsOrder    []BackendOp
 	committedTx stringset.Set
 	m           sync.Mutex
 }
@@ -233,6 +254,7 @@ func (b *simBackend) SetTagsIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
+	b.logOp(BackendOpTypeSetTagsIf, path)
 	m, err := b.Backend.SetTagsIf(ctx, path, expected, t)
 	if err != nil {
 		return m, err
@@ -247,6 +269,7 @@ func (b *simBackend) Write(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
+	b.logOp(BackendOpTypeWrite, path)
 	m, err := b.Backend.Write(ctx, path, value, t)
 	if err != nil {
 		return m, err
@@ -262,6 +285,7 @@ func (b *simBackend) WriteIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
+	b.logOp(BackendOpTypeWriteIf, path)
 	m, err := b.Backend.WriteIf(ctx, path, value, expected, t)
 	if err != nil {
 		return m, err
@@ -276,6 +300,7 @@ func (b *simBackend) WriteIfNotExists(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
+	b.logOp(BackendOpTypeWriteIfNotExists, path)
 	m, err := b.Backend.WriteIfNotExists(ctx, path, value, t)
 	if err != nil {
 		return m, err
@@ -288,11 +313,7 @@ func (b *simBackend) CommitOrder() []data.TxID {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	var res []data.TxID
-	for _, str := range b.txOrder {
-		res = append(res, data.TxID(str))
-	}
-	return res
+	return slices.Clone(b.txOrder)
 }
 
 func (b *simBackend) NotifyCommitted(txid data.TxID) {
@@ -302,8 +323,21 @@ func (b *simBackend) NotifyCommitted(txid data.TxID) {
 	stid := string(txid)
 	if !b.committedTx.Has(stid) {
 		b.committedTx.Add(stid)
-		b.txOrder = append(b.txOrder, stid)
+		b.txOrder = append(b.txOrder, txid)
 	}
+}
+
+func (b *simBackend) Ops() []BackendOp {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return slices.Clone(b.opsOrder)
+}
+
+func (b *simBackend) logOp(tp BackendOpType, path string) {
+	b.m.Lock()
+	b.opsOrder = append(b.opsOrder, BackendOp{Type: tp, Path: path})
+	b.m.Unlock()
 }
 
 func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
@@ -334,14 +368,14 @@ func (b *simBackend) checkCommittedTx(path string, t backend.Tags) {
 			return
 		}
 		b.committedTx.Add(string(tx))
-		b.txOrder = append(b.txOrder, string(tx))
+		b.txOrder = append(b.txOrder, tx)
 		return
 	}
 	if pi.Type != paths.KeyType || len(ti.LastWriter) == 0 {
 		return
 	}
 	b.committedTx.Add(string(ti.LastWriter))
-	b.txOrder = append(b.txOrder, string(ti.LastWriter))
+	b.txOrder = append(b.txOrder, ti.LastWriter)
 }
 
 func newClock(t *testing.T, random []byte) *testkit.SimulatedClock {
