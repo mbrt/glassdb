@@ -296,6 +296,9 @@ func (b *simBackend) CommitOrder() []data.TxID {
 }
 
 func (b *simBackend) NotifyCommitted(txid data.TxID) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
 	stid := string(txid)
 	if !b.committedTx.Has(stid) {
 		b.committedTx.Add(stid)
