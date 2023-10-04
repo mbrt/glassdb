@@ -44,10 +44,10 @@ func selectDB(dbs []*glassdb.DB, second bool) *glassdb.DB {
 	return dbs[0]
 }
 
-func FuzzReadWhileWrite(f *testing.F) {
-	f.Add(false, false, uint8(1), deterministicRandBytes(42, 1024))
-	f.Add(false, true, uint8(2), deterministicRandBytes(3, 1024))
-	f.Add(true, false, uint8(2), deterministicRandBytes(666, 1024))
+func FuzzReadWriteInit(f *testing.F) {
+	f.Add(false, false, uint8(1), deterministicRandBytes(42, 512))
+	f.Add(false, true, uint8(2), deterministicRandBytes(3, 512))
+	f.Add(true, false, uint8(2), deterministicRandBytes(666, 512))
 
 	f.Fuzz(func(t *testing.T, rdb2, wdb2 bool, numKeys uint8, rnd []byte) {
 		// The test should never last more than 500 ms in real time.
@@ -129,6 +129,121 @@ func FuzzReadWhileWrite(f *testing.F) {
 						return r.Err
 					}
 					if err := tx.Write(keys[i].Collection, keys[i].Key, []byte{1}); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		})
+		_ = sim.Wait() // The error here doesn't matter.
+
+		if err := sim.Verify(ctx, keyNames); err != nil {
+			f.Failed()
+		}
+	})
+}
+
+func FuzzReadWrite2(f *testing.F) {
+	f.Add(false, false, false, uint8(1), deterministicRandBytes(42, 512))
+	f.Add(false, true, true, uint8(2), deterministicRandBytes(3, 512))
+	f.Add(true, true, false, uint8(2), deterministicRandBytes(666, 512))
+
+	f.Fuzz(func(t *testing.T, rdb2, w1db2, w2db2 bool, numKeys uint8, rnd []byte) {
+		// The test should never last more than 500 ms in real time.
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		sim := simulator.New(t, rnd)
+		dbs := []*glassdb.DB{
+			sim.DBInstance(), sim.DBInstance(),
+		}
+		collName := []byte("simc")
+		keyNames := make([]simulator.CollectionKey, int(numKeys))
+		for i := 0; i < int(numKeys); i++ {
+			keyNames[i] = simulator.CollectionKey{
+				Collection: collName,
+				Key:        []byte(fmt.Sprintf("key%d", i)),
+			}
+		}
+
+		toFQKey := func(db *glassdb.DB) []glassdb.FQKey {
+			res := make([]glassdb.FQKey, len(keyNames))
+			for i := 0; i < int(numKeys); i++ {
+				res[i] = glassdb.FQKey{
+					Collection: db.Collection(keyNames[i].Collection),
+					Key:        keyNames[i].Key,
+				}
+			}
+			return res
+		}
+
+		// This will always run before everything else.
+		err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+			coll := db.Collection(collName)
+			if err := coll.Create(context.Background()); err != nil {
+				return err
+			}
+			return db.Tx(ctx, func(tx *glassdb.Tx) error {
+				for _, k := range keyNames {
+					if err := tx.Write(coll, k.Key, []byte{0}); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		})
+		assert.NoError(t, err)
+
+		// These will run in parallel pseudo-deterministically.
+		sim.Run(ctx, "r-tx", selectDB(dbs, rdb2), func(ctx context.Context, db *glassdb.DB) error {
+			keys := toFQKey(db)
+			var readVals [][]byte
+
+			err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+				readVals = nil // Idempotence.
+				res := tx.ReadMulti(keys)
+				for _, r := range res {
+					if r.Err != nil {
+						return r.Err
+					}
+					readVals = append(readVals, r.Value)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+
+			// Notify the reads.
+			for i := 0; i < len(keyNames); i++ {
+				sim.NotifyReadValue(ctx, keyNames[i], readVals[i])
+			}
+			return nil
+		})
+		sim.Run(ctx, "w1-tx", selectDB(dbs, w1db2), func(ctx context.Context, db *glassdb.DB) error {
+			keys := toFQKey(db)
+			return db.Tx(ctx, func(tx *glassdb.Tx) error {
+				res := tx.ReadMulti(keys)
+				for i, r := range res {
+					if r.Err != nil {
+						return r.Err
+					}
+					if err := tx.Write(keys[i].Collection, keys[i].Key, []byte{1}); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		})
+		sim.Run(ctx, "w2-tx", selectDB(dbs, w2db2), func(ctx context.Context, db *glassdb.DB) error {
+			keys := toFQKey(db)
+			return db.Tx(ctx, func(tx *glassdb.Tx) error {
+				res := tx.ReadMulti(keys)
+				for i, r := range res {
+					if r.Err != nil {
+						return r.Err
+					}
+					if err := tx.Write(keys[i].Collection, keys[i].Key, []byte{2}); err != nil {
 						return err
 					}
 				}
