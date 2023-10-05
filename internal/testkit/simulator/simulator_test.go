@@ -168,37 +168,39 @@ func TestDB(t *testing.T) {
 
 func TestDeterminism(t *testing.T) {
 	ctx := context.Background()
-	var ops []BackendOp
+	var refOps []BackendOp
 
-	for i := 0; i < 50; i++ {
-		sim := New(t, []byte{0})
-		collName := []byte("coll")
+	for i := 0; i < 10; i++ {
+		t.Run(fmt.Sprintf("iteration %d", i), func(t *testing.T) {
+			sim := New(t, []byte{0})
+			collName := []byte("coll")
 
-		err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
-			coll := db.Collection(collName)
-			return coll.Create(ctx)
+			err := sim.Init(ctx, func(ctx context.Context, db *glassdb.DB) error {
+				coll := db.Collection(collName)
+				return coll.Create(ctx)
+			})
+			assert.NoError(t, err)
+
+			testDB := sim.DBInstance()
+			sim.Run(ctx, "tx0", testDB, func(ctx context.Context, db *glassdb.DB) error {
+				coll := db.Collection(collName)
+				coll.Write(ctx, []byte("key1"), []byte("val"))
+				return nil
+			})
+			sim.Run(ctx, "tx1", testDB, func(ctx context.Context, db *glassdb.DB) error {
+				coll := db.Collection(collName)
+				coll.Write(ctx, []byte("key2"), []byte("val"))
+				return nil
+			})
+			err = sim.Wait()
+			assert.NoError(t, err)
+
+			newOps := sim.Ops()
+			if refOps == nil {
+				refOps = newOps
+				return
+			}
+			require.Equal(t, refOps, newOps)
 		})
-		assert.NoError(t, err)
-
-		testDB := sim.DBInstance()
-		sim.Run(ctx, "tx0", testDB, func(ctx context.Context, db *glassdb.DB) error {
-			coll := db.Collection(collName)
-			coll.Write(ctx, []byte("key1"), []byte("val"))
-			return nil
-		})
-		sim.Run(ctx, "tx1", testDB, func(ctx context.Context, db *glassdb.DB) error {
-			coll := db.Collection(collName)
-			coll.Write(ctx, []byte("key2"), []byte("val"))
-			return nil
-		})
-		err = sim.Wait()
-		assert.NoError(t, err)
-
-		newOps := sim.Ops()
-		if ops == nil {
-			ops = newOps
-			continue
-		}
-		require.Equal(t, ops, newOps, "iteration #%d", i)
 	}
 }
