@@ -16,6 +16,7 @@ package testkit
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -63,7 +64,19 @@ func (c aclock) After(d time.Duration) <-chan time.Time {
 }
 
 func (c aclock) Sleep(d time.Duration) {
-	c.inner.Sleep(c.compress(d))
+	d = c.compress(d)
+	// The only guarantee for a sleep is that it will take "at lest" the
+	// duration you give it. This means sometimes sleeping way longer than the
+	// duration and this results in much slower tests. I observed that often
+	// times a microsecond sleep results in a millisecond waiting.
+	//
+	// The way to fix this is to trade in some CPU and do "busy waiting" instead
+	// for short durations.
+	if d < 500*time.Microsecond {
+		busyWait(d)
+	} else {
+		c.inner.Sleep(d)
+	}
 }
 
 func (c aclock) Now() time.Time {
@@ -110,6 +123,15 @@ type atimer struct {
 
 func (t atimer) Reset(d time.Duration) bool {
 	return t.Timer.Reset(d / time.Duration(t.multiplier))
+}
+
+func busyWait(d time.Duration) {
+	// Wait by repeatedly yielding to the scheduler.
+	start := time.Now()
+	runtime.Gosched()
+	for time.Since(start) < d {
+		runtime.Gosched()
+	}
 }
 
 // Make sure the Clock interface is implemented correctly.
