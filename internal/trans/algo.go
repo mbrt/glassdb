@@ -100,8 +100,8 @@ type Algo struct {
 	log        *slog.Logger
 }
 
-func (t Algo) Begin(d Data) *Handle {
-	tid := data.NewTId()
+func (t Algo) Begin(ctx context.Context, d Data) *Handle {
+	tid := newTxID(ctx)
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -200,6 +200,7 @@ func (t Algo) End(ctx context.Context, tx *Handle) error {
 		return nil
 	}
 	// Release all the locks and abort.
+	// TODO: This fails when the context was already canceled.
 	if err := t.mon.AbortTx(ctx, tx.id); err != nil {
 		tx.log.LogAttrs(ctx, slog.LevelError, "Commit End", errAttr(err))
 		// Schedule follow-up cleanup.
@@ -1092,6 +1093,19 @@ type Handle struct {
 	log           *slog.Logger
 }
 
+var txIDKey = struct{}{}
+
+func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
+	return context.WithValue(ctx, txIDKey, id)
+}
+
+func TxIDFromCtx(ctx context.Context) data.TxID {
+	if id, ok := ctx.Value(txIDKey).(data.TxID); ok {
+		return id
+	}
+	return nil
+}
+
 type validationState struct {
 	Paths []pathState
 }
@@ -1313,4 +1327,12 @@ type txLog data.TxID
 
 func (t txLog) LogValue() slog.Value {
 	return slog.StringValue(data.TxID(t).String())
+}
+
+func newTxID(ctx context.Context) data.TxID {
+	// Allow for deterministic transaction IDs (only in tests).
+	if id := TxIDFromCtx(ctx); id != nil {
+		return id
+	}
+	return data.NewTId()
 }

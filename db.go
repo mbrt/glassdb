@@ -191,7 +191,7 @@ func (d *DB) txImpl(ctx context.Context, fn func(tx *Tx) error, stats *Stats) (e
 		stats.TxReads += len(access.Reads)
 		stats.TxWrites += len(access.Writes)
 		if handle == nil {
-			handle = d.algo.Begin(access)
+			handle = d.algo.Begin(ctx, access)
 		} else {
 			d.algo.Reset(handle, access)
 		}
@@ -226,7 +226,6 @@ func (d *DB) txImpl(ctx context.Context, fn func(tx *Tx) error, stats *Stats) (e
 				continue
 			}
 			// Consider aborted.
-			// TODO: Restart the transaction on trans.ErrTxAlreadyFinalized.
 			return err
 		}
 

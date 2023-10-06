@@ -394,7 +394,7 @@ func (l lockerWorker) waitForTx(ctx context.Context, key string, txs []data.TxID
 			return ctx.Err()
 		case <-l.locker.tmon.WaitForTx(ctx, tx):
 		case <-wctx.nextReqCh:
-		case <-wctx.Timer().Chan():
+		case <-wctx.clock.After(waitPollDuration):
 		}
 
 		break
@@ -463,23 +463,7 @@ type lockOpResult struct {
 
 type waitCtx struct {
 	clock     clockwork.Clock
-	timer     clockwork.Timer
 	nextReqCh <-chan struct{}
-}
-
-func (w *waitCtx) Timer() clockwork.Timer {
-	if w.timer == nil {
-		w.timer = w.clock.NewTimer(waitPollDuration)
-		return w.timer
-	}
-	w.timer.Reset(waitPollDuration)
-	return w.timer
-}
-
-func (w *waitCtx) Close() {
-	if w.timer != nil {
-		w.timer.Stop()
-	}
 }
 
 // txLocks maps a path to its current lock.

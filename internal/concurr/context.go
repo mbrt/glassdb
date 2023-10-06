@@ -27,13 +27,9 @@ func ContextWithTimeout(
 	timeout time.Duration,
 ) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
-	go func() {
-		select {
-		case <-clock.After(timeout):
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	clock.AfterFunc(timeout, func() {
+		cancel()
+	})
 	return ctx, cancel
 }
 
