@@ -371,11 +371,12 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		if err != nil {
 			return err
 		}
-		if v.Value.NotWritten {
+		switch {
+		case v.Value.NotWritten:
 			expectedWriter = li.LastWriter
-		} else if v.Value.Deleted {
+		case v.Value.Deleted:
 			expectedDeleted = true
-		} else {
+		default:
 			expectedWriter = locker
 			expectedVal = v
 		}
