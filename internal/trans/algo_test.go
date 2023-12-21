@@ -433,6 +433,69 @@ func TestReadonlyAfterDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestReadonlyLocalAfterDelete(t *testing.T) {
+	ctx := context.Background()
+	tm, tctx := testAlgoContext(t)
+	keyp := paths.FromKey("testp", []byte("k"))
+
+	// Commit the value and delete from the same algo.
+	commitWrites(t, tm, []WriteAccess{
+		{
+			Path: keyp,
+			Val:  []byte("v"),
+		},
+	})
+	commitWrites(t, tm, []WriteAccess{
+		{
+			Path:   keyp,
+			Delete: true,
+		},
+	})
+
+	// Read the value.
+	r, err := doRead(ctx, tctx, keyp)
+	assert.NoError(t, err)
+
+	// Then commit.
+	h := tm.Begin(ctx, Data{
+		Reads: []ReadAccess{r},
+	})
+	err = tm.Commit(ctx, h)
+	assert.NoError(t, err)
+}
+
+func TestReadonlyLocalAfterDeleteFlushed(t *testing.T) {
+	ctx := context.Background()
+	tm, tctx := testAlgoContext(t)
+	keyp := paths.FromKey("testp", []byte("k"))
+
+	// Commit the value and delete from the same algo.
+	commitWrites(t, tm, []WriteAccess{
+		{
+			Path: keyp,
+			Val:  []byte("v"),
+		},
+	})
+	h := commitWrites(t, tm, []WriteAccess{
+		{
+			Path:   keyp,
+			Delete: true,
+		},
+	})
+	flushWrites(t, tm, h)
+
+	// Read the value.
+	r, err := doRead(ctx, tctx, keyp)
+	assert.NoError(t, err)
+
+	// Then commit.
+	h = tm.Begin(ctx, Data{
+		Reads: []ReadAccess{r},
+	})
+	err = tm.Commit(ctx, h)
+	assert.NoError(t, err)
+}
+
 func TestReadonlyFromUncommitted(t *testing.T) {
 	ctx := context.Background()
 	tm, tctx := testAlgoContext(t)

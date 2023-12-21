@@ -293,7 +293,8 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 	// since, nor locked by others) and avoid any locking.
 	err := t.fanout(ctx, len(vstate.Paths), func(ctx context.Context, i int) error {
 		item := &vstate.Paths[i]
-		if item.ReadVersion.IsLocal() {
+		if item.ReadVersion.IsLocal() || item.NotFound {
+			// TODO: Refactor localReadNotFound separately.
 			return t.validateLocalRead(ctx, item)
 		}
 		return t.validateBackendRead(ctx, item)
@@ -360,8 +361,9 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 
 	// Determine what's the expected last writer.
 	var (
-		expectedWriter data.TxID
-		expectedVal    KeyCommitStatus
+		expectedWriter  data.TxID
+		expectedVal     KeyCommitStatus
+		expectedDeleted bool
 	)
 	switch status {
 	case storage.TxCommitStatusOK:
@@ -371,6 +373,8 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		}
 		if v.Value.NotWritten {
 			expectedWriter = li.LastWriter
+		} else if v.Value.Deleted {
+			expectedDeleted = true
 		} else {
 			expectedWriter = locker
 			expectedVal = v
@@ -381,6 +385,17 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 
 	default:
 		return fmt.Errorf("unknown tx commit status: %v", status)
+	}
+
+	// Deleted items need to be checked separately, because they have no
+	// "read" version.
+	if expectedDeleted {
+		if item.NotFound {
+			item.Result = vResultOK
+			return nil
+		}
+		item.Result = vResultRetry
+		return nil
 	}
 
 	if readFromT.Equal(expectedWriter) {
