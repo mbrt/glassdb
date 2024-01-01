@@ -3,7 +3,7 @@ module github.com/mbrt/glassdb
 go 1.21
 
 require (
-	cloud.google.com/go/storage v1.35.1
+	cloud.google.com/go/storage v1.36.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/golang/protobuf v1.5.3
 	github.com/googleapis/gax-go/v2 v2.12.0
