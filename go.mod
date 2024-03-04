@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.39.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/golang/protobuf v1.5.3
-	github.com/googleapis/gax-go/v2 v2.12.1
+	github.com/googleapis/gax-go/v2 v2.12.2
 	github.com/gorilla/mux v1.8.1
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/sourcegraph/conc v0.3.0
