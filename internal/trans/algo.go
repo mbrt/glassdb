@@ -293,8 +293,10 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 	// since, nor locked by others) and avoid any locking.
 	err := t.fanout(ctx, len(vstate.Paths), func(ctx context.Context, i int) error {
 		item := &vstate.Paths[i]
-		if item.ReadVersion.IsLocal() || item.NotFound {
-			// TODO: Refactor localReadNotFound separately.
+		if item.NotFound {
+			return t.validateReadNotFound(ctx, item)
+		}
+		if item.ReadVersion.IsLocal() {
 			return t.validateLocalRead(ctx, item)
 		}
 		return t.validateBackendRead(ctx, item)
@@ -313,15 +315,14 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 }
 
 func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
+	if item.NotFound {
+		return t.validateReadNotFound(ctx, item)
+	}
+
 	// We need the freshest possible meta, because we don't have a lock.
 	meta, err := t.global.GetMetadata(ctx, item.Path)
 	if err != nil {
 		if errors.Is(err, backend.ErrNotFound) {
-			if item.NotFound {
-				// All good here, the item is still not found now.
-				item.Result = vResultOK
-				return nil
-			}
 			// The item is not there anymore. Retry.
 			item.Result = vResultRetry
 			return nil
@@ -361,9 +362,8 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 
 	// Determine what's the expected last writer.
 	var (
-		expectedWriter  data.TxID
-		expectedVal     KeyCommitStatus
-		expectedDeleted bool
+		expectedWriter data.TxID
+		expectedVal    KeyCommitStatus
 	)
 	switch status {
 	case storage.TxCommitStatusOK:
@@ -375,7 +375,9 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		case v.Value.NotWritten:
 			expectedWriter = li.LastWriter
 		case v.Value.Deleted:
-			expectedDeleted = true
+			// We expected something but this was deleted.
+			item.Result = vResultRetry
+			return nil
 		default:
 			expectedWriter = locker
 			expectedVal = v
@@ -386,17 +388,6 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 
 	default:
 		return fmt.Errorf("unknown tx commit status: %v", status)
-	}
-
-	// Deleted items need to be checked separately, because they have no
-	// "read" version.
-	if expectedDeleted {
-		if item.NotFound {
-			item.Result = vResultOK
-			return nil
-		}
-		item.Result = vResultRetry
-		return nil
 	}
 
 	if readFromT.Equal(expectedWriter) {
@@ -427,10 +418,84 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 	return nil
 }
 
-func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
-	if item.NotFound {
-		return t.validateBackendReadNotFound(ctx, item)
+func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
+	// We need the freshest possible meta, because we don't have a lock.
+	meta, err := t.global.GetMetadata(ctx, item.Path)
+	if err != nil {
+		if errors.Is(err, backend.ErrNotFound) {
+			// All good here, the item is still not found now.
+			item.Result = vResultOK
+			return nil
+		}
+		return err
 	}
+
+	// Check the current state of the item.
+	li, err := storage.TagsLockInfo(meta.Tags)
+	if err != nil {
+		return err
+	}
+
+	// If the item is not locked, some transaction committed. We need to retry.
+	if li.Type == storage.LockTypeNone {
+		item.Result = vResultRetry
+		return nil
+	}
+
+	// The item is locked. If this is locked in read, it means another
+	// transaction before us committed in write.
+	if li.Type == storage.LockTypeRead {
+		item.Result = vResultRetry
+		return nil
+	}
+
+	// The item is locked in write. If the current transaction committed, we
+	// need to check whether the item was deleted.
+	if len(li.LockedBy) != 1 {
+		return fmt.Errorf("bad lock: %q with %d lockers", li.Type, len(li.LockedBy))
+	}
+	locker := li.LockedBy[0]
+	status, err := t.mon.TxStatus(ctx, locker)
+	if err != nil {
+		return err
+	}
+
+	var lastWriter data.TxID
+
+	switch status {
+	case storage.TxCommitStatusOK:
+		lastWriter = locker
+
+	case storage.TxCommitStatusAborted, storage.TxCommitStatusPending:
+		lastWriter = li.LastWriter
+
+	default:
+		return fmt.Errorf("unknown tx commit status: %v", status)
+	}
+
+	// We need to check whether the last writer deleted the item or not.
+	v, err := t.mon.CommittedValue(ctx, item.Path, lastWriter)
+	if err != nil {
+		return err
+	}
+	if v.Value.Deleted {
+		item.Result = vResultOK
+		return nil
+	}
+
+	// Was written to. Update local cache and retry.
+	t.updateLocal(
+		WriteAccess{
+			Path:   item.Path,
+			Val:    v.Value.Value,
+			Delete: v.Value.Deleted},
+		lastWriter)
+
+	item.Result = vResultRetry
+	return nil
+}
+
+func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
 	// Here the item was found.
 	// We need the freshest possible meta, because we don't have a lock.
 	meta, err := t.global.GetMetadata(ctx, item.Path)
@@ -511,41 +576,6 @@ func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
 			Delete: v.Value.Deleted},
 		locker)
 	item.Result = vResultRetry
-	return nil
-}
-
-func (t Algo) validateBackendReadNotFound(ctx context.Context, item *pathState) error {
-	meta, err := t.global.GetMetadata(ctx, item.Path)
-	if errors.Is(err, backend.ErrNotFound) {
-		// All good here, the item is still not found now.
-		item.Result = vResultOK
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	// It was not found, but now it's there. There's only one valid
-	// state: which is a non-committed lock-create.
-	li, err := storage.TagsLockInfo(meta.Tags)
-	if err != nil {
-		return err
-	}
-	if li.Type != storage.LockTypeCreate {
-		item.Result = vResultRetry
-		return nil
-	}
-	if len(li.LockedBy) != 1 {
-		return fmt.Errorf("bad lock: %q with %d lockers", li.Type, len(li.LockedBy))
-	}
-	status, err := t.mon.TxStatus(ctx, li.LockedBy[0])
-	if err != nil {
-		return err
-	}
-	if status == storage.TxCommitStatusOK {
-		item.Result = vResultRetry
-		return nil
-	}
-	item.Result = vResultOK
 	return nil
 }
 
