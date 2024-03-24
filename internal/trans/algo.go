@@ -315,10 +315,6 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 }
 
 func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
-	if item.NotFound {
-		return t.validateReadNotFound(ctx, item)
-	}
-
 	// We need the freshest possible meta, because we don't have a lock.
 	meta, err := t.global.GetMetadata(ctx, item.Path)
 	if err != nil {
