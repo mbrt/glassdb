@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	cloud.google.com/go/storage v1.40.0
-	github.com/cenkalti/backoff/v4 v4.2.1
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/golang/protobuf v1.5.4
 	github.com/googleapis/gax-go/v2 v2.12.3
 	github.com/gorilla/mux v1.8.1
