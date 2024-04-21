@@ -145,7 +145,11 @@ func (d *controller) Request(key string) Request {
 	newReq := c.Curr.Main.Request
 	for _, r := range c.Curr.Other {
 		// Requests in the bundle are mergeable by definition.
-		newReq, _ = newReq.Merge(r.Request)
+		var ok bool
+		newReq, ok = newReq.Merge(r.Request)
+		if !ok {
+			panic("dedup: unexpected non-mergeable request in the bundle")
+		}
 	}
 
 	// Merge pending requests. Any mergeable will join the bundle.

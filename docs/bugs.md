@@ -16,9 +16,9 @@ Example trace:
 
 With some translation:
 
-* `mWM_ZtvtYPzaBVtyTfYg2Q==` -> 99633f66dbed60fcda055b724df620d9
-* `2-5ygdNxvw0zuVOMI4qF3A==` -> dbee7281d371bf0d33b9538c238a85dc
-* `pbXUUH0jZveeMaROyYhNIg==` -> a5b5d4507d2366f79e31a44ec9884d22
+* `mWM_ZtvtYPzaBVtyTfYg2Q==` -> `99633f66dbed60fcda055b724df620d9`
+* `2-5ygdNxvw0zuVOMI4qF3A==` -> `dbee7281d371bf0d33b9538c238a85dc`
+* `pbXUUH0jZveeMaROyYhNIg==` -> `a5b5d4507d2366f79e31a44ec9884d22`
 
 ```log
 2023/03/15 09:55:23 Tx: txid, LockWrite("key") BEGIN
@@ -203,19 +203,19 @@ panic: send on closed channel
 
 goroutine 763298 [running]:
 github.com/mbrt/glassdb/internal/trans.(*Monitor).BeginTx(0xc000000780, {0xe486a0, 0xc000a560a0}, {0xc0007048a0, 0x10, 0x10})
-        /home/michele/Documents/Development/Progetti/glassdb/internal/trans/monitor.go:60 +0x1ff
+        /ws/glassdb/internal/trans/monitor.go:60 +0x1ff
 github.com/mbrt/glassdb/internal/trans.Algo.Commit({{0xe4aaf0, 0xc0008daae0}, {{0xe4c640, 0xc0008dad20}, {0xc0008dac30, {0xe4aaf0, 0xc0008daae0}}, {0xe4aaf0, 0xc0008daae0}}, {0xc0008dac30, ...}, ...}, ...)
-        /home/michele/Documents/Development/Progetti/glassdb/internal/trans/algo.go:93 +0x70
+        /ws/glassdb/internal/trans/algo.go:93 +0x70
 github.com/mbrt/glassdb.(*DB).txImpl(0xc000004c00, {0xe486a0?, 0xc000a560a0}, 0xc000533f40, 0xc000533ea0)
-        /home/michele/Documents/Development/Progetti/glassdb/db.go:185 +0xa6e
+        /ws/glassdb/db.go:185 +0xa6e
 github.com/mbrt/glassdb.(*DB).Tx(0xc000004c00, {0xe486a0, 0xc000a560a0}, 0xc0007f1f58?)
-        /home/michele/Documents/Development/Progetti/glassdb/db.go:110 +0xcf
+        /ws/glassdb/db.go:110 +0xcf
 github.com/mbrt/glassdb_test.BenchmarkSharedR.func2({0xc00108c110?, 0xc000be62d0?, 0x4433e5?})
-        /home/michele/Documents/Development/Progetti/glassdb/bench_test.go:226 +0x93
+        /ws/glassdb/bench_test.go:226 +0x93
 github.com/mbrt/glassdb_test.BenchmarkSharedR.func3()
-        /home/michele/Documents/Development/Progetti/glassdb/bench_test.go:237 +0x66
+        /ws/glassdb/bench_test.go:237 +0x66
 created by github.com/mbrt/glassdb_test.BenchmarkSharedR
-        /home/michele/Documents/Development/Progetti/glassdb/bench_test.go:235 +0x5ac
+        /ws/glassdb/bench_test.go:235 +0x5ac
 ```
 
 This happens because transactions run after `db.Close()`. We need to make sure
@@ -261,3 +261,135 @@ Completely indistinguishable.
 
 As the client is very complicated, a quick fix for this was to just always send
 the CRC32 field along with every upload.
+
+## Deadlock in ReadMulti + Write
+
+This is happening in `TestReadMulti`, which reads and writes 15 keys in the same
+transaction. There are no parallel transactions and these are executed 30 times
+in a row.
+
+The observed deadlock is:
+
+```log
+panic: test timed out after 2m0s
+running tests:
+	TestReadMulti (1m48s)
+	TestReadMulti/gcs (1m48s)
+
+goroutine 124957 [chan receive, 1 minutes]:
+testing.(*T).Run(0xc000552b60, {0xd7a349?, 0xeb1f80?}, 0xc000618360)
+	/usr/lib/go/src/testing/testing.go:1750 +0x3ab
+github.com/mbrt/glassdb_test.TestReadMulti(0xc000552b60)
+	/ws/glassdb/glassdb_test.go:479 +0xf0
+testing.tRunner(0xc000552b60, 0xdcfc98)
+	/usr/lib/go/src/testing/testing.go:1689 +0xfb
+created by testing.(*T).Run in goroutine 1
+	/usr/lib/go/src/testing/testing.go:1742 +0x390
+
+goroutine 125011 [semacquire, 1 minutes]:
+sync.runtime_Semacquire(0xc00062c4c0?)
+	/usr/lib/go/src/runtime/sema.go:62 +0x25
+sync.(*WaitGroup).Wait(0xc00062c4c0?)
+	/usr/lib/go/src/sync/waitgroup.go:116 +0x48
+golang.org/x/sync/errgroup.(*Group).Wait(0xc00062c4c0)
+	/ws/go/pkg/mod/golang.org/x/sync@v0.7.0/errgroup/errgroup.go:56 +0x25
+github.com/mbrt/glassdb/internal/trans.Algo.fanout({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:1064 +0x4e
+github.com/mbrt/glassdb/internal/trans.Algo.unlockAll({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:997 +0x1f2
+github.com/mbrt/glassdb/internal/trans.Algo.serialValidate({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:660 +0x110
+github.com/mbrt/glassdb/internal/trans.Algo.validateReadWrite({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:215 +0x13b
+github.com/mbrt/glassdb/internal/trans.Algo.validateRound({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:187 +0x25b
+github.com/mbrt/glassdb/internal/trans.Algo.Commit({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:122 +0x11c
+github.com/mbrt/glassdb.(*DB).txImpl.func3(...)
+	/ws/glassdb/db.go:219
+github.com/mbrt/glassdb/internal/trace.WithRegion(...)
+	/ws/glassdb/internal/trace/notrace.go:30
+github.com/mbrt/glassdb.(*DB).txImpl(0xc000236008, {0xeadec0, 0x14b9840}, 0xc000661f00, 0xc0006605b0)
+	/ws/glassdb/db.go:218 +0xa48
+github.com/mbrt/glassdb.(*DB).Tx(0xc000236008, {0xeadec0, 0x14b9840}, 0xc000661f00)
+	/ws/glassdb/db.go:134 +0xb2
+github.com/mbrt/glassdb_test.TestReadMulti.func1(0xc000413040)
+	/ws/glassdb/glassdb_test.go:505 +0x3db
+testing.tRunner(0xc000413040, 0xc000618360)
+	/usr/lib/go/src/testing/testing.go:1689 +0xfb
+created by testing.(*T).Run in goroutine 124957
+	/usr/lib/go/src/testing/testing.go:1742 +0x390
+
+goroutine 134014 [select, 1 minutes]:
+github.com/mbrt/glassdb/internal/concurr.(*controller).Do(0xc0003fe070, {0xeadfd8, 0xc00022e5f0}, {0xc00022d0e0, 0x22}, {0xeaa070, 0xc0005bc7c0}, {0xea4340, 0xc000556100})
+	/ws/glassdb/internal/concurr/dedup.go:101 +0x3a5
+github.com/mbrt/glassdb/internal/concurr.(*Dedup).Do(...)
+	/ws/glassdb/internal/concurr/dedup.go:37
+github.com/mbrt/glassdb/internal/trans.(*Locker).pushRequest(0xc000556100, {0xeadfd8, 0xc00022e5f0}, {0xc00022d0e0, 0x22}, 0x1, {0xc00043d7f0, 0x10, 0x10})
+	/ws/glassdb/internal/trans/tlocker.go:169 +0x24c
+github.com/mbrt/glassdb/internal/trans.(*Locker).Unlock(...)
+	/ws/glassdb/internal/trans/tlocker.go:100
+github.com/mbrt/glassdb/internal/trans.Algo.unlock.func1(...)
+	/ws/glassdb/internal/trans/algo.go:949
+github.com/mbrt/glassdb/internal/trace.WithRegion(...)
+	/ws/glassdb/internal/trace/notrace.go:30
+github.com/mbrt/glassdb/internal/trans.Algo.unlock({{0xeb1f80, 0xc00099d7d0}, {{0xeb2ff0, 0xc0004fc2d0}, {0xc0004fc240, {0xeb1f80, 0xc00099d7d0}}, {0xeb1f80, 0xc00099d7d0}}, {0xc0004fc240, ...}, ...}, ...)
+	/ws/glassdb/internal/trans/algo.go:948 +0x165
+github.com/mbrt/glassdb/internal/trans.Algo.unlockAll.func1({0xeadfd8?, 0xc00022e5f0?}, 0xe)
+	/ws/glassdb/internal/trans/algo.go:999 +0xc5
+github.com/mbrt/glassdb/internal/concurr.Fanout.Spawn.func1()
+	/ws/glassdb/internal/concurr/fanout.go:40 +0x26
+golang.org/x/sync/errgroup.(*Group).Go.func1()
+	/ws/go/pkg/mod/golang.org/x/sync@v0.7.0/errgroup/errgroup.go:78 +0x56
+created by golang.org/x/sync/errgroup.(*Group).Go in goroutine 125011
+	/ws/go/pkg/mod/golang.org/x/sync@v0.7.0/errgroup/errgroup.go:75 +0x96
+
+goroutine 133846 [select]:
+github.com/mbrt/glassdb/internal/trans.(*Monitor).refreshPending(0xc00068a0c0, {0xeae160, 0xc00042c8e8}, {0xc00043d7f0, 0x10, 0x10}, {0xeac300, 0xc00054b220})
+	/ws/glassdb/internal/trans/monitor.go:503 +0x265
+github.com/mbrt/glassdb/internal/trans.(*Monitor).StartRefreshTx.func1({0xeae160, 0xc00042c8e8})
+	/ws/glassdb/internal/trans/monitor.go:102 +0xe5
+github.com/mbrt/glassdb/internal/concurr.(*Background).Go.func1()
+	/ws/glassdb/internal/concurr/background.go:58 +0x6a
+github.com/sourcegraph/conc/panics.(*Catcher).Try(0x0?, 0xc0005ddfd0?)
+	/ws/go/pkg/mod/github.com/sourcegraph/conc@v0.3.0/panics/panics.go:23 +0x48
+github.com/sourcegraph/conc.(*WaitGroup).Go.func1()
+	/ws/go/pkg/mod/github.com/sourcegraph/conc@v0.3.0/waitgroup.go:32 +0x53
+created by github.com/sourcegraph/conc.(*WaitGroup).Go in goroutine 133845
+	/ws/go/pkg/mod/github.com/sourcegraph/conc@v0.3.0/waitgroup.go:30 +0x73
+```
+
+* One goroutine is blocked inside `unlockAll`, which unlocks all the keys in
+  parallel before acquiring all the locks again, but in a well defined order.
+* Another is inside `dedup.controller.Go` (internal/concurr/dedup.go:101),
+  waiting to be notified and perform the unlock.
+* Another is in `refreshPending` (internal/trans/monitor.go:503), keeping the
+  transaction alive.
+
+It's unlikely that the third goroutine has some problem. The biggest suspicion
+goes to the `dedup` controller, which is quite complicated.
+
+From the logs, one key is stuck inside `UNLOCK`. The same that timed out while
+locking in write.
+
+```csv
+tx,msg,path,args,res,err
+f107b,Commit round BEGIN,,,,
+f107b,LockWrite BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+f107b,LockWrite END,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,updating lock: context canceled
+f107b,Commit round END,,,,retry validation
+f107b,Commit round BEGIN,,,,
+f107b,Unlock BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+f107b,Unlock END,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+f107b,LockWrite BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+f107b,LockWrite END,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+107b,Commit round END,,,,
+f107b,Unlock BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+ce553,Commit round BEGIN,,,,
+ce553,LockWrite BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+ce553,LockWrite END,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,context canceled
+f107b,Unlock END,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+ce553,Commit round END,,,,retry validation
+ce553,Commit round BEGIN,,,,
+ce553,Unlock BEGIN,example/_c/O6KhQmpYQqlg/_k/PqKtBI4,,,
+```

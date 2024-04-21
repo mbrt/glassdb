@@ -470,6 +470,7 @@ func TestMultipleRMW(t *testing.T) {
 	}
 }
 
+// TODO: Fix deadlock with gcp backend.
 func TestReadMulti(t *testing.T) {
 	ctx := context.Background()
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
