@@ -46,12 +46,28 @@ func TestMergeDo(t *testing.T) {
 	d := NewDedup(tw)
 	wg := errgroup.Group{}
 	wg.Go(func() error {
-		return d.Do(ctx, "key", testRequest{counter: 1})
+		return d.Do(ctx, "key", mergeableRequest(1))
 	})
-	err := d.Do(ctx, "key", testRequest{counter: 1})
+	err := d.Do(ctx, "key", mergeableRequest(1))
 	assert.NoError(t, err)
 	err = wg.Wait()
 	assert.NoError(t, err)
+	assert.Equal(t, 2, tw.res)
+}
+
+func TestSequentialDo(t *testing.T) {
+	tw := &testMergeWorker{}
+	ctx := context.Background()
+	d := NewDedup(tw)
+	wg := errgroup.Group{}
+	wg.Go(func() error {
+		return d.Do(ctx, "key", unmergeableRequest(1))
+	})
+	err := d.Do(ctx, "key", mergeableRequest(1))
+	assert.NoError(t, err)
+	err = wg.Wait()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, tw.res)
 }
 
 type testWorker struct {
@@ -69,19 +85,37 @@ type testMergeWorker struct {
 }
 
 func (t *testMergeWorker) Work(ctx context.Context, key string, cntr DedupContr) error {
+	r := cntr.Request(key).(testRequest)
+	if t.res > 0 {
+		// We are at the second request. Process it immediately.
+		t.res = r.counter
+		return nil
+	}
+
+	// Wait for the next request to come in.
+	// This is just to make sure we're merging it with the next.
 	select {
 	case <-cntr.OnNextDo(key):
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 
-	r := cntr.Request(key).(testRequest)
+	r = cntr.Request(key).(testRequest)
 	t.res = r.counter
 	return nil
 }
 
+func mergeableRequest(counter int) testRequest {
+	return testRequest{counter: counter, canMerge: true}
+}
+
+func unmergeableRequest(counter int) testRequest {
+	return testRequest{counter: counter}
+}
+
 type testRequest struct {
-	counter int
+	counter  int
+	canMerge bool
 }
 
 func (r testRequest) CanReorder() bool { return false }
@@ -91,5 +125,8 @@ func (r testRequest) Merge(other Request) (Request, bool) {
 	if !ok {
 		return nil, false
 	}
-	return testRequest{r.counter + or.counter}, true
+	if !r.canMerge || !or.canMerge {
+		return nil, false
+	}
+	return mergeableRequest(r.counter + or.counter), true
 }
