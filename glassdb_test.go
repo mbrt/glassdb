@@ -502,6 +502,10 @@ func TestReadMulti(t *testing.T) {
 
 			// Read and write.
 			for i := 0; i < 30; i++ {
+				// This is to make sure we catch deadlocks.
+				ctx, cancel := context.WithTimeout(ctx, txTimeout)
+				defer cancel()
+
 				err = db.Tx(ctx, func(tx *glassdb.Tx) error {
 					res := tx.ReadMulti(keys)
 					for i, r := range res {
