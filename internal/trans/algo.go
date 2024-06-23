@@ -74,6 +74,7 @@ func NewAlgo(
 	local storage.Local,
 	locker *Locker,
 	mon *Monitor,
+	gc *GC,
 	bg *concurr.Background,
 	log *slog.Logger,
 ) Algo {
@@ -84,6 +85,7 @@ func NewAlgo(
 		reader:     NewReader(local, g, mon),
 		locker:     locker,
 		mon:        mon,
+		gc:         gc,
 		background: bg,
 		log:        log,
 	}
@@ -96,6 +98,7 @@ type Algo struct {
 	reader     Reader
 	locker     *Locker
 	mon        *Monitor
+	gc         *GC
 	background *concurr.Background
 	log        *slog.Logger
 }
@@ -200,8 +203,9 @@ func (t Algo) End(ctx context.Context, tx *Handle) error {
 		return nil
 	}
 	// Release all the locks and abort.
-	// TODO: This fails when the context was already canceled.
 	if err := t.mon.AbortTx(ctx, tx.id); err != nil {
+		// Failing because of a timeout is not a big problem, as we're going to
+		// follow up with an async cleanup.
 		tx.log.LogAttrs(ctx, slog.LevelError, "Commit End", errAttr(err))
 		// Schedule follow-up cleanup.
 		t.asyncCleanup(ctx, tx)
@@ -1048,7 +1052,7 @@ func (t Algo) asyncCleanup(ctx context.Context, tx *Handle) {
 			}
 			return
 		}
-		// TODO: Delete transaction log when safe to do so.
+		t.gc.ScheduleTxCleanup(tx.id)
 	})
 }
 
