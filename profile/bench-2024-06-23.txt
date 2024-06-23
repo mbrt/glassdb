@@ -1,0 +1,594 @@
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  238058	      4817 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4421021 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:438.229ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.214495s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:238058 TxTime:17m32.459425s TxReads:238058 TxWrites:238058 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:238058 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     835	   1417898 ns/op	         0.001198 metar/op	         0 metaw/op	         0.001198 r/op	         0 retries/op	1415829583 txns/op	         1.000 w/op	   87709 B/op	     454 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m23.343048s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:835 TxTime:19m42.217702s TxReads:835 TxWrites:835 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:835 ObjLists:0}
+Benchmark10RMW/memory-8         	   28963	     42709 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41599725 txns/op	         0 w/op	   11557 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:5.32965s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m43.566996s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:28963 TxTime:20m4.852835s TxReads:289630 TxWrites:0 TxRetries:0 MetaReads:289631 MetaWrites:0 ObjReads:289630 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     506	   2412093 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2408815482 txns/op	         0 w/op	  528775 B/op	    5105 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:3m56.610622s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:506 TxTime:20m18.860634s TxReads:5060 TxWrites:0 TxRetries:0 MetaReads:5061 MetaWrites:0 ObjReads:5060 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2754	    530646 ns/op	         0.7959 metar/op	         1.984 metaw/op	         0.09114 r/op	         0.02977 retries/op	 529042349 txns/op	         3.133 w/op	   27989 B/op	     448 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:2m25.606091s TxReads:212 TxWrites:212 TxRetries:6 MetaReads:193 MetaWrites:209 ObjReads:19 ObjWrites:329 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:822 TxTime:5m56.776049s TxReads:1692 TxWrites:1692 TxRetries:24 MetaReads:576 MetaWrites:1647 ObjReads:70 ObjWrites:2561 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2754 TxTime:24m16.982629s TxReads:5672 TxWrites:5672 TxRetries:82 MetaReads:2192 MetaWrites:5465 ObjReads:251 ObjWrites:8628 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      97	  13368287 ns/op	         7.309 metar/op	         4.134 metaw/op	         1.711 r/op	         0.6392 retries/op	13363645670 txns/op	         6.567 w/op	 1380722 B/op	   12912 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:32 TxTime:6m31.321765s TxReads:110 TxWrites:110 TxRetries:23 MetaReads:210 MetaWrites:121 ObjReads:52 ObjWrites:209 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:97 TxTime:21m36.27363s TxReads:318 TxWrites:318 TxRetries:62 MetaReads:709 MetaWrites:401 ObjReads:166 ObjWrites:637 ObjLists:0}
+Benchmark10R/memory-8                        	   26364	     45554 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45396973 txns/op	         0.0003793 w/op	   16149 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:5.094251s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m33.817786s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26365 TxTime:19m56.958681s TxReads:263640 TxWrites:10 TxRetries:0 MetaReads:263651 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	    1008	   1169633 ns/op	        10.00 metar/op	         0 metaw/op	         0.0009921 r/op	         0 retries/op	1169233216 txns/op	         0.009921 w/op	  298229 B/op	    3009 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m3.619237s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1014 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:1009 TxTime:19m41.490395s TxReads:10080 TxWrites:10 TxRetries:0 MetaReads:10091 MetaWrites:10 ObjReads:1 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19824	     61083 ns/op	         0.0001009 metar/op	         4.902 metaw/op	         0 r/op	         0 retries/op	 120535758 txns/op	         4.050 w/op	   27126 B/op	     417 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:203 TxTime:1m0.579664s TxReads:202 TxWrites:205 TxRetries:0 MetaReads:33 MetaWrites:531 ObjReads:0 ObjWrites:414 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20243 TxTime:19m54.445533s TxReads:20242 TxWrites:20245 TxRetries:0 MetaReads:4 MetaWrites:48870 ObjReads:0 ObjWrites:40488 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:40148 TxTime:40m37.596543s TxReads:40147 TxWrites:40150 TxRetries:0 MetaReads:32 MetaWrites:97181 ObjReads:0 ObjWrites:80304 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     261	   4768568 ns/op	         0.1724 metar/op	         7.326 metaw/op	         0 r/op	         0 retries/op	9538424747 txns/op	         5.180 w/op	  507076 B/op	    5091 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:197 TxTime:15m20.923289s TxReads:196 TxWrites:199 TxRetries:0 MetaReads:16 MetaWrites:732 ObjReads:1 ObjWrites:520 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:515 TxTime:42m29.90876s TxReads:514 TxWrites:517 TxRetries:0 MetaReads:88 MetaWrites:1917 ObjReads:1 ObjWrites:1363 ObjLists:0}
+Benchmark100W/memory-8                       	    1000	   1069724 ns/op	       190.0 metar/op	        11.70 metaw/op	         0.001000 r/op	         0 retries/op	1067273693 txns/op	       191.0 w/op	  598158 B/op	    7815 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m59.592575s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19905 MetaWrites:394 ObjReads:2 ObjWrites:20003 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1000 TxTime:17m47.273693s TxReads:0 TxWrites:100000 TxRetries:0 MetaReads:190003 MetaWrites:11697 ObjReads:1 ObjWrites:191000 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 184601774 ns/op	       338.8 metar/op	       210.7 metaw/op	         1.333 r/op	         0 retries/op	184596561833 txns/op	       157.7 w/op	24633614 B/op	  256992 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m37.649487s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1638 MetaWrites:150 ObjReads:10 ObjWrites:1092 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m45.979427s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1719 MetaWrites:977 ObjReads:9 ObjWrites:804 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:18m27.579371s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2034 MetaWrites:1264 ObjReads:8 ObjWrites:946 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	23.783s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  237219	      4822 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4428837 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:432.497ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.364125s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:237219 TxTime:17m30.604245s TxReads:237219 TxWrites:237219 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:237219 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     829	   1426798 ns/op	         0.001206 metar/op	         0 metaw/op	         0.001206 r/op	         0 retries/op	1424372462 txns/op	         1.000 w/op	   84745 B/op	     453 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m24.494948s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:829 TxTime:19m40.804771s TxReads:829 TxWrites:829 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:829 ObjLists:0}
+Benchmark10RMW/memory-8         	   27913	     42601 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41506388 txns/op	         0 w/op	   11556 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.996348s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m58.984414s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:27913 TxTime:19m18.567802s TxReads:279130 TxWrites:0 TxRetries:0 MetaReads:279131 MetaWrites:0 ObjReads:279130 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     501	   2557272 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2553316824 txns/op	         0 w/op	  526922 B/op	    5100 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:3m58.469064s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:501 TxTime:21m19.211729s TxReads:5010 TxWrites:0 TxRetries:0 MetaReads:5011 MetaWrites:0 ObjReads:5010 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2190	    504766 ns/op	         0.7845 metar/op	         1.983 metaw/op	         0.08721 r/op	         0.02740 retries/op	 503067908 txns/op	         3.127 w/op	   24416 B/op	     391 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:54.573812s TxReads:206 TxWrites:206 TxRetries:3 MetaReads:83 MetaWrites:199 ObjReads:12 ObjWrites:312 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2190 TxTime:18m21.718719s TxReads:4500 TxWrites:4500 TxRetries:60 MetaReads:1718 MetaWrites:4343 ObjReads:191 ObjWrites:6849 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      86	  13032503 ns/op	         7.174 metar/op	         3.895 metaw/op	         1.663 r/op	         0.6047 retries/op	13022807384 txns/op	         6.256 w/op	 1381595 B/op	   12562 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:86 TxTime:18m39.961435s TxReads:276 TxWrites:276 TxRetries:52 MetaReads:617 MetaWrites:335 ObjReads:143 ObjWrites:538 ObjLists:0}
+Benchmark10R/memory-8                        	   26949	     45767 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45613270 txns/op	         0.0003711 w/op	   16148 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:6.633107s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m23.693659s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26950 TxTime:20m29.346915s TxReads:269490 TxWrites:10 TxRetries:0 MetaReads:269501 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     946	   1237396 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1236857284 txns/op	         0.01057 w/op	  295130 B/op	    3008 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m10.676235s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1016 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:947 TxTime:19m32.931535s TxReads:9460 TxWrites:10 TxRetries:0 MetaReads:9471 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19914	     59586 ns/op	         0.0000502 metar/op	         4.882 metaw/op	         0 r/op	         0 retries/op	 117565118 txns/op	         4.025 w/op	   26974 B/op	     415 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:204 TxTime:1m2.864174s TxReads:203 TxWrites:206 TxRetries:0 MetaReads:38 MetaWrites:514 ObjReads:0 ObjWrites:417 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20255 TxTime:19m48.849551s TxReads:20254 TxWrites:20257 TxRetries:0 MetaReads:4 MetaWrites:49041 ObjReads:0 ObjWrites:40511 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:40078 TxTime:39m1.33376s TxReads:40077 TxWrites:40080 TxRetries:0 MetaReads:5 MetaWrites:97216 ObjReads:0 ObjWrites:80157 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     231	   4813969 ns/op	         0.1645 metar/op	         7.403 metaw/op	         0 r/op	         0 retries/op	9625888234 txns/op	         5.346 w/op	  518288 B/op	    5170 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:209 TxTime:18m14.94531s TxReads:208 TxWrites:211 TxRetries:0 MetaReads:62 MetaWrites:781 ObjReads:1 ObjWrites:557 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:468 TxTime:37m58.524117s TxReads:467 TxWrites:470 TxRetries:0 MetaReads:70 MetaWrites:1716 ObjReads:1 ObjWrites:1245 ObjLists:0}
+Benchmark100W/memory-8                       	     985	   1082481 ns/op	       189.8 metar/op	        11.85 metaw/op	         0.001015 r/op	         0 retries/op	1080193701 txns/op	       190.8 w/op	  598409 B/op	    7813 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:2m1.510816s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19910 MetaWrites:379 ObjReads:1 ObjWrites:20010 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:985 TxTime:17m43.990795s TxReads:0 TxWrites:98500 TxRetries:0 MetaReads:187003 MetaWrites:11668 ObjReads:1 ObjWrites:187985 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 176784758 ns/op	       341.3 metar/op	       198.8 metaw/op	         1.333 r/op	         0 retries/op	176779521167 txns/op	       157.8 w/op	24188821 B/op	  251644 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m54.942291s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1645 MetaWrites:150 ObjReads:6 ObjWrites:1088 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m2.461737s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1735 MetaWrites:982 ObjReads:9 ObjWrites:792 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m40.677127s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2049 MetaWrites:1193 ObjReads:8 ObjWrites:947 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	22.253s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  241273	      4817 ns/op	         0.0000041 metar/op	         0 metaw/op	         0.0000041 r/op	         0 retries/op	   4425757 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:472.08ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:45.662602s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:241273 TxTime:17m47.815597s TxReads:241273 TxWrites:241273 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:241273 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     842	   1425519 ns/op	         0.001188 metar/op	         0 metaw/op	         0.001188 r/op	         0 retries/op	1423241735 txns/op	         1.000 w/op	   88732 B/op	     455 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m22.213599s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:842 TxTime:19m58.369541s TxReads:842 TxWrites:842 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:842 ObjLists:0}
+Benchmark10RMW/memory-8         	   27490	     42589 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41484333 txns/op	         0 w/op	   11559 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.668777s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:7m5.14365s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:27490 TxTime:19m0.404305s TxReads:274900 TxWrites:0 TxRetries:0 MetaReads:274901 MetaWrites:0 ObjReads:274900 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     498	   2413798 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2410462592 txns/op	         0 w/op	  523543 B/op	    5100 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m0.123816s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:498 TxTime:20m0.410371s TxReads:4980 TxWrites:0 TxRetries:0 MetaReads:4981 MetaWrites:0 ObjReads:4980 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    6130	    611472 ns/op	         0.9116 metar/op	         1.992 metaw/op	         0.09772 r/op	         0.03100 retries/op	 609799567 txns/op	         3.152 w/op	   27885 B/op	     451 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:19.409447s TxReads:202 TxWrites:202 TxRetries:1 MetaReads:52 MetaWrites:201 ObjReads:9 ObjWrites:307 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:6130 TxTime:1h2m18.071347s TxReads:12640 TxWrites:12640 TxRetries:190 MetaReads:5588 MetaWrites:12209 ObjReads:599 ObjWrites:19319 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      93	  12348465 ns/op	         7.022 metar/op	         3.860 metaw/op	         1.548 r/op	         0.6022 retries/op	12343803258 txns/op	         6.452 w/op	 1298838 B/op	   12250 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:43 TxTime:9m6.52048s TxReads:132 TxWrites:132 TxRetries:23 MetaReads:292 MetaWrites:170 ObjReads:66 ObjWrites:272 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:93 TxTime:19m7.973703s TxReads:298 TxWrites:298 TxRetries:56 MetaReads:653 MetaWrites:359 ObjReads:144 ObjWrites:600 ObjLists:0}
+Benchmark10R/memory-8                        	   26097	     45659 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45505617 txns/op	         0.0003832 w/op	   16146 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:5.697616s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m38.442908s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26098 TxTime:19m47.671716s TxReads:260970 TxWrites:10 TxRetries:0 MetaReads:260981 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	    1054	   1158470 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1157898353 txns/op	         0.009488 w/op	  296481 B/op	    3008 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:1m57.755579s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1018 MetaWrites:3 ObjReads:5 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:1055 TxTime:20m23.197675s TxReads:10540 TxWrites:10 TxRetries:0 MetaReads:10551 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19459	     61841 ns/op	         0 metar/op	         4.911 metaw/op	         0 r/op	         0 retries/op	 122025493 txns/op	         4.050 w/op	   27150 B/op	     417 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:201 TxTime:1m3.098327s TxReads:200 TxWrites:203 TxRetries:0 MetaReads:33 MetaWrites:499 ObjReads:0 ObjWrites:411 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20189 TxTime:20m17.095972s TxReads:20188 TxWrites:20191 TxRetries:0 MetaReads:4 MetaWrites:48756 ObjReads:0 ObjWrites:40378 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:39408 TxTime:39m34.594161s TxReads:39407 TxWrites:39410 TxRetries:0 MetaReads:4 MetaWrites:95557 ObjReads:0 ObjWrites:78818 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     250	   4756644 ns/op	         0.1360 metar/op	         7.180 metaw/op	         0 r/op	         0 retries/op	9514019432 txns/op	         5.180 w/op	  501591 B/op	    5015 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:202 TxTime:16m48.02602s TxReads:201 TxWrites:204 TxRetries:0 MetaReads:49 MetaWrites:752 ObjReads:1 ObjWrites:536 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:497 TxTime:39m46.084108s TxReads:496 TxWrites:499 TxRetries:0 MetaReads:43 MetaWrites:1800 ObjReads:1 ObjWrites:1297 ObjLists:0}
+Benchmark100W/memory-8                       	    1014	   1089669 ns/op	       190.1 metar/op	        11.56 metaw/op	         0.0009862 r/op	         0 retries/op	1087393727 txns/op	       191.1 w/op	  597925 B/op	    7815 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m57.945509s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19902 MetaWrites:392 ObjReads:2 ObjWrites:20005 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1014 TxTime:18m22.617239s TxReads:0 TxWrites:101400 TxRetries:0 MetaReads:192804 MetaWrites:11726 ObjReads:1 ObjWrites:193814 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 176431484 ns/op	       338.7 metar/op	       207.2 metaw/op	         1.500 r/op	         0 retries/op	176426195167 txns/op	       158.2 w/op	24514974 B/op	  255596 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m34.312447s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1624 MetaWrites:153 ObjReads:9 ObjWrites:1114 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m27.410652s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1721 MetaWrites:976 ObjReads:10 ObjWrites:848 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m38.557171s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2033 MetaWrites:1243 ObjReads:9 ObjWrites:949 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	25.852s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  237136	      4853 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4458116 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:456.886ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.347283s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:237136 TxTime:17m37.179749s TxReads:237136 TxWrites:237136 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:237136 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     820	   1424764 ns/op	         0.001220 metar/op	         0 metaw/op	         0.001220 r/op	         0 retries/op	1422299212 txns/op	         1.000 w/op	   87953 B/op	     454 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m25.941011s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:820 TxTime:19m26.285354s TxReads:820 TxWrites:820 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:820 ObjLists:0}
+Benchmark10RMW/memory-8         	   28011	     42285 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41183056 txns/op	         0 w/op	   11555 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.657708s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m57.247451s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:28011 TxTime:19m13.578593s TxReads:280110 TxWrites:0 TxRetries:0 MetaReads:280111 MetaWrites:0 ObjReads:280110 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     493	   2512759 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2509025185 txns/op	         0 w/op	  526017 B/op	    5100 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m2.910154s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:493 TxTime:20m36.949416s TxReads:4930 TxWrites:0 TxRetries:0 MetaReads:4931 MetaWrites:0 ObjReads:4930 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    4995	    593423 ns/op	         0.9193 metar/op	         2.000 metaw/op	         0.1039 r/op	         0.03343 retries/op	 591781272 txns/op	         3.160 w/op	   31479 B/op	     508 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:23.866586s TxReads:202 TxWrites:202 TxRetries:1 MetaReads:35 MetaWrites:198 ObjReads:5 ObjWrites:305 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:4995 TxTime:49m15.947453s TxReads:10324 TxWrites:10324 TxRetries:167 MetaReads:4592 MetaWrites:9992 ObjReads:519 ObjWrites:15785 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      92	  13853368 ns/op	         7.978 metar/op	         3.902 metaw/op	         1.554 r/op	         0.5652 retries/op	13848772891 txns/op	         6.707 w/op	 1378716 B/op	   13002 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:40 TxTime:8m37.943172s TxReads:114 TxWrites:114 TxRetries:17 MetaReads:298 MetaWrites:162 ObjReads:57 ObjWrites:243 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:92 TxTime:21m14.087106s TxReads:288 TxWrites:288 TxRetries:52 MetaReads:734 MetaWrites:359 ObjReads:143 ObjWrites:617 ObjLists:0}
+Benchmark10R/memory-8                        	   25894	     45718 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45571732 txns/op	         0.0003862 w/op	   16149 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:5.018959s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m42.041621s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:25895 TxTime:19m40.181269s TxReads:258940 TxWrites:10 TxRetries:0 MetaReads:258951 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     987	   1185954 ns/op	        10.00 metar/op	         0 metaw/op	         0.001013 r/op	         0 retries/op	1185540289 txns/op	         0.01013 w/op	  294237 B/op	    3003 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m5.28351s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1015 MetaWrites:3 ObjReads:6 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:988 TxTime:19m32.859019s TxReads:9870 TxWrites:10 TxRetries:0 MetaReads:9881 MetaWrites:10 ObjReads:1 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19612	     60551 ns/op	         0 metar/op	         4.875 metaw/op	         0 r/op	         0 retries/op	 119463584 txns/op	         4.041 w/op	   27062 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:199 TxTime:1m3.987396s TxReads:198 TxWrites:201 TxRetries:0 MetaReads:34 MetaWrites:488 ObjReads:0 ObjWrites:407 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20300 TxTime:20m7.284212s TxReads:20299 TxWrites:20302 TxRetries:0 MetaReads:4 MetaWrites:49068 ObjReads:0 ObjWrites:40602 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:39628 TxTime:39m3.030162s TxReads:39627 TxWrites:39630 TxRetries:0 MetaReads:4 MetaWrites:95619 ObjReads:0 ObjWrites:79258 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     259	   4808010 ns/op	         0.1506 metar/op	         7.429 metaw/op	         0 r/op	         0 retries/op	9613631873 txns/op	         5.212 w/op	  507859 B/op	    5107 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:201 TxTime:15m29.916077s TxReads:200 TxWrites:203 TxRetries:0 MetaReads:28 MetaWrites:700 ObjReads:2 ObjWrites:519 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:515 TxTime:41m32.235685s TxReads:514 TxWrites:517 TxRetries:0 MetaReads:46 MetaWrites:1925 ObjReads:2 ObjWrites:1353 ObjLists:0}
+Benchmark100W/memory-8                       	    1006	   1057209 ns/op	       190.1 metar/op	        11.65 metaw/op	         0.004970 r/op	         0 retries/op	1055020405 txns/op	       191.1 w/op	  597687 B/op	    7809 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m58.810725s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19902 MetaWrites:395 ObjReads:2 ObjWrites:20002 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1006 TxTime:17m41.350527s TxReads:0 TxWrites:100600 TxRetries:0 MetaReads:191204 MetaWrites:11716 ObjReads:5 ObjWrites:192200 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 179693155 ns/op	       337.2 metar/op	       208.5 metaw/op	         1.667 r/op	         0 retries/op	179685517833 txns/op	       157.8 w/op	24646826 B/op	  256268 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m49.356061s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1634 MetaWrites:153 ObjReads:9 ObjWrites:1108 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m20.22079s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1737 MetaWrites:925 ObjReads:10 ObjWrites:799 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m58.113107s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2024 MetaWrites:1251 ObjReads:10 ObjWrites:947 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	24.758s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  236151	      4830 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4442976 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:441.063ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.653278s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:236151 TxTime:17m29.213196s TxReads:236151 TxWrites:236151 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:236151 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     828	   1424239 ns/op	         0.001208 metar/op	         0 metaw/op	         0.001208 r/op	         0 retries/op	1422141440 txns/op	         1.000 w/op	   87064 B/op	     454 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m24.675575s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:828 TxTime:19m37.533112s TxReads:828 TxWrites:828 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:828 ObjLists:0}
+Benchmark10RMW/memory-8         	   28140	     42768 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41663138 txns/op	         0 w/op	   11556 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.821969s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m55.617076s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:28140 TxTime:19m32.400711s TxReads:281400 TxWrites:0 TxRetries:0 MetaReads:281401 MetaWrites:0 ObjReads:281400 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     465	   2468802 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2464794267 txns/op	         0 w/op	  522921 B/op	    5101 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m17.069794s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:465 TxTime:19m6.129334s TxReads:4650 TxWrites:0 TxRetries:0 MetaReads:4651 MetaWrites:0 ObjReads:4650 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2486	    585742 ns/op	         0.9155 metar/op	         2.010 metaw/op	         0.1022 r/op	         0.03339 retries/op	 584050839 txns/op	         3.158 w/op	   29670 B/op	     479 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:2m50.111963s TxReads:216 TxWrites:216 TxRetries:8 MetaReads:272 MetaWrites:218 ObjReads:32 ObjWrites:342 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:704 TxTime:8m37.887614s TxReads:1468 TxWrites:1468 TxRetries:30 MetaReads:833 MetaWrites:1428 ObjReads:93 ObjWrites:2255 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:1627 TxTime:13m2.246963s TxReads:3344 TxWrites:3344 TxRetries:45 MetaReads:1169 MetaWrites:3263 ObjReads:137 ObjWrites:5067 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2486 TxTime:24m11.950385s TxReads:5138 TxWrites:5138 TxRetries:83 MetaReads:2276 MetaWrites:4997 ObjReads:254 ObjWrites:7852 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	     100	  13664611 ns/op	         7.550 metar/op	         4.070 metaw/op	         1.830 r/op	         0.6300 retries/op	13660116600 txns/op	         6.790 w/op	 1418925 B/op	   13262 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:22m46.01166s TxReads:326 TxWrites:326 TxRetries:63 MetaReads:755 MetaWrites:407 ObjReads:183 ObjWrites:679 ObjLists:0}
+Benchmark10R/memory-8                        	   26521	     45571 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45415522 txns/op	         0.0003771 w/op	   16149 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:4.986117s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m31.171373s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26522 TxTime:20m4.586086s TxReads:265210 TxWrites:10 TxRetries:0 MetaReads:265221 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     974	   1178230 ns/op	        10.00 metar/op	         0 metaw/op	         0.002053 r/op	         0 retries/op	1177748386 txns/op	         0.01027 w/op	  296540 B/op	    3007 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m6.496091s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1018 MetaWrites:3 ObjReads:6 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:975 TxTime:19m10.06598s TxReads:9740 TxWrites:10 TxRetries:0 MetaReads:9751 MetaWrites:10 ObjReads:2 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19646	     73970 ns/op	         0 metar/op	         4.951 metaw/op	         0 r/op	         0 retries/op	 146065149 txns/op	         4.049 w/op	   27129 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:205 TxTime:59.565098s TxReads:204 TxWrites:207 TxRetries:0 MetaReads:31 MetaWrites:509 ObjReads:0 ObjWrites:417 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20214 TxTime:20m52.408463s TxReads:20213 TxWrites:20216 TxRetries:0 MetaReads:31 MetaWrites:48924 ObjReads:0 ObjWrites:40437 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:39773 TxTime:48m35.984576s TxReads:39772 TxWrites:39775 TxRetries:0 MetaReads:35 MetaWrites:97267 ObjReads:0 ObjWrites:79555 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     253	   4628866 ns/op	         0.1225 metar/op	         7.269 metaw/op	         0 r/op	         0 retries/op	9258532103 txns/op	         4.992 w/op	  503248 B/op	    5044 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:199 TxTime:16m43.200929s TxReads:198 TxWrites:201 TxRetries:0 MetaReads:47 MetaWrites:742 ObjReads:1 ObjWrites:522 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:505 TxTime:39m51.953904s TxReads:504 TxWrites:507 TxRetries:0 MetaReads:56 MetaWrites:1846 ObjReads:1 ObjWrites:1272 ObjLists:0}
+Benchmark100W/memory-8                       	     988	   1104730 ns/op	       190.0 metar/op	        11.82 metaw/op	         0.001012 r/op	         0 retries/op	1102544735 txns/op	       191.0 w/op	  598079 B/op	    7810 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:2m0.959179s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19909 MetaWrites:383 ObjReads:1 ObjWrites:20009 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:988 TxTime:18m9.314198s TxReads:0 TxWrites:98800 TxRetries:0 MetaReads:187741 MetaWrites:11681 ObjReads:1 ObjWrites:188716 ObjLists:0}
+Benchmark100W/gcs-8                          	       7	 181905807 ns/op	       358.6 metar/op	       171.3 metaw/op	         1.000 r/op	         0 retries/op	181900394143 txns/op	       178.9 w/op	25002374 B/op	  250327 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m46.223681s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1645 MetaWrites:152 ObjReads:8 ObjWrites:1091 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:12m28.062785s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1591 MetaWrites:743 ObjReads:5 ObjWrites:799 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:7 TxTime:21m13.302759s TxReads:0 TxWrites:700 TxRetries:0 MetaReads:2511 MetaWrites:1199 ObjReads:7 ObjWrites:1252 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	24.881s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  239931	      4853 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4464359 txns/op	         1.000 w/op	    3169 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:445.785ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.083423s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:239931 TxTime:17m51.138043s TxReads:239931 TxWrites:239931 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:239931 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     813	   1424871 ns/op	         0.001230 metar/op	         0 metaw/op	         0.001230 r/op	         0 retries/op	1422594381 txns/op	         1.000 w/op	   84942 B/op	     453 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m27.106839s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:813 TxTime:19m16.569232s TxReads:813 TxWrites:813 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:813 ObjLists:0}
+Benchmark10RMW/memory-8         	   27306	     42403 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41306323 txns/op	         0 w/op	   11555 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.785426s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:7m7.918963s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:27306 TxTime:18m47.910455s TxReads:273060 TxWrites:0 TxRetries:0 MetaReads:273061 MetaWrites:0 ObjReads:273060 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     483	   2457240 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2454087064 txns/op	         0 w/op	  525312 B/op	    5102 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m7.380448s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:483 TxTime:19m45.324052s TxReads:4830 TxWrites:0 TxRetries:0 MetaReads:4831 MetaWrites:0 ObjReads:4830 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2146	    612466 ns/op	         0.8630 metar/op	         1.995 metaw/op	         0.08947 r/op	         0.03215 retries/op	 610853097 txns/op	         3.137 w/op	   32231 B/op	     523 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:1m57.147075s TxReads:214 TxWrites:214 TxRetries:7 MetaReads:230 MetaWrites:210 ObjReads:26 ObjWrites:345 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:1022 TxTime:9m29.231859s TxReads:2106 TxWrites:2106 TxRetries:31 MetaReads:850 MetaWrites:2030 ObjReads:94 ObjWrites:3191 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2146 TxTime:21m50.890747s TxReads:4430 TxWrites:4430 TxRetries:69 MetaReads:1852 MetaWrites:4281 ObjReads:192 ObjWrites:6731 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      81	  12414216 ns/op	         6.654 metar/op	         4.049 metaw/op	         1.593 r/op	         0.6173 retries/op	12409773877 txns/op	         6.395 w/op	 1308027 B/op	   12096 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:81 TxTime:16m45.191684s TxReads:262 TxWrites:262 TxRetries:50 MetaReads:539 MetaWrites:328 ObjReads:129 ObjWrites:518 ObjLists:0}
+Benchmark10R/memory-8                        	   26625	     45440 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45287073 txns/op	         0.0003756 w/op	   16147 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:5.292177s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m29.324305s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26626 TxTime:20m5.884248s TxReads:266250 TxWrites:10 TxRetries:0 MetaReads:266261 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	    1016	   1186162 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1185782951 txns/op	         0.009843 w/op	  295310 B/op	    3005 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m0.949337s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1013 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:1017 TxTime:20m6.791863s TxReads:10160 TxWrites:10 TxRetries:0 MetaReads:10171 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   20136	     59729 ns/op	         0 metar/op	         4.883 metaw/op	         0 r/op	         0 retries/op	 117865327 txns/op	         4.042 w/op	   27049 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:202 TxTime:1m2.554057s TxReads:201 TxWrites:204 TxRetries:0 MetaReads:37 MetaWrites:505 ObjReads:1 ObjWrites:414 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20215 TxTime:20m21.131571s TxReads:20214 TxWrites:20217 TxRetries:0 MetaReads:34 MetaWrites:48843 ObjReads:0 ObjWrites:40438 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:40689 TxTime:39m33.421844s TxReads:40688 TxWrites:40691 TxRetries:0 MetaReads:4 MetaWrites:98331 ObjReads:0 ObjWrites:81381 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     247	   4804996 ns/op	         0.1538 metar/op	         7.429 metaw/op	         0 r/op	         0 retries/op	9611928089 txns/op	         5.178 w/op	  512140 B/op	    5142 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:203 TxTime:16m12.132645s TxReads:202 TxWrites:205 TxRetries:0 MetaReads:24 MetaWrites:758 ObjReads:2 ObjWrites:530 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:496 TxTime:39m42.339981s TxReads:495 TxWrites:498 TxRetries:0 MetaReads:49 MetaWrites:1839 ObjReads:2 ObjWrites:1282 ObjLists:0}
+Benchmark100W/memory-8                       	    1020	   1063276 ns/op	       190.2 metar/op	        11.51 metaw/op	         0.0009804 r/op	         0 retries/op	1060983629 txns/op	       191.2 w/op	  597940 B/op	    7816 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m57.134181s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19902 MetaWrites:396 ObjReads:3 ObjWrites:20001 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1020 TxTime:18m2.203302s TxReads:0 TxWrites:102000 TxRetries:0 MetaReads:194003 MetaWrites:11738 ObjReads:1 ObjWrites:195020 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 176381714 ns/op	       339.3 metar/op	       201.7 metaw/op	         1.167 r/op	         0 retries/op	176376309333 txns/op	       157.8 w/op	24345645 B/op	  252906 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m44.636742s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1634 MetaWrites:151 ObjReads:9 ObjWrites:1097 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m0.697362s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1748 MetaWrites:923 ObjReads:5 ObjWrites:779 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m38.257856s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2037 MetaWrites:1210 ObjReads:7 ObjWrites:947 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	23.249s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  243428	      4907 ns/op	         0.0000041 metar/op	         0 metaw/op	         0.0000041 r/op	         0 retries/op	   4505759 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:436.473ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:45.159284s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:243428 TxTime:18m16.827882s TxReads:243428 TxWrites:243428 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:243428 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     846	   1410798 ns/op	         0.001182 metar/op	         0 metaw/op	         0.001182 r/op	         0 retries/op	1408711623 txns/op	         1.000 w/op	   88150 B/op	     454 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m21.51805s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:846 TxTime:19m51.770033s TxReads:846 TxWrites:846 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:846 ObjLists:0}
+Benchmark10RMW/memory-8         	   28293	     42276 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41175393 txns/op	         0 w/op	   11555 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.630598s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m53.102955s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:28293 TxTime:19m24.975401s TxReads:282930 TxWrites:0 TxRetries:0 MetaReads:282931 MetaWrites:0 ObjReads:282930 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     464	   2550004 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2545389360 txns/op	         0 w/op	  525728 B/op	    5099 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m17.797765s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:464 TxTime:19m41.060663s TxReads:4640 TxWrites:0 TxRetries:0 MetaReads:4641 MetaWrites:0 ObjReads:4640 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2310	    481618 ns/op	         0.7420 metar/op	         1.983 metaw/op	         0.08355 r/op	         0.02727 retries/op	 480087223 txns/op	         3.125 w/op	   26281 B/op	     422 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:2m18.416681s TxReads:212 TxWrites:212 TxRetries:6 MetaReads:187 MetaWrites:210 ObjReads:20 ObjWrites:333 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:865 TxTime:10m18.330721s TxReads:1794 TxWrites:1794 TxRetries:32 MetaReads:964 MetaWrites:1732 ObjReads:113 ObjWrites:2758 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:1674 TxTime:14m26.732032s TxReads:3444 TxWrites:3444 TxRetries:48 MetaReads:1269 MetaWrites:3331 ObjReads:146 ObjWrites:5232 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2310 TxTime:18m29.001485s TxReads:4746 TxWrites:4746 TxRetries:63 MetaReads:1714 MetaWrites:4581 ObjReads:193 ObjWrites:7218 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	     102	  12269851 ns/op	         6.814 metar/op	         3.863 metaw/op	         1.363 r/op	         0.5000 retries/op	12265557147 txns/op	         6.235 w/op	 1237231 B/op	   11634 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:39 TxTime:7m37.159031s TxReads:116 TxWrites:116 TxRetries:19 MetaReads:234 MetaWrites:158 ObjReads:53 ObjWrites:250 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:102 TxTime:20m51.086829s TxReads:306 TxWrites:306 TxRetries:51 MetaReads:695 MetaWrites:394 ObjReads:139 ObjWrites:636 ObjLists:0}
+Benchmark10R/memory-8                        	   26236	     45782 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45627857 txns/op	         0.0003812 w/op	   16148 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:5.620531s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1012 MetaWrites:9 ObjReads:1 ObjWrites:12 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m36.001212s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26237 TxTime:19m57.211337s TxReads:262360 TxWrites:10 TxRetries:0 MetaReads:262371 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	    1054	   1195402 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1195020674 txns/op	         0.009488 w/op	  295367 B/op	    3006 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:1m56.483707s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1017 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:1055 TxTime:21m1.230477s TxReads:10540 TxWrites:10 TxRetries:0 MetaReads:10551 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19867	     59850 ns/op	         0 metar/op	         4.909 metaw/op	         0 r/op	         0 retries/op	 118068076 txns/op	         4.050 w/op	   27130 B/op	     417 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:197 TxTime:1m4.702389s TxReads:196 TxWrites:199 TxRetries:0 MetaReads:37 MetaWrites:487 ObjReads:0 ObjWrites:402 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20228 TxTime:19m51.599519s TxReads:20227 TxWrites:20230 TxRetries:0 MetaReads:4 MetaWrites:48921 ObjReads:0 ObjWrites:40456 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:40234 TxTime:39m5.742878s TxReads:40233 TxWrites:40236 TxRetries:0 MetaReads:4 MetaWrites:97526 ObjReads:0 ObjWrites:80468 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     235	   4882003 ns/op	         0.1702 metar/op	         7.468 metaw/op	         0 r/op	         0 retries/op	9761638974 txns/op	         5.285 w/op	  513774 B/op	    5169 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:204 TxTime:17m7.864719s TxReads:203 TxWrites:206 TxRetries:0 MetaReads:31 MetaWrites:781 ObjReads:2 ObjWrites:550 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:472 TxTime:38m25.636674s TxReads:471 TxWrites:474 TxRetries:0 MetaReads:50 MetaWrites:1760 ObjReads:1 ObjWrites:1246 ObjLists:0}
+Benchmark100W/memory-8                       	    1034	   1105657 ns/op	       190.4 metar/op	        11.56 metaw/op	         0.001934 r/op	         0 retries/op	1103313423 txns/op	       191.5 w/op	  598117 B/op	    7822 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m55.677053s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19903 MetaWrites:197 ObjReads:2 ObjWrites:20000 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1034 TxTime:19m0.826079s TxReads:0 TxWrites:103400 TxRetries:0 MetaReads:196916 MetaWrites:11957 ObjReads:2 ObjWrites:198032 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 179187359 ns/op	       341.8 metar/op	       199.7 metaw/op	         1.000 r/op	         0 retries/op	179179907333 txns/op	       158.3 w/op	24337084 B/op	  252894 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m55.416335s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1638 MetaWrites:156 ObjReads:9 ObjWrites:1099 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m6.907886s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1718 MetaWrites:939 ObjReads:8 ObjWrites:796 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m55.079444s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2052 MetaWrites:1198 ObjReads:6 ObjWrites:950 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	24.528s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  236884	      4828 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4433939 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:427.171ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.428405s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:236884 TxTime:17m30.329289s TxReads:236884 TxWrites:236884 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:236884 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     801	   1432990 ns/op	         0.001248 metar/op	         0 metaw/op	         0.001248 r/op	         0 retries/op	1430790673 txns/op	         1.000 w/op	   84738 B/op	     452 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m29.291643s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:801 TxTime:19m6.063329s TxReads:801 TxWrites:801 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:801 ObjLists:0}
+Benchmark10RMW/memory-8         	   28303	     42167 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41062073 txns/op	         0 w/op	   11556 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4.792685s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:6m53.034525s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:28303 TxTime:19m22.179852s TxReads:283030 TxWrites:0 TxRetries:0 MetaReads:283031 MetaWrites:0 ObjReads:283030 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     459	   2532044 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2527747610 txns/op	         0 w/op	  526923 B/op	    5102 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m20.4114s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:459 TxTime:19m20.236153s TxReads:4590 TxWrites:0 TxRetries:0 MetaReads:4591 MetaWrites:0 ObjReads:4590 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    5726	    629134 ns/op	         0.9377 metar/op	         1.988 metaw/op	         0.1022 r/op	         0.03318 retries/op	 627504560 txns/op	         3.156 w/op	   33871 B/op	     547 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:20.771642s TxReads:204 TxWrites:204 TxRetries:2 MetaReads:40 MetaWrites:203 ObjReads:8 ObjWrites:303 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:5726 TxTime:59m53.091112s TxReads:11832 TxWrites:11832 TxRetries:190 MetaReads:5369 MetaWrites:11381 ObjReads:585 ObjWrites:18070 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      90	  12979057 ns/op	         7.644 metar/op	         3.978 metaw/op	         1.511 r/op	         0.5444 retries/op	12974642889 txns/op	         6.344 w/op	 1324353 B/op	   12611 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:38 TxTime:9m56.716815s TxReads:124 TxWrites:124 TxRetries:24 MetaReads:346 MetaWrites:159 ObjReads:69 ObjWrites:261 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:75 TxTime:16m35.090753s TxReads:240 TxWrites:240 TxRetries:45 MetaReads:571 MetaWrites:285 ObjReads:114 ObjWrites:479 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:90 TxTime:19m27.71786s TxReads:278 TxWrites:278 TxRetries:49 MetaReads:688 MetaWrites:358 ObjReads:136 ObjWrites:571 ObjLists:0}
+Benchmark10R/memory-8                        	   26299	     46246 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  46097046 txns/op	         0.0003802 w/op	   16150 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:6.15364s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m34.936121s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26300 TxTime:20m12.43258s TxReads:262990 TxWrites:10 TxRetries:0 MetaReads:263001 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     984	   1195220 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1194797080 txns/op	         0.01016 w/op	  295684 B/op	    3004 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m5.496088s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1017 MetaWrites:3 ObjReads:6 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:985 TxTime:19m38.531273s TxReads:9840 TxWrites:10 TxRetries:0 MetaReads:9851 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19574	     61112 ns/op	         0 metar/op	         4.891 metaw/op	         0 r/op	         0 retries/op	 120578805 txns/op	         4.041 w/op	   27080 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:205 TxTime:1m0.095179s TxReads:204 TxWrites:207 TxRetries:0 MetaReads:35 MetaWrites:503 ObjReads:0 ObjWrites:417 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20208 TxTime:20m9.847815s TxReads:20207 TxWrites:20210 TxRetries:0 MetaReads:4 MetaWrites:48756 ObjReads:0 ObjWrites:40417 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:39550 TxTime:39m20.347274s TxReads:39549 TxWrites:39552 TxRetries:0 MetaReads:4 MetaWrites:95739 ObjReads:0 ObjWrites:79102 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     259	   4765105 ns/op	         0.1351 metar/op	         7.448 metaw/op	         0 r/op	         0 retries/op	9527692039 txns/op	         5.205 w/op	  508578 B/op	    5130 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:197 TxTime:16m17.474939s TxReads:196 TxWrites:199 TxRetries:0 MetaReads:51 MetaWrites:733 ObjReads:0 ObjWrites:516 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:515 TxTime:42m1.894307s TxReads:514 TxWrites:517 TxRetries:0 MetaReads:66 MetaWrites:1935 ObjReads:1 ObjWrites:1358 ObjLists:0}
+Benchmark100W/memory-8                       	    1015	   1103210 ns/op	       190.2 metar/op	        11.75 metaw/op	         0.0009852 r/op	         0 retries/op	1100897476 txns/op	       191.1 w/op	  597979 B/op	    7815 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m57.861576s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19903 MetaWrites:390 ObjReads:1 ObjWrites:20007 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1015 TxTime:18m37.410938s TxReads:0 TxWrites:101500 TxRetries:0 MetaReads:193008 MetaWrites:11927 ObjReads:1 ObjWrites:194012 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 176968545 ns/op	       337.7 metar/op	       201.5 metaw/op	         1.167 r/op	         0 retries/op	176963360833 txns/op	       157.5 w/op	24238398 B/op	  252079 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m50.918593s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1663 MetaWrites:151 ObjReads:10 ObjWrites:1075 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m10.673738s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1725 MetaWrites:947 ObjReads:10 ObjWrites:801 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m41.780165s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2027 MetaWrites:1209 ObjReads:7 ObjWrites:945 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	26.375s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  237088	      4831 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4438151 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:775.811ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.385293s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:237088 TxTime:17m32.232233s TxReads:237088 TxWrites:237088 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:237088 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     849	   1421854 ns/op	         0.001178 metar/op	         0 metaw/op	         0.001178 r/op	         0 retries/op	1419595620 txns/op	         1.000 w/op	   84916 B/op	     453 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m20.869567s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:849 TxTime:20m5.236681s TxReads:849 TxWrites:849 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:849 ObjLists:0}
+Benchmark10RMW/memory-8         	   27766	     42909 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  41808016 txns/op	         0 w/op	   11555 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:5.102927s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:7m1.115793s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:27766 TxTime:19m20.841365s TxReads:277660 TxWrites:0 TxRetries:0 MetaReads:277661 MetaWrites:0 ObjReads:277660 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     458	   2450233 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2446542910 txns/op	         0 w/op	  525908 B/op	    5101 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:4m21.004263s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:458 TxTime:18m40.516653s TxReads:4580 TxWrites:0 TxRetries:0 MetaReads:4581 MetaWrites:0 ObjReads:4580 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2550	    586691 ns/op	         0.9184 metar/op	         2.010 metaw/op	         0.1055 r/op	         0.03451 retries/op	 585027899 txns/op	         3.160 w/op	   30638 B/op	     496 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:46.873942s TxReads:206 TxWrites:206 TxRetries:3 MetaReads:77 MetaWrites:203 ObjReads:11 ObjWrites:315 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2550 TxTime:24m51.821143s TxReads:5276 TxWrites:5276 TxRetries:88 MetaReads:2342 MetaWrites:5126 ObjReads:269 ObjWrites:8058 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      82	  12607008 ns/op	         6.732 metar/op	         3.976 metaw/op	         1.659 r/op	         0.6220 retries/op	12602506037 txns/op	         6.439 w/op	 1334692 B/op	   12262 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:32 TxTime:7m38.69377s TxReads:102 TxWrites:102 TxRetries:19 MetaReads:263 MetaWrites:131 ObjReads:53 ObjWrites:209 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:82 TxTime:17m13.405495s TxReads:266 TxWrites:266 TxRetries:51 MetaReads:552 MetaWrites:326 ObjReads:136 ObjWrites:528 ObjLists:0}
+Benchmark10R/memory-8                        	   26361	     46071 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45922719 txns/op	         0.0003793 w/op	   16147 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:6.780547s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m33.64818s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:26362 TxTime:20m10.680533s TxReads:263610 TxWrites:10 TxRetries:0 MetaReads:263621 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     939	   1167235 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	1166853838 txns/op	         0.01065 w/op	  297733 B/op	    3008 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m10.329768s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1018 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:940 TxTime:18m20.183146s TxReads:9390 TxWrites:10 TxRetries:0 MetaReads:9401 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   19603	     60122 ns/op	         0.0001020 metar/op	         4.894 metaw/op	         0 r/op	         0 retries/op	 118626198 txns/op	         4.044 w/op	   27095 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:202 TxTime:1m0.781238s TxReads:201 TxWrites:204 TxRetries:0 MetaReads:33 MetaWrites:504 ObjReads:0 ObjWrites:413 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20226 TxTime:20m7.553677s TxReads:20225 TxWrites:20228 TxRetries:0 MetaReads:4 MetaWrites:49041 ObjReads:0 ObjWrites:40453 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:39641 TxTime:39m30.772365s TxReads:39640 TxWrites:39643 TxRetries:0 MetaReads:33 MetaWrites:95954 ObjReads:0 ObjWrites:79290 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     240	   4744321 ns/op	         0.1417 metar/op	         7.325 metaw/op	         0 r/op	         0 retries/op	9486402325 txns/op	         5.196 w/op	  507789 B/op	    5086 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:206 TxTime:17m34.556681s TxReads:205 TxWrites:208 TxRetries:0 MetaReads:62 MetaWrites:774 ObjReads:1 ObjWrites:554 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:481 TxTime:38m36.195101s TxReads:480 TxWrites:483 TxRetries:0 MetaReads:68 MetaWrites:1763 ObjReads:1 ObjWrites:1256 ObjLists:0}
+Benchmark100W/memory-8                       	    1011	   1085721 ns/op	       190.1 metar/op	        11.79 metaw/op	         0.002967 r/op	         0 retries/op	1083339572 txns/op	       191.1 w/op	  598156 B/op	    7817 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m58.179227s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19903 MetaWrites:390 ObjReads:2 ObjWrites:20007 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:1011 TxTime:18m15.256307s TxReads:0 TxWrites:101100 TxRetries:0 MetaReads:192206 MetaWrites:11920 ObjReads:3 ObjWrites:193210 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 177672236 ns/op	       340.7 metar/op	       200.8 metaw/op	         1.667 r/op	         0 retries/op	177666920500 txns/op	       157.2 w/op	24264761 B/op	  252192 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m29.584977s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1652 MetaWrites:154 ObjReads:9 ObjWrites:1059 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:15m6.712037s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1692 MetaWrites:954 ObjReads:10 ObjWrites:793 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m46.001523s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2045 MetaWrites:1205 ObjReads:10 ObjWrites:943 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	22.942s
+goos: linux
+goarch: amd64
+pkg: github.com/mbrt/glassdb
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+BenchmarkSingleRMW/memory-8     	  239044	      4829 ns/op	         0.0000042 metar/op	         0 metaw/op	         0.0000042 r/op	         0 retries/op	   4425550 txns/op	         1.000 w/op	    3170 B/op	      39 allocs/op
+--- BENCH: BenchmarkSingleRMW/memory-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:426.016ms TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:10000 TxTime:46.062407s TxReads:10000 TxWrites:10000 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:10000 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:239044 TxTime:17m37.901151s TxReads:239044 TxWrites:239044 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:239044 ObjLists:0}
+BenchmarkSingleRMW/gcs-8        	     835	   1421625 ns/op	         0.001198 metar/op	         0 metaw/op	         0.001198 r/op	         0 retries/op	1419431225 txns/op	         1.000 w/op	   84709 B/op	     453 allocs/op
+--- BENCH: BenchmarkSingleRMW/gcs-8
+    bench_test.go:67: Stats: {TxN:100 TxTime:2m23.4096s TxReads:100 TxWrites:100 TxRetries:0 MetaReads:3 MetaWrites:0 ObjReads:2 ObjWrites:100 ObjLists:0}
+    bench_test.go:67: Stats: {TxN:835 TxTime:19m45.225073s TxReads:835 TxWrites:835 TxRetries:0 MetaReads:2 MetaWrites:0 ObjReads:1 ObjWrites:835 ObjLists:0}
+Benchmark10RMW/memory-8         	   27422	     43195 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	  42078036 txns/op	         0 w/op	   11557 B/op	     130 allocs/op
+--- BENCH: Benchmark10RMW/memory-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:5.090724s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:10000 TxTime:7m6.383743s TxReads:100000 TxWrites:0 TxRetries:0 MetaReads:100001 MetaWrites:0 ObjReads:100000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:27422 TxTime:19m13.863909s TxReads:274220 TxWrites:0 TxRetries:0 MetaReads:274221 MetaWrites:0 ObjReads:274220 ObjWrites:0 ObjLists:0}
+Benchmark10RMW/gcs-8            	     518	   2414622 ns/op	        10.00 metar/op	         0 metaw/op	        10.00 r/op	         0 retries/op	2411086504 txns/op	         0 w/op	  523304 B/op	    5101 allocs/op
+--- BENCH: Benchmark10RMW/gcs-8
+    bench_test.go:121: Stats: {TxN:100 TxTime:3m50.941339s TxReads:1000 TxWrites:0 TxRetries:0 MetaReads:1001 MetaWrites:0 ObjReads:1000 ObjWrites:0 ObjLists:0}
+    bench_test.go:121: Stats: {TxN:518 TxTime:20m48.942809s TxReads:5180 TxWrites:0 TxRetries:0 MetaReads:5181 MetaWrites:0 ObjReads:5180 ObjWrites:0 ObjLists:0}
+BenchmarkConcurrMultipleRMW/memory-8         	    2251	    678182 ns/op	         1.008 metar/op	         2.004 metaw/op	         0.1053 r/op	         0.03554 retries/op	 676502068 txns/op	         3.169 w/op	   32807 B/op	     525 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/memory-8
+    bench_test.go:188: Stats: {TxN:100 TxTime:1m9.544976s TxReads:206 TxWrites:206 TxRetries:3 MetaReads:107 MetaWrites:206 ObjReads:14 ObjWrites:316 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:1720 TxTime:15m13.564899s TxReads:3554 TxWrites:3554 TxRetries:57 MetaReads:1494 MetaWrites:3406 ObjReads:186 ObjWrites:5423 ObjLists:0}
+    bench_test.go:188: Stats: {TxN:2251 TxTime:25m22.806155s TxReads:4662 TxWrites:4662 TxRetries:80 MetaReads:2268 MetaWrites:4511 ObjReads:237 ObjWrites:7134 ObjLists:0}
+BenchmarkConcurrMultipleRMW/gcs-8            	      91	  13975672 ns/op	         7.813 metar/op	         4.044 metaw/op	         1.648 r/op	         0.6044 retries/op	13971045264 txns/op	         6.802 w/op	 1407940 B/op	   13249 allocs/op
+--- BENCH: BenchmarkConcurrMultipleRMW/gcs-8
+    bench_test.go:188: Stats: {TxN:91 TxTime:21m11.365119s TxReads:292 TxWrites:292 TxRetries:55 MetaReads:711 MetaWrites:368 ObjReads:150 ObjWrites:619 ObjLists:0}
+Benchmark10R/memory-8                        	   25544	     45652 ns/op	        10.00 metar/op	         0 metaw/op	         0 r/op	         0 retries/op	  45499084 txns/op	         0.0003915 w/op	   16149 B/op	     162 allocs/op
+--- BENCH: Benchmark10R/memory-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:6.389838s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:10001 TxTime:7m48.242362s TxReads:100000 TxWrites:10 TxRetries:0 MetaReads:100011 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:25545 TxTime:19m22.346858s TxReads:255440 TxWrites:10 TxRetries:0 MetaReads:255451 MetaWrites:10 ObjReads:0 ObjWrites:11 ObjLists:0}
+Benchmark10R/gcs-8                           	     978	   1176837 ns/op	        10.00 metar/op	         0 metaw/op	         0.001022 r/op	         0 retries/op	1176435421 txns/op	         0.01022 w/op	  297788 B/op	    3006 allocs/op
+--- BENCH: Benchmark10R/gcs-8
+    bench_test.go:246: Stats: {TxN:101 TxTime:2m6.934862s TxReads:1000 TxWrites:10 TxRetries:0 MetaReads:1017 MetaWrites:3 ObjReads:7 ObjWrites:18 ObjLists:0}
+    bench_test.go:246: Stats: {TxN:979 TxTime:19m12.730518s TxReads:9780 TxWrites:10 TxRetries:0 MetaReads:9791 MetaWrites:10 ObjReads:1 ObjWrites:11 ObjLists:0}
+BenchmarkSharedR/memory-8                    	   18372	     60853 ns/op	         0 metar/op	         4.885 metaw/op	         0 r/op	         0 retries/op	 120060138 txns/op	         4.042 w/op	   27145 B/op	     416 allocs/op
+--- BENCH: BenchmarkSharedR/memory-8
+    bench_test.go:312: Stats: {TxN:211 TxTime:18.136687s TxReads:210 TxWrites:213 TxRetries:0 MetaReads:4 MetaWrites:517 ObjReads:0 ObjWrites:424 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:20231 TxTime:21m28.880342s TxReads:20230 TxWrites:20233 TxRetries:0 MetaReads:4 MetaWrites:49148 ObjReads:0 ObjWrites:40463 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:37127 TxTime:36m45.841324s TxReads:37126 TxWrites:37129 TxRetries:0 MetaReads:4 MetaWrites:89757 ObjReads:0 ObjWrites:74255 ObjLists:0}
+BenchmarkSharedR/gcs-8                       	     234	   4857147 ns/op	         0.1325 metar/op	         7.423 metaw/op	         0 r/op	         0 retries/op	9715008667 txns/op	         5.192 w/op	  510757 B/op	    5128 allocs/op
+--- BENCH: BenchmarkSharedR/gcs-8
+    bench_test.go:312: Stats: {TxN:209 TxTime:17m14.48404s TxReads:208 TxWrites:211 TxRetries:0 MetaReads:25 MetaWrites:792 ObjReads:2 ObjWrites:568 ObjLists:0}
+    bench_test.go:312: Stats: {TxN:469 TxTime:38m7.261026s TxReads:468 TxWrites:471 TxRetries:0 MetaReads:41 MetaWrites:1744 ObjReads:2 ObjWrites:1221 ObjLists:0}
+Benchmark100W/memory-8                       	     997	   1149485 ns/op	       190.0 metar/op	        11.90 metaw/op	         0.002006 r/op	         0 retries/op	1146786533 txns/op	       191.0 w/op	  598817 B/op	    7824 allocs/op
+--- BENCH: Benchmark100W/memory-8
+    bench_test.go:353: Stats: {TxN:100 TxTime:1m59.95736s TxReads:0 TxWrites:10000 TxRetries:0 MetaReads:19903 MetaWrites:392 ObjReads:1 ObjWrites:20005 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:997 TxTime:19m3.346173s TxReads:0 TxWrites:99700 TxRetries:0 MetaReads:189424 MetaWrites:11868 ObjReads:2 ObjWrites:190403 ObjLists:0}
+Benchmark100W/gcs-8                          	       6	 174503202 ns/op	       337.5 metar/op	       208.5 metaw/op	         1.167 r/op	         0 retries/op	174497472167 txns/op	       157.7 w/op	24580633 B/op	  256145 allocs/op
+--- BENCH: Benchmark100W/gcs-8
+    bench_test.go:353: Stats: {TxN:4 TxTime:13m44.489982s TxReads:0 TxWrites:400 TxRetries:0 MetaReads:1646 MetaWrites:147 ObjReads:9 ObjWrites:1106 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:5 TxTime:14m58.399804s TxReads:0 TxWrites:500 TxRetries:0 MetaReads:1735 MetaWrites:945 ObjReads:8 ObjWrites:784 ObjLists:0}
+    bench_test.go:353: Stats: {TxN:6 TxTime:17m26.984833s TxReads:0 TxWrites:600 TxRetries:0 MetaReads:2026 MetaWrites:1251 ObjReads:7 ObjWrites:946 ObjLists:0}
+PASS
+ok  	github.com/mbrt/glassdb	23.540s
