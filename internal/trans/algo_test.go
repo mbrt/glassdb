@@ -77,6 +77,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	t.Cleanup(cancel)
 
 	clock := testkit.NewAcceleratedClock(clockMultiplier)
+	log := slog.New(nilHandler{})
 	cache := cache.New(1024)
 	local := storage.NewLocal(cache, clock)
 	global := storage.NewGlobal(b, local, clock)
@@ -85,6 +86,8 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	t.Cleanup(background.Close)
 	tmon := NewMonitor(clock, local, tlogger, background)
 	locker := NewLocker(local, global, tlogger, clock, tmon)
+	gc := NewGC(clock, background, tlogger, log)
+
 	// Disable algo background tasks, as they make tests flaky.
 	// They should be tested separately.
 	background = (*concurr.Background)(nil)
@@ -93,7 +96,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	_, err := global.Write(ctx, paths.CollectionInfo(testCollName), collInfoContents, nil)
 	require.NoError(t, err)
 
-	tm := NewAlgo(clock, global, local, locker, tmon, background, slog.New(nilHandler{}))
+	tm := NewAlgo(clock, global, local, locker, tmon, gc, background, log)
 	return tm, testContext{
 		backend: b,
 		clock:   clock,

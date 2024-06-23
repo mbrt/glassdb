@@ -78,12 +78,15 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 	tl := storage.NewTLogger(opts.Clock, global, local, name)
 	tmon := trans.NewMonitor(opts.Clock, local, tl, bg)
 	locker := trans.NewLocker(local, global, tl, opts.Clock, tmon)
+	gc := trans.NewGC(opts.Clock, bg, tl, opts.Logger)
+	gc.Start(ctx)
 	ta := trans.NewAlgo(
 		opts.Clock,
 		global,
 		local,
 		locker,
 		tmon,
+		gc,
 		bg,
 		opts.Logger,
 	)
@@ -94,6 +97,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 		cache:      cache,
 		background: bg,
 		tmon:       tmon,
+		gc:         gc,
 		algo:       ta,
 		clock:      opts.Clock,
 		logger:     opts.Logger,
@@ -109,6 +113,7 @@ type DB struct {
 	cache      *cache.Cache
 	background *concurr.Background
 	tmon       *trans.Monitor
+	gc         *trans.GC
 	algo       trans.Algo
 	clock      clockwork.Clock
 	logger     *slog.Logger
