@@ -65,18 +65,9 @@ func (c Collection) ReadWeak(
 	maxStaleness time.Duration,
 ) ([]byte, error) {
 	p := paths.FromKey(c.prefix, key)
-	lr, ok := c.local.Read(p, maxStaleness)
-	if ok {
-		return lr.Value, nil
-	}
-	// We don't have the value ready. We could read it from global storage,
-	// but we would need to account for locked items. In case of lock create
-	// we could read an empty object where instead it should be either not
-	// found, or assume the first value.
-	// Better to just use a readonly transaction.
-	//
-	// TODO: Use storage.Reader instead.
-	return c.ReadStrong(ctx, key)
+	r := trans.NewReader(c.local, c.global, c.db.tmon)
+	rv, err := r.Read(ctx, p, maxStaleness)
+	return rv.Value, err
 }
 
 func (c Collection) Write(ctx context.Context, key, value []byte) error {
