@@ -29,3 +29,11 @@ jobs:
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.54
+
+    - name: Coverage
+      run: go test -coverprofile=coverage.txt -covermode=atomic ./...
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
