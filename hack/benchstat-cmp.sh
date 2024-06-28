@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Copyright 2023 The glassdb Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2023 The glassdb Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# !/bin/bash
-#
+
 # See https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
 
 set -e
