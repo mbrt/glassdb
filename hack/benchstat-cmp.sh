@@ -18,7 +18,7 @@
 set -e
 
 # Compute defaults: last two benchmarks.
-DEF=$(ls -ltr profile/bench-* | awk '{ print $9 }' | tail -2)
+DEF=$(ls -ltr docs/profile/bench-* | awk '{ print $9 }' | tail -2)
 OLD_DEF=$(echo "${DEF}" | sed -n '1p')
 NEW_DEF=$(echo "${DEF}" | sed -n '2p')
 

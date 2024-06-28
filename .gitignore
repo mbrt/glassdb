@@ -1,4 +1,4 @@
 .env/
-/profile/*.prof
-/profile/trace.out
+/docs/profile/*.prof
+/docs/profile/trace.out
 /glassdb.test
