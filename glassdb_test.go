@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"os"
 	"sort"
 	"testing"
 	"time"
@@ -52,9 +51,12 @@ var (
 	debugLogs    = flag.Bool("debug-logs", false, "debug db logs")
 )
 
-var debugLogger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-	Level: slog.LevelDebug,
-}))
+func newDebugLogger(t testing.TB) *slog.Logger {
+	t.Helper()
+	return testkit.NewLogger(t, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+}
 
 func initGCSBackend(t testing.TB) backend.Backend {
 	t.Helper()
@@ -66,7 +68,7 @@ func initGCSBackend(t testing.TB) backend.Backend {
 	}
 	backend := gcs.New(bucket)
 	if *debugBackend {
-		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
+		return middleware.NewBackendLogger(backend, "Backend", newDebugLogger(t))
 	}
 	return backend
 }
@@ -75,7 +77,7 @@ func initMemoryBackend(t testing.TB) backend.Backend {
 	t.Helper()
 	backend := memory.New()
 	if *debugBackend {
-		return middleware.NewBackendLogger(backend, "Backend", debugLogger)
+		return middleware.NewBackendLogger(backend, "Backend", newDebugLogger(t))
 	}
 	return backend
 }
@@ -105,7 +107,7 @@ func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
 	opts := glassdb.DefaultOptions()
 	opts.Clock = c
 	if *debugLogs {
-		opts.Logger = debugLogger
+		opts.Logger = newDebugLogger(t)
 	} else {
 		opts.Logger = slog.New(nilHandler{})
 	}
