@@ -15,7 +15,8 @@ Apple's [FoundationDB](https://github.com/apple/foundationdb).
 
 ## Project status
 
-**Warning:** This is still alpha software.
+> [!WARNING]
+> This is still alpha software.
 
 Transactions _should_ be working correctly and performance could definitely
 improve. Interfaces and file formats are _not_ stable and can still change at
@@ -281,7 +282,6 @@ This project is not an official Google project. It is not supported by Google
 and Google specifically disclaims all warranties as to its quality,
 merchantability, or fitness for a particular purpose.
 
-## Footnotes
 
 [^1]: Even though S3
   [is strongly consistent](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html#ConsistencyModel),
