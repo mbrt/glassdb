@@ -26,9 +26,7 @@ soon.
 Note also that currently we only support
 [Google GCS](https://cloud.google.com/storage/), but adding
 [Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs/)
-should be very easy. More work is required for
-[Amazon S3](https://aws.amazon.com/s3/) which lacks request preconditions on
-uploads.[^1]
+and [Amazon S3](https://aws.amazon.com/s3/) should be very easy.[^1]
 
 ## Usage example
 
@@ -283,8 +281,6 @@ and Google specifically disclaims all warranties as to its quality,
 merchantability, or fitness for a particular purpose.
 
 
-[^1]: Even though S3
-  [is strongly consistent](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html#ConsistencyModel),
-  it doesn't support `If-` headers on
-  [PUT operations](https://s3.amazonaws.com/doc/s3-developer-guide/RESTObjectPUT.html)
-  like it does on [GET](https://s3.amazonaws.com/doc/s3-developer-guide/RESTObjectGET.html).
+[^1]: S3 added [conditional
+  writes](https://aws.amazon.com/about-aws/whats-new/2024/11/amazon-s3-functionality-conditional-writes/)
+  only very recently.
