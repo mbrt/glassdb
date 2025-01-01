@@ -3,19 +3,19 @@ module github.com/mbrt/glassdb
 go 1.21
 
 require (
-	cloud.google.com/go/storage v1.47.0
-	github.com/cenkalti/backoff/v4 v4.3.0
+	cloud.google.com/go/storage v1.49.0
+	github.com/cenkalti/backoff/v5 v5.0.0
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/mux v1.8.1
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.9.0
-	google.golang.org/api v0.209.0
-	google.golang.org/protobuf v1.35.2
+	golang.org/x/sync v0.10.0
+	google.golang.org/api v0.214.0
+	google.golang.org/protobuf v1.36.1
 )
 
-require github.com/googleapis/gax-go/v2 v2.14.0
+require github.com/googleapis/gax-go/v2 v2.14.1
 
 require (
 	cel.dev/expr v0.16.1 // indirect
