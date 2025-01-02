@@ -75,6 +75,10 @@ func (c aclock) Since(t time.Time) time.Duration {
 	return c.Now().Sub(t)
 }
 
+func (c aclock) Until(t time.Time) time.Duration {
+	return t.Sub(c.Now())
+}
+
 func (c aclock) NewTicker(d time.Duration) clockwork.Ticker {
 	return c.inner.NewTicker(c.compress(d))
 }
