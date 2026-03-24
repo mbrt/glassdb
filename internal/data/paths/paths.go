@@ -25,8 +25,10 @@ import (
 	"github.com/mbrt/glassdb/internal/data"
 )
 
+// Type represents the category of a storage path (e.g. key, collection, transaction).
 type Type string
 
+// Path type constants for each category of storage object.
 const (
 	UnknownType        Type = ""
 	KeyType            Type = "_k"
@@ -46,46 +48,57 @@ var bufPool = sync.Pool{
 	},
 }
 
+// FromKey encodes a key into a storage path under the given prefix.
 func FromKey(prefix string, key []byte) string {
 	return prefixEncode(prefix, KeyType, key)
 }
 
+// ToKey decodes a key from its storage path suffix.
 func ToKey(suffix string) ([]byte, error) {
 	return decode(KeyType, suffix)
 }
 
+// KeysPrefix returns the storage path prefix for listing all keys under the given prefix.
 func KeysPrefix(prefix string) string {
 	return typedPrefix(prefix, KeyType)
 }
 
+// FromCollection encodes a collection name into a storage path under the given prefix.
 func FromCollection(prefix string, name []byte) string {
 	return prefixEncode(prefix, CollectionType, name)
 }
 
+// ToCollection decodes a collection name from its storage path suffix.
 func ToCollection(suffix string) ([]byte, error) {
 	return decode(CollectionType, suffix)
 }
 
+// CollectionInfo returns the storage path for the collection info object under the given prefix.
 func CollectionInfo(prefix string) string {
 	return path.Join(prefix, "_i")
 }
 
+// IsCollectionInfo reports whether the given path refers to a collection info object.
 func IsCollectionInfo(p string) bool {
 	return strings.HasSuffix(p, "/_i")
 }
 
+// CollectionsPrefix returns the storage path prefix for listing all collections under the given prefix.
 func CollectionsPrefix(prefix string) string {
 	return typedPrefix(prefix, CollectionType)
 }
 
+// FromTransaction encodes a transaction ID into a storage path under the given prefix.
 func FromTransaction(prefix string, id data.TxID) string {
 	return prefixEncode(prefix, TransactionType, id)
 }
 
+// ToTransaction decodes a transaction ID from its storage path suffix.
 func ToTransaction(suffix string) (data.TxID, error) {
 	return decode(TransactionType, suffix)
 }
 
+// Parse splits a storage path into its prefix, type, and suffix components.
 func Parse(p string) (ParseResult, error) {
 	// Collection info is a special case.
 	// Example path: foo/bar/_i -> prefix: foo/bar, suffix: ""
@@ -123,6 +136,7 @@ func Parse(p string) (ParseResult, error) {
 	}, nil
 }
 
+// ParseResult holds the components of a parsed storage path.
 type ParseResult struct {
 	Prefix string
 	Suffix string

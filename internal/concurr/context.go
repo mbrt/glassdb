@@ -21,6 +21,7 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+// ContextWithTimeout returns a context that is cancelled after the given timeout using the provided clock.
 func ContextWithTimeout(
 	parent context.Context,
 	clock clockwork.Clock,

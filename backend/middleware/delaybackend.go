@@ -30,6 +30,7 @@ import (
 
 var errBackoff = errors.New("rate limited")
 
+// GCSDelays contains typical latency values observed with Google Cloud Storage.
 var GCSDelays = DelayOptions{
 	MetaRead:       Latency{22 * time.Millisecond, 7 * time.Millisecond},
 	MetaWrite:      Latency{31 * time.Millisecond, 8 * time.Millisecond},
@@ -39,6 +40,7 @@ var GCSDelays = DelayOptions{
 	SameObjWritePs: 1,
 }
 
+// DelayOptions configures simulated latency for each type of backend operation.
 type DelayOptions struct {
 	MetaRead  Latency
 	MetaWrite Latency
@@ -50,11 +52,13 @@ type DelayOptions struct {
 	SameObjWritePs int
 }
 
+// Latency describes the mean and standard deviation of an operation's duration.
 type Latency struct {
 	Mean   time.Duration
 	StdDev time.Duration
 }
 
+// NewDelayBackend creates a DelayBackend that adds simulated latency to backend operations.
 func NewDelayBackend(
 	inner backend.Backend,
 	clock clockwork.Clock,
@@ -77,6 +81,8 @@ func NewDelayBackend(
 	}
 }
 
+// DelayBackend is a backend.Backend decorator that simulates network latency
+// and per-object write rate limiting.
 type DelayBackend struct {
 	inner      backend.Backend
 	clock      clockwork.Clock
@@ -89,6 +95,7 @@ type DelayBackend struct {
 	retryDelay time.Duration
 }
 
+// ReadIfModified implements backend.Backend.
 func (b *DelayBackend) ReadIfModified(
 	ctx context.Context,
 	path string,
@@ -104,6 +111,7 @@ func (b *DelayBackend) Read(ctx context.Context, path string) (backend.ReadReply
 	return r, err
 }
 
+// GetMetadata implements backend.Backend.
 func (b *DelayBackend) GetMetadata(
 	ctx context.Context,
 	path string,
@@ -113,6 +121,7 @@ func (b *DelayBackend) GetMetadata(
 	return r, err
 }
 
+// SetTagsIf implements backend.Backend.
 func (b *DelayBackend) SetTagsIf(
 	ctx context.Context,
 	path string,
@@ -140,6 +149,7 @@ func (b *DelayBackend) Write(
 	return r, err
 }
 
+// WriteIf implements backend.Backend.
 func (b *DelayBackend) WriteIf(
 	ctx context.Context,
 	path string,
@@ -154,6 +164,7 @@ func (b *DelayBackend) WriteIf(
 	return b.inner.WriteIf(ctx, path, value, expected, t)
 }
 
+// WriteIfNotExists implements backend.Backend.
 func (b *DelayBackend) WriteIfNotExists(
 	ctx context.Context,
 	path string,
@@ -167,6 +178,7 @@ func (b *DelayBackend) WriteIfNotExists(
 	return b.inner.WriteIfNotExists(ctx, path, value, t)
 }
 
+// Delete implements backend.Backend.
 func (b *DelayBackend) Delete(ctx context.Context, path string) error {
 	if err := b.backoff(ctx, path); err != nil {
 		return err
@@ -176,6 +188,7 @@ func (b *DelayBackend) Delete(ctx context.Context, path string) error {
 	return err
 }
 
+// DeleteIf implements backend.Backend.
 func (b *DelayBackend) DeleteIf(
 	ctx context.Context,
 	path string,
@@ -188,6 +201,7 @@ func (b *DelayBackend) DeleteIf(
 	return b.inner.DeleteIf(ctx, path, expected)
 }
 
+// List implements backend.Backend.
 func (b *DelayBackend) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
 	b.delay(b.list)
 	r, err := b.inner.List(ctx, dirPath)

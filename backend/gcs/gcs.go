@@ -38,14 +38,17 @@ import (
 
 var errRateLimited = errors.New("rate limited")
 
+// New creates a Backend backed by the given GCS bucket.
 func New(bucket *storage.BucketHandle) Backend {
 	return Backend{bucket}
 }
 
+// Backend implements backend.Backend using Google Cloud Storage.
 type Backend struct {
 	bucket *storage.BucketHandle
 }
 
+// GetMetadata implements backend.Backend.
 func (b Backend) GetMetadata(ctx context.Context, path string) (backend.Metadata, error) {
 	attr, err := b.object(path).Attrs(ctx)
 	if err != nil {
@@ -60,6 +63,7 @@ func (b Backend) GetMetadata(ctx context.Context, path string) (backend.Metadata
 	}, nil
 }
 
+// ReadIfModified implements backend.Backend.
 func (b Backend) ReadIfModified(ctx context.Context,
 	path string,
 	version int64,
@@ -75,6 +79,7 @@ func (b Backend) Read(ctx context.Context, path string) (backend.ReadReply, erro
 	return b.readFrom(ctx, obj)
 }
 
+// SetTagsIf implements backend.Backend.
 func (b Backend) SetTagsIf(
 	ctx context.Context,
 	path string,
@@ -109,6 +114,7 @@ func (b Backend) Write(ctx context.Context,
 	return b.writeTo(ctx, obj, value, t)
 }
 
+// WriteIf implements backend.Backend.
 func (b Backend) WriteIf(
 	ctx context.Context,
 	path string,
@@ -123,6 +129,7 @@ func (b Backend) WriteIf(
 	return b.writeTo(ctx, obj, value, t)
 }
 
+// WriteIfNotExists implements backend.Backend.
 func (b Backend) WriteIfNotExists(
 	ctx context.Context,
 	path string,
@@ -135,6 +142,7 @@ func (b Backend) WriteIfNotExists(
 	return b.writeTo(ctx, obj, value, t)
 }
 
+// Delete implements backend.Backend.
 func (b Backend) Delete(ctx context.Context, path string) error {
 	if err := b.object(path).Delete(ctx); err != nil {
 		return annotate(fmt.Errorf("deleting object: %w", err))
@@ -142,6 +150,7 @@ func (b Backend) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteIf implements backend.Backend.
 func (b Backend) DeleteIf(ctx context.Context, path string, expected backend.Version) error {
 	obj := b.object(path).If(storage.Conditions{
 		GenerationMatch:     expected.Contents,
@@ -153,6 +162,7 @@ func (b Backend) DeleteIf(ctx context.Context, path string, expected backend.Ver
 	return nil
 }
 
+// List implements backend.Backend.
 func (b Backend) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
 	iter := b.bucket.Objects(ctx, &storage.Query{
 		Delimiter:                "/",

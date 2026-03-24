@@ -6,7 +6,7 @@ unit-test:
 	hack/test-all.sh
 
 lint:
-	go tool revive ./...
+	go tool revive -config revive.toml ./...
 	@test -z "$$(gofmt -s -l .)" || (echo "Unformatted files:"; gofmt -s -l .; exit 1)
 
 format:

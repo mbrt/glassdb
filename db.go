@@ -57,10 +57,12 @@ type Options struct {
 	CacheSize int
 }
 
+// Open opens a database with the given name using default options.
 func Open(ctx context.Context, name string, b backend.Backend) (*DB, error) {
 	return OpenWith(ctx, name, b, DefaultOptions())
 }
 
+// OpenWith opens a database with the given name and custom options.
 func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options) (*DB, error) {
 	if !nameRegexp.MatchString(name) {
 		return nil, fmt.Errorf("name must be alphanumeric, got %q", name)
@@ -107,6 +109,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 	return res, nil
 }
 
+// DB represents an open glassdb database instance.
 type DB struct {
 	name       string
 	backend    *statsBackend
@@ -122,16 +125,19 @@ type DB struct {
 	statsM     sync.Mutex
 }
 
+// Close releases resources associated with the database.
 func (d *DB) Close(context.Context) error {
 	d.background.Close()
 	return nil
 }
 
+// Collection returns a top-level collection with the given name.
 func (d *DB) Collection(name []byte) Collection {
 	p := paths.FromCollection(d.root.prefix, name)
 	return d.openCollection(p)
 }
 
+// Tx executes f within a serializable transaction, retrying on conflicts.
 func (d *DB) Tx(ctx context.Context, f func(tx *Tx) error) error {
 	stats := &Stats{TxN: 1}
 	begin := d.clock.Now()

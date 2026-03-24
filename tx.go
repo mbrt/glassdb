@@ -26,6 +26,7 @@ import (
 	"github.com/sourcegraph/conc"
 )
 
+// ErrAborted is returned when a transaction is explicitly aborted.
 var ErrAborted = errors.New("aborted transaction")
 
 func newTx(
@@ -44,6 +45,7 @@ func newTx(
 	}
 }
 
+// Tx represents an active database transaction.
 type Tx struct {
 	ctx     context.Context
 	global  storage.Global
@@ -91,6 +93,7 @@ func (t *Tx) Read(c Collection, key []byte) ([]byte, error) {
 	return rv.Value, nil
 }
 
+// ReadMulti reads multiple keys concurrently within the transaction.
 func (t *Tx) ReadMulti(ks []FQKey) []ReadResult {
 	if len(ks) == 0 {
 		return nil
@@ -170,6 +173,7 @@ func (t *Tx) Write(c Collection, key, value []byte) error {
 	return nil
 }
 
+// Delete marks the key for deletion within the transaction.
 func (t *Tx) Delete(c Collection, key []byte) error {
 	if key == nil {
 		return errors.New("invalid nil key")
@@ -179,6 +183,7 @@ func (t *Tx) Delete(c Collection, key []byte) error {
 	return nil
 }
 
+// Abort explicitly aborts the transaction, preventing it from committing.
 func (t *Tx) Abort() error {
 	t.aborted = true
 	return ErrAborted
@@ -226,6 +231,7 @@ type FQKey struct {
 	Key        []byte
 }
 
+// ReadResult holds the value or error from a single read in ReadMulti.
 type ReadResult struct {
 	Value []byte
 	Err   error

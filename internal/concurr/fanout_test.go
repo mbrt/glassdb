@@ -27,7 +27,7 @@ func TestFanout(t *testing.T) {
 	ctx := context.Background()
 	f := NewFanout(3)
 	v := make([]bool, 3)
-	res := f.Spawn(ctx, 3, func(ctx context.Context, i int) error {
+	res := f.Spawn(ctx, 3, func(_ context.Context, i int) error {
 		v[i] = true
 		return nil
 	})

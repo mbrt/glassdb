@@ -25,6 +25,7 @@ import (
 	"github.com/mbrt/glassdb/internal/data"
 )
 
+// LockType represents the type of lock held on a storage object.
 type LockType int
 
 func (v LockType) toTag() (string, error) {
@@ -38,10 +39,11 @@ func (v LockType) toTag() (string, error) {
 	case LockTypeCreate:
 		return lockTagCreate, nil
 	default:
-		return "", fmt.Errorf("unknown lock type %q", v)
+		return "", fmt.Errorf("unknown lock type %v", v)
 	}
 }
 
+// Possible values for LockType.
 const (
 	LockTypeUnknown LockType = iota
 	LockTypeNone
@@ -62,29 +64,27 @@ const (
 	lockTagNone   = "-"
 )
 
+// NewLocker returns a Locker that manages locks through the given global storage.
 func NewLocker(g Global) Locker {
 	return Locker{g}
 }
 
+// Locker applies lock updates to storage objects by writing lock state into
+// backend tags and conditionally updating values.
 type Locker struct {
 	global Global
 }
 
+// UpdateLock applies the given lock update to the object at key, using
+// conditional writes to ensure the object's version matches expected.
 func (l Locker) UpdateLock(
 	ctx context.Context,
 	key string,
 	expected backend.Version,
 	update LockUpdate,
 ) error {
-	if update.Type == LockTypeNone && update.Value.Deleted {
-		if update.PrevType != LockTypeCreate && update.PrevType != LockTypeWrite {
-			return fmt.Errorf("cannot delete from unlock type %v", update.PrevType)
-		}
-		return l.global.DeleteIf(ctx, key, expected)
-	}
-	isUnlockCreate := update.Type == LockTypeNone && update.PrevType == LockTypeCreate
-	if isUnlockCreate && (len(update.Writer) == 0 || update.Value.NotWritten) {
-		return l.global.DeleteIf(ctx, key, expected)
+	if done, err := l.handleLockDeletion(ctx, key, expected, update); done {
+		return err
 	}
 	if expected.IsNull() {
 		switch update.Type {
@@ -97,7 +97,34 @@ func (l Locker) UpdateLock(
 			return backend.ErrNotFound
 		}
 	}
+	return l.applyLockTags(ctx, key, expected, update)
+}
 
+func (l Locker) handleLockDeletion(
+	ctx context.Context,
+	key string,
+	expected backend.Version,
+	update LockUpdate,
+) (bool, error) {
+	if update.Type == LockTypeNone && update.Value.Deleted {
+		if update.PrevType != LockTypeCreate && update.PrevType != LockTypeWrite {
+			return true, fmt.Errorf("cannot delete from unlock type %v", update.PrevType)
+		}
+		return true, l.global.DeleteIf(ctx, key, expected)
+	}
+	isUnlockCreate := update.Type == LockTypeNone && update.PrevType == LockTypeCreate
+	if isUnlockCreate && (len(update.Writer) == 0 || update.Value.NotWritten) {
+		return true, l.global.DeleteIf(ctx, key, expected)
+	}
+	return false, nil
+}
+
+func (l Locker) applyLockTags(
+	ctx context.Context,
+	key string,
+	expected backend.Version,
+	update LockUpdate,
+) error {
 	ltype, err := update.Type.toTag()
 	if err != nil {
 		return err
@@ -124,6 +151,8 @@ func (l Locker) UpdateLock(
 	return err
 }
 
+// UnlockCreateUncommitted releases a create-lock on an object whose
+// transaction was not committed, deleting the object.
 func (l Locker) UnlockCreateUncommitted(
 	ctx context.Context,
 	key string,
@@ -135,6 +164,7 @@ func (l Locker) UnlockCreateUncommitted(
 	})
 }
 
+// LockUpdate describes the desired state of a lock after an update operation.
 type LockUpdate struct {
 	Type     LockType
 	PrevType LockType
@@ -143,6 +173,8 @@ type LockUpdate struct {
 	Value    TValue
 }
 
+// TValue holds a value written by a transaction, including whether it was
+// a deletion or was not written at all.
 type TValue struct {
 	Value   []byte
 	Deleted bool
@@ -151,12 +183,15 @@ type TValue struct {
 	NotWritten bool
 }
 
+// LockRequest specifies the transactions that want to acquire or release a lock.
 type LockRequest struct {
 	Type      LockType
 	Lockers   []data.TxID
 	Unlockers []data.TxID
 }
 
+// TxPathState describes a transaction's commit status and the value it wrote
+// for a particular path.
 type TxPathState struct {
 	Tx     data.TxID
 	Status TxCommitStatus
@@ -180,6 +215,8 @@ type LockOps struct {
 	UnlockedFor []data.TxID
 }
 
+// ComputeLockUpdate determines the next lock operation to perform given the
+// current lock state, a lock request, and the status of relevant transactions.
 func ComputeLockUpdate(curr LockInfo, req LockRequest, txs []TxPathState) (LockOps, error) {
 	// First compute what to do about unlocks.
 	unlockOps, err := computeUnlockUpdate(curr, req.Unlockers, txs)
@@ -378,12 +415,15 @@ func isWriterType(lt LockType) bool {
 	return lt == LockTypeCreate || lt == LockTypeWrite
 }
 
+// LockInfo describes the current lock state of a storage object.
 type LockInfo struct {
 	Type       LockType
 	LockedBy   []data.TxID
 	LastWriter data.TxID
 }
 
+// Valid checks that the lock info is internally consistent, returning an error
+// if any invariants are violated.
 func (v LockInfo) Valid() error {
 	if len(v.LockedBy) == 0 {
 		if v.Type != LockTypeNone {

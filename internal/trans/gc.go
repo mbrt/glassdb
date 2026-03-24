@@ -17,6 +17,8 @@ const (
 	sizeLimit       = 1024
 )
 
+// NewGC returns a GC that periodically deletes finalized transaction logs
+// using the given background executor.
 func NewGC(
 	clock clockwork.Clock,
 	bg *concurr.Background,
@@ -31,6 +33,8 @@ func NewGC(
 	}
 }
 
+// GC periodically garbage-collects finalized transaction logs that are no
+// longer needed.
 type GC struct {
 	clock clockwork.Clock
 	bg    *concurr.Background
@@ -40,6 +44,8 @@ type GC struct {
 	m     sync.Mutex
 }
 
+// Start begins the background cleanup loop that processes due items at
+// regular intervals.
 func (g *GC) Start(ctx context.Context) {
 	g.bg.Go(ctx, func(ctx context.Context) {
 		tick := g.clock.NewTicker(cleanupInterval)
@@ -55,6 +61,7 @@ func (g *GC) Start(ctx context.Context) {
 	})
 }
 
+// ScheduleTxCleanup enqueues a transaction log for deletion after a delay.
 func (g *GC) ScheduleTxCleanup(txid data.TxID) {
 	t := g.clock.Now().Add(cleanupInterval)
 

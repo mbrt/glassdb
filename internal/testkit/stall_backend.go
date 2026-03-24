@@ -23,6 +23,7 @@ import (
 	"github.com/mbrt/glassdb/backend"
 )
 
+// NewStallBackend wraps a backend so that writes can be paused, stalled, and released.
 func NewStallBackend(inner backend.Backend) *StallBackend {
 	res := &StallBackend{
 		Backend: inner,
@@ -44,10 +45,12 @@ type StallBackend struct {
 	wg      conc.WaitGroup
 }
 
+// WaitForStalled blocks until all stalled write operations have been queued.
 func (b *StallBackend) WaitForStalled() {
 	b.wg.Wait()
 }
 
+// StallWrites causes all subsequent write operations to be held until released.
 func (b *StallBackend) StallWrites() {
 	b.m.Lock()
 	b.stall = true
@@ -56,6 +59,7 @@ func (b *StallBackend) StallWrites() {
 	b.cond.Broadcast()
 }
 
+// StopStalling allows new write operations to proceed normally without stalling.
 func (b *StallBackend) StopStalling() {
 	b.m.Lock()
 	b.stall = false
@@ -63,6 +67,7 @@ func (b *StallBackend) StopStalling() {
 	b.cond.Broadcast()
 }
 
+// ReleaseStalled allows all previously stalled write operations to complete.
 func (b *StallBackend) ReleaseStalled() {
 	b.m.Lock()
 	b.release = true
@@ -70,6 +75,7 @@ func (b *StallBackend) ReleaseStalled() {
 	b.cond.Broadcast()
 }
 
+// SetTagsIf sets tags on a path conditionally, stalling if stalling is enabled.
 func (b *StallBackend) SetTagsIf(
 	ctx context.Context,
 	path string,
@@ -114,6 +120,7 @@ func (b *StallBackend) Write(
 	return backend.Metadata{}, context.Canceled
 }
 
+// WriteIf writes a value conditionally, stalling if stalling is enabled.
 func (b *StallBackend) WriteIf(
 	ctx context.Context,
 	path string,
@@ -137,6 +144,7 @@ func (b *StallBackend) WriteIf(
 	return backend.Metadata{}, context.Canceled
 }
 
+// WriteIfNotExists writes a value only if the path does not exist, stalling if stalling is enabled.
 func (b *StallBackend) WriteIfNotExists(
 	ctx context.Context,
 	path string,
@@ -159,6 +167,7 @@ func (b *StallBackend) WriteIfNotExists(
 	return backend.Metadata{}, context.Canceled
 }
 
+// Delete removes an object at the given path, stalling if stalling is enabled.
 func (b *StallBackend) Delete(ctx context.Context, path string) error {
 	b.m.Lock()
 	if !b.stall {
@@ -176,6 +185,7 @@ func (b *StallBackend) Delete(ctx context.Context, path string) error {
 	return context.Canceled
 }
 
+// DeleteIf removes an object conditionally, stalling if stalling is enabled.
 func (b *StallBackend) DeleteIf(
 	ctx context.Context,
 	path string,

@@ -19,6 +19,7 @@ import (
 	"sync"
 )
 
+// New creates a new LRU cache with the given maximum size in bytes.
 func New(maxSizeB int) *Cache {
 	return &Cache{
 		maxSizeB: maxSizeB,
@@ -27,10 +28,13 @@ func New(maxSizeB int) *Cache {
 	}
 }
 
+// Value is an interface for cache entries that report their size in bytes.
 type Value interface {
 	SizeB() int
 }
 
+// Cache is a thread-safe LRU cache that evicts the least recently used entries
+// when the total size exceeds the configured maximum.
 type Cache struct {
 	m         sync.Mutex
 	maxSizeB  int
@@ -39,6 +43,7 @@ type Cache struct {
 	evicts    *list.List
 }
 
+// Get returns the value for the given key, moving it to the front of the LRU list.
 func (c *Cache) Get(key string) (Value, bool) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -49,6 +54,7 @@ func (c *Cache) Get(key string) (Value, bool) {
 	return nil, false
 }
 
+// Set stores a value in the cache for the given key, evicting old entries if necessary.
 func (c *Cache) Set(key string, val Value) {
 	c.Update(key, func(Value) Value {
 		return val
@@ -87,6 +93,7 @@ func (c *Cache) Update(key string, fn func(v Value) Value) {
 	c.removeOldest()
 }
 
+// Delete removes the entry for the given key from the cache.
 func (c *Cache) Delete(key string) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -96,6 +103,7 @@ func (c *Cache) Delete(key string) {
 	}
 }
 
+// SizeB returns the current total size of the cache in bytes.
 func (c *Cache) SizeB() int {
 	c.m.Lock()
 	defer c.m.Unlock()

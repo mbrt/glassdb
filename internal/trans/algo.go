@@ -32,6 +32,7 @@ import (
 	"github.com/mbrt/glassdb/internal/trace"
 )
 
+// ErrRetry signals that the transaction should be retried from the beginning.
 var ErrRetry = errors.New("retry transaction")
 
 type statusType int
@@ -68,6 +69,8 @@ var (
 	errValidateRetry = errors.New("retry validation")
 )
 
+// NewAlgo returns an Algo that coordinates transactions using the given
+// storage, locking, monitoring, and garbage collection components.
 func NewAlgo(
 	c clockwork.Clock,
 	g storage.Global,
@@ -91,6 +94,8 @@ func NewAlgo(
 	}
 }
 
+// Algo implements the transaction commit protocol, including read validation,
+// locking, and write application.
 type Algo struct {
 	clock      clockwork.Clock
 	global     storage.Global
@@ -103,6 +108,7 @@ type Algo struct {
 	log        *slog.Logger
 }
 
+// Begin starts a new transaction with the given data and returns a handle to it.
 func (t Algo) Begin(ctx context.Context, d Data) *Handle {
 	tid := newTxID(ctx)
 	return &Handle{
@@ -113,6 +119,8 @@ func (t Algo) Begin(ctx context.Context, d Data) *Handle {
 	}
 }
 
+// Commit validates all reads and applies all writes for the transaction,
+// returning ErrRetry if a conflict is detected.
 func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 	if tx.status == statusNew {
 		t.mon.BeginTx(ctx, tx.id)
@@ -149,6 +157,8 @@ func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 	return nil
 }
 
+// ValidateReads validates that the reads in a read-only transaction are still
+// consistent, returning ErrRetry if any read has been invalidated.
 func (t Algo) ValidateReads(ctx context.Context, tx *Handle) error {
 	if tx.status == statusNew {
 		t.mon.BeginTx(ctx, tx.id)
@@ -190,6 +200,8 @@ func (t Algo) validateRound(ctx context.Context, vstate *validationState, tx *Ha
 	return t.validateReadWrite(ctx, vstate, tx)
 }
 
+// Reset replaces the transaction's data with new data, preserving any acquired
+// locks. It panics if the transaction was already committed.
 func (t Algo) Reset(tx *Handle, data Data) {
 	if tx.status == statusCommitted {
 		panic("Cannot reset a committed transaction")
@@ -198,6 +210,8 @@ func (t Algo) Reset(tx *Handle, data Data) {
 	tx.data = data
 }
 
+// End aborts a non-committed transaction, releasing its locks and cleaning up
+// resources. It is a no-op if the transaction was already committed.
 func (t Algo) End(ctx context.Context, tx *Handle) error {
 	if tx == nil || tx.status == statusCommitted {
 		return nil
@@ -348,11 +362,20 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		return nil
 	}
 
+	return t.validateLockedRead(ctx, item, li, readFromT)
+}
+
+func (t Algo) validateLockedRead(
+	ctx context.Context,
+	item *pathState,
+	li storage.LockInfo,
+	readFromT data.TxID,
+) error {
 	// The item is still locked in write or create. Two valid cases:
 	// - If the transaction is committed, it must be the one we read from.
 	// - If not committed, the last writer must be the one we read from.
 	if len(li.LockedBy) != 1 {
-		return fmt.Errorf("bad lock: %q with %d lockers", li.Type, len(li.LockedBy))
+		return fmt.Errorf("bad lock: %v with %d lockers", li.Type, len(li.LockedBy))
 	}
 	locker := li.LockedBy[0]
 	status, err := t.mon.TxStatus(ctx, locker)
@@ -452,7 +475,7 @@ func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
 	// The item is locked in write. If the current transaction committed, we
 	// need to check whether the item was deleted.
 	if len(li.LockedBy) != 1 {
-		return fmt.Errorf("bad lock: %q with %d lockers", li.Type, len(li.LockedBy))
+		return fmt.Errorf("bad lock: %v with %d lockers", li.Type, len(li.LockedBy))
 	}
 	locker := li.LockedBy[0]
 	status, err := t.mon.TxStatus(ctx, locker)
@@ -538,7 +561,7 @@ func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
 
 	// This was locked in write.
 	if len(li.LockedBy) != 1 {
-		return fmt.Errorf("bad lock: %q with %d lockers", li.Type, len(li.LockedBy))
+		return fmt.Errorf("bad lock: %v with %d lockers", li.Type, len(li.LockedBy))
 	}
 	locker := li.LockedBy[0]
 	status, err := t.mon.TxStatus(ctx, locker)
@@ -1039,7 +1062,7 @@ func (t Algo) asyncCleanup(ctx context.Context, tx *Handle) {
 		w := f.Spawn(ctx, len(ps), func(ctx context.Context, i int) error {
 			pl := ps[i]
 			if err := t.unlock(ctx, pl.Path, tx); err != nil {
-				errs[i] = fmt.Errorf("unlocking %q: %w", pl, err)
+				errs[i] = fmt.Errorf("unlocking %v: %w", pl, err)
 			}
 			return nil
 		})
@@ -1097,26 +1120,34 @@ func (t Algo) deadlockTimeoutCtx(
 	return concurr.ContextWithTimeout(ctx, t.clock, timeout)
 }
 
+// Data holds the reads and writes that make up a transaction.
 type Data struct {
 	Reads  []ReadAccess
 	Writes []WriteAccess
 }
 
+// ReadAccess records a single key read within a transaction, including the
+// version observed and whether the key existed.
 type ReadAccess struct {
 	Path    string
 	Version ReadVersion
 	Found   bool
 }
 
+// ReadVersion identifies the version of a value read by a transaction, either
+// by backend version number or by the local writer's transaction ID.
 type ReadVersion struct {
 	Version    int64
 	LastWriter data.TxID
 }
 
+// IsLocal reports whether this version refers to a locally committed value
+// that has not yet been persisted to the backend.
 func (r ReadVersion) IsLocal() bool {
 	return r.Version == 0
 }
 
+// ToStorageVersion converts the read version to a storage.Version.
 func (r ReadVersion) ToStorageVersion() storage.Version {
 	return storage.Version{
 		B:      backend.Version{Contents: r.Version},
@@ -1124,12 +1155,14 @@ func (r ReadVersion) ToStorageVersion() storage.Version {
 	}
 }
 
+// WriteAccess records a single key write within a transaction.
 type WriteAccess struct {
 	Path   string
 	Val    []byte
 	Delete bool
 }
 
+// Handle is an opaque reference to an in-progress transaction managed by Algo.
 type Handle struct {
 	data          Data
 	status        statusType
@@ -1141,10 +1174,13 @@ type Handle struct {
 
 var txIDKey = struct{}{}
 
+// CtxWithTxID returns a new context carrying the given transaction ID.
 func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
 	return context.WithValue(ctx, txIDKey, id)
 }
 
+// TxIDFromCtx extracts the transaction ID from the context, or returns nil if
+// none is set.
 func TxIDFromCtx(ctx context.Context) data.TxID {
 	if id, ok := ctx.Value(txIDKey).(data.TxID); ok {
 		return id

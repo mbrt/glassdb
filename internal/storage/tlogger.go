@@ -32,14 +32,18 @@ import (
 	pb "github.com/mbrt/glassdb/internal/proto"
 )
 
+// ErrKeyNotFound is returned when a key is not found in a committed transaction log.
 var ErrKeyNotFound = errors.New("key not found in committed transaction")
 
+// TxCommitStatus represents the commit state of a transaction.
 type TxCommitStatus int
 
+// IsFinal reports whether the status represents a terminal state (committed or aborted).
 func (s TxCommitStatus) IsFinal() bool {
 	return s == TxCommitStatusOK || s == TxCommitStatusAborted
 }
 
+// Possible values for TxCommitStatus.
 const (
 	TxCommitStatusUnknown TxCommitStatus = iota
 	TxCommitStatusOK
@@ -56,6 +60,8 @@ const (
 	commitStatusPending = "pending"
 )
 
+// TxLog holds the full contents of a transaction log entry, including its
+// writes and acquired locks.
 type TxLog struct {
 	ID        data.TxID
 	Timestamp time.Time
@@ -64,6 +70,7 @@ type TxLog struct {
 	Locks     []PathLock
 }
 
+// TxWrite represents a single write operation within a transaction.
 type TxWrite struct {
 	Path       string
 	Value      []byte
@@ -71,17 +78,21 @@ type TxWrite struct {
 	PrevWriter data.TxID
 }
 
+// TxStatus holds the commit status of a transaction along with its timestamp
+// and backend version.
 type TxStatus struct {
 	Status     TxCommitStatus
 	LastUpdate time.Time
 	Version    backend.Version
 }
 
+// PathLock associates a storage path with its lock type.
 type PathLock struct {
 	Path string
 	Type LockType
 }
 
+// NewTLogger returns a TLogger that stores transaction logs under the given prefix.
 func NewTLogger(c clockwork.Clock, g Global, l Local, prefix string) TLogger {
 	return TLogger{prefix, c, g, l}
 }
@@ -94,6 +105,8 @@ type TLogger struct {
 	local  Local
 }
 
+// CommitStatus returns the commit status of the transaction with the given ID,
+// reading from the local cache when possible.
 func (t TLogger) CommitStatus(ctx context.Context, id data.TxID) (TxStatus, error) {
 	tlt, err := t.readTags(ctx, id)
 	if err != nil {
@@ -105,6 +118,7 @@ func (t TLogger) CommitStatus(ctx context.Context, id data.TxID) (TxStatus, erro
 	return tlt, nil
 }
 
+// Get reads and parses the full transaction log for the given transaction ID.
 func (t TLogger) Get(ctx context.Context, id data.TxID) (TxLog, error) {
 	tr, err := t.readLog(ctx, id)
 	if err != nil {
@@ -153,6 +167,7 @@ func (t TLogger) Get(ctx context.Context, id data.TxID) (TxLog, error) {
 	return res, nil
 }
 
+// Set creates a new transaction log entry, failing if one already exists.
 func (t TLogger) Set(ctx context.Context, l TxLog) (backend.Version, error) {
 	if l.Timestamp.IsZero() {
 		l.Timestamp = t.clock.Now()
@@ -166,6 +181,7 @@ func (t TLogger) Set(ctx context.Context, l TxLog) (backend.Version, error) {
 	return m.Version, err
 }
 
+// SetIf updates the transaction log only if its current version matches expected.
 func (t TLogger) SetIf(ctx context.Context, l TxLog, expected backend.Version) (backend.Version, error) {
 	if l.Timestamp.IsZero() {
 		l.Timestamp = t.clock.Now()
@@ -179,6 +195,7 @@ func (t TLogger) SetIf(ctx context.Context, l TxLog, expected backend.Version) (
 	return m.Version, err
 }
 
+// Delete removes the transaction log for the given ID, ignoring not-found errors.
 func (t TLogger) Delete(ctx context.Context, id data.TxID) error {
 	err := t.global.Delete(ctx, paths.FromTransaction(t.prefix, id))
 	if errors.Is(err, backend.ErrNotFound) {
@@ -257,73 +274,14 @@ func marshalLog(l TxLog) ([]byte, error) {
 	collWrites := make(map[string]*pb.CollectionWrites)
 
 	for _, e := range l.Writes {
-		pr, err := paths.Parse(e.Path)
-		if err != nil {
+		if err := marshalWrite(collWrites, e); err != nil {
 			return nil, err
 		}
-		if pr.Type != paths.KeyType {
-			return nil, fmt.Errorf("expected 'key' path, got path %q", e.Path)
-		}
-		write := &pb.Write{
-			Suffix:  path.Join(string(pr.Type), pr.Suffix),
-			PrevTid: e.PrevWriter,
-		}
-		if e.Deleted {
-			write.ValDelete = &pb.Write_Deleted{Deleted: true}
-		} else {
-			write.ValDelete = &pb.Write_Value{Value: e.Value}
-		}
-		collP := collWrites[pr.Prefix]
-		if collP == nil {
-			collP = &pb.CollectionWrites{
-				Prefix: pr.Prefix,
-				Locks:  &pb.CollectionLocks{},
-			}
-			collWrites[pr.Prefix] = collP
-		}
-		collP.Writes = append(collP.Writes, write)
 	}
 
 	for _, e := range l.Locks {
-		var lt pb.Lock_LockType
-		switch e.Type {
-		case LockTypeNone:
-			lt = pb.Lock_NONE
-		case LockTypeRead:
-			lt = pb.Lock_READ
-		case LockTypeWrite:
-			lt = pb.Lock_WRITE
-		case LockTypeCreate:
-			lt = pb.Lock_CREATE
-		default:
-			lt = pb.Lock_UNKNOWN
-		}
-
-		pr, err := paths.Parse(e.Path)
-		if err != nil {
+		if err := marshalLock(collWrites, e); err != nil {
 			return nil, err
-		}
-
-		var clocks *pb.CollectionLocks
-		if collP := collWrites[pr.Prefix]; collP == nil {
-			clocks = &pb.CollectionLocks{}
-			collP = &pb.CollectionWrites{
-				Prefix: pr.Prefix,
-				Locks:  clocks,
-			}
-			collWrites[pr.Prefix] = collP
-		} else {
-			clocks = collP.GetLocks()
-		}
-
-		if pr.Type == paths.CollectionInfoType {
-			clocks.CollectionLock = lt
-		} else {
-			lock := &pb.Lock{
-				Suffix:   path.Join(string(pr.Type), pr.Suffix),
-				LockType: lt,
-			}
-			clocks.Locks = append(clocks.Locks, lock)
 		}
 	}
 
@@ -350,6 +308,82 @@ func marshalLog(l TxLog) ([]byte, error) {
 		return nil, fmt.Errorf("marshalling transaction: %w", err)
 	}
 	return buf, nil
+}
+
+func marshalWrite(collWrites map[string]*pb.CollectionWrites, e TxWrite) error {
+	pr, err := paths.Parse(e.Path)
+	if err != nil {
+		return err
+	}
+	if pr.Type != paths.KeyType {
+		return fmt.Errorf("expected 'key' path, got path %q", e.Path)
+	}
+	write := &pb.Write{
+		Suffix:  path.Join(string(pr.Type), pr.Suffix),
+		PrevTid: e.PrevWriter,
+	}
+	if e.Deleted {
+		write.ValDelete = &pb.Write_Deleted{Deleted: true}
+	} else {
+		write.ValDelete = &pb.Write_Value{Value: e.Value}
+	}
+	collP := collWrites[pr.Prefix]
+	if collP == nil {
+		collP = &pb.CollectionWrites{
+			Prefix: pr.Prefix,
+			Locks:  &pb.CollectionLocks{},
+		}
+		collWrites[pr.Prefix] = collP
+	}
+	collP.Writes = append(collP.Writes, write)
+	return nil
+}
+
+func marshalLock(collWrites map[string]*pb.CollectionWrites, e PathLock) error {
+	lt := lockTypeToProto(e.Type)
+
+	pr, err := paths.Parse(e.Path)
+	if err != nil {
+		return err
+	}
+
+	var clocks *pb.CollectionLocks
+	if collP := collWrites[pr.Prefix]; collP == nil {
+		clocks = &pb.CollectionLocks{}
+		collP = &pb.CollectionWrites{
+			Prefix: pr.Prefix,
+			Locks:  clocks,
+		}
+		collWrites[pr.Prefix] = collP
+	} else {
+		clocks = collP.GetLocks()
+	}
+
+	if pr.Type == paths.CollectionInfoType {
+		clocks.CollectionLock = lt
+	} else {
+		lock := &pb.Lock{
+			Suffix:   path.Join(string(pr.Type), pr.Suffix),
+			LockType: lt,
+		}
+		clocks.Locks = append(clocks.Locks, lock)
+	}
+	return nil
+}
+
+func lockTypeToProto(t LockType) pb.Lock_LockType {
+	switch t {
+	case LockTypeNone:
+		return pb.Lock_NONE
+	case LockTypeRead:
+		return pb.Lock_READ
+	case LockTypeWrite:
+		return pb.Lock_WRITE
+	case LockTypeCreate:
+		return pb.Lock_CREATE
+	default:
+		return pb.Lock_UNKNOWN
+	}
 }
 
 func logTags(l TxLog) backend.Tags {

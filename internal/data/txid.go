@@ -28,10 +28,12 @@ func (t TxID) String() string {
 	return hex.EncodeToString(t)
 }
 
+// Equal reports whether t and other are the same transaction ID.
 func (t TxID) Equal(other TxID) bool {
 	return bytes.Equal(t, other)
 }
 
+// NewTId generates a new random 128-bit transaction ID.
 func NewTId() TxID {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -40,6 +42,7 @@ func NewTId() TxID {
 	return b
 }
 
+// NewTxIDSet creates a TxIDSet containing the given transaction IDs, deduplicating any repeats.
 func NewTxIDSet(ids ...TxID) TxIDSet {
 	res := make(TxIDSet, 0, len(ids))
 	for _, id := range ids {
@@ -51,6 +54,7 @@ func NewTxIDSet(ids ...TxID) TxIDSet {
 // TxIDSet is a set of transaction IDs optimized for small sizes.
 type TxIDSet []TxID
 
+// Add inserts a transaction ID into the set, returning the updated set and whether it was added.
 func (s TxIDSet) Add(a TxID) (TxIDSet, bool) {
 	if s.Contains(a) {
 		return s, false
@@ -58,6 +62,7 @@ func (s TxIDSet) Add(a TxID) (TxIDSet, bool) {
 	return append(s, a), true
 }
 
+// AddMulti inserts multiple transaction IDs into the set, deduplicating any repeats.
 func (s TxIDSet) AddMulti(ids ...TxID) TxIDSet {
 	res := s
 	for _, e := range ids {
@@ -66,6 +71,7 @@ func (s TxIDSet) AddMulti(ids ...TxID) TxIDSet {
 	return res
 }
 
+// Contains reports whether the set contains the given transaction ID.
 func (s TxIDSet) Contains(a TxID) bool {
 	for _, id := range s {
 		if id.Equal(a) {
@@ -75,6 +81,7 @@ func (s TxIDSet) Contains(a TxID) bool {
 	return false
 }
 
+// IndexOf returns the index of the given transaction ID in the set, or -1 if not found.
 func (s TxIDSet) IndexOf(a TxID) int {
 	for i, id := range s {
 		if id.Equal(a) {

@@ -24,12 +24,17 @@ import (
 	"github.com/mbrt/glassdb/internal/cache"
 )
 
+// MaxStaleness is the maximum duration a cached value can be stale, effectively
+// meaning that any cached value is acceptable regardless of age.
 const MaxStaleness = time.Duration(math.MaxInt64)
 
+// NewLocal returns a Local backed by the given cache and clock.
 func NewLocal(c *cache.Cache, clock clockwork.Clock) Local {
 	return Local{c, clock}
 }
 
+// Local provides a local in-memory cache for storage objects, including both
+// values and metadata with staleness tracking.
 type Local struct {
 	cache *cache.Cache
 	clock clockwork.Clock
@@ -52,6 +57,8 @@ func (c Local) Read(key string, maxStale time.Duration) (LocalRead, bool) {
 	}, true
 }
 
+// GetMeta returns the cached metadata for the given key, if it exists and
+// is not staler than maxStale.
 func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool) {
 	e, ok := c.entry(key)
 	if !ok || e.M == nil {
@@ -67,6 +74,7 @@ func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool)
 	}, true
 }
 
+// WriteWithMeta stores both the value and its metadata in the cache atomically.
 func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 	updated := c.clock.Now()
 	newEntry := cacheEntry{
@@ -99,6 +107,7 @@ func (c Local) Write(key string, value []byte, v Version) {
 	})
 }
 
+// SetMeta updates only the cached metadata for the given key.
 func (c Local) SetMeta(key string, meta backend.Metadata) {
 	newMeta := &cacheMeta{
 		Meta:    meta,
@@ -115,8 +124,8 @@ func (c Local) SetMeta(key string, meta backend.Metadata) {
 	})
 }
 
-// MarkStale annotates the given key value as outdated, only if it's currently
-// set at the given version.
+// MarkValueOutated annotates the given key value as outdated, only if it's
+// currently set at the given version.
 func (c Local) MarkValueOutated(key string, v Version) {
 	c.cache.Update(key, func(old cache.Value) cache.Value {
 		if old == nil {
@@ -139,6 +148,7 @@ func (c Local) MarkValueOutated(key string, v Version) {
 	})
 }
 
+// MarkDeleted marks the given key as deleted in the cache with the given version.
 func (c Local) MarkDeleted(key string, v Version) {
 	newValue := &cacheValue{
 		Deleted: true,
@@ -155,6 +165,7 @@ func (c Local) MarkDeleted(key string, v Version) {
 	})
 }
 
+// Delete removes the given key entirely from the cache.
 func (c Local) Delete(key string) {
 	c.cache.Delete(key)
 }
@@ -172,6 +183,7 @@ func (c Local) isStale(updated time.Time, maxStaleness time.Duration) bool {
 	return staleness > maxStaleness
 }
 
+// LocalRead holds the result of reading a value from the local cache.
 type LocalRead struct {
 	Value   []byte
 	Version Version
@@ -180,6 +192,7 @@ type LocalRead struct {
 	Outdated bool
 }
 
+// LocalMetadata holds cached metadata along with its freshness status.
 type LocalMetadata struct {
 	M backend.Metadata
 	// Outdated is true if the metadata is certainly outdated.

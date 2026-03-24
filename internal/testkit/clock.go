@@ -22,6 +22,7 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+// NewSelfAdvanceClock creates a fake clock that automatically advances when sleepers are waiting.
 func NewSelfAdvanceClock(t *testing.T) clockwork.Clock {
 	c := clockwork.NewFakeClock()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -43,6 +44,7 @@ func NewSelfAdvanceClock(t *testing.T) clockwork.Clock {
 	return c
 }
 
+// NewAcceleratedClock creates a clock that runs faster than real time by the given multiplier.
 func NewAcceleratedClock(multiplier int) clockwork.Clock {
 	c := clockwork.NewRealClock()
 	return aclock{

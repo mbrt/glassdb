@@ -26,6 +26,7 @@ import (
 	"google.golang.org/api/option"
 )
 
+// NewGCSClient creates a GCS storage client backed by an in-memory fake server for testing.
 func NewGCSClient(ctx context.Context, t testing.TB, logging bool) *storage.Client {
 	t.Helper()
 

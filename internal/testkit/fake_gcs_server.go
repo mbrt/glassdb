@@ -136,7 +136,7 @@ func (s *fakeGCSServer) getObject(w http.ResponseWriter, req *http.Request) {
 		rawToHTTPHandler(s.downloadObject)(w, req)
 		return
 	}
-	handler := jsonToHTTPHandler(func(r *http.Request) (jsonResponse, error) {
+	handler := jsonToHTTPHandler(func(_ *http.Request) (jsonResponse, error) {
 		data, err := fromGetObjectRequest(req)
 		if err != nil {
 			return jsonResponse{}, err

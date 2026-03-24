@@ -26,6 +26,7 @@ const (
 	minSamples      = 10
 )
 
+// Bench tracks timing samples over a configurable duration for benchmarking.
 type Bench struct {
 	startTime        time.Time
 	totDuration      time.Duration
@@ -34,10 +35,12 @@ type Bench struct {
 	m                sync.Mutex
 }
 
+// SetDuration sets the expected total duration for the benchmark run.
 func (b *Bench) SetDuration(d time.Duration) {
 	b.expectedDuration = d
 }
 
+// Start begins the benchmark timer.
 func (b *Bench) Start() {
 	b.startTime = time.Now()
 	if b.expectedDuration == 0 {
@@ -45,14 +48,17 @@ func (b *Bench) Start() {
 	}
 }
 
+// End records the total elapsed time since Start was called.
 func (b *Bench) End() {
 	b.totDuration = time.Since(b.startTime)
 }
 
+// IsTestFinished reports whether the benchmark has run long enough and collected enough samples.
 func (b *Bench) IsTestFinished() bool {
 	return time.Since(b.startTime) >= b.expectedDuration && len(b.samples) >= minSamples
 }
 
+// Measure times the execution of fn and records the duration as a sample.
 func (b *Bench) Measure(fn func() error) error {
 	start := time.Now()
 	if err := fn(); err != nil {
@@ -66,6 +72,7 @@ func (b *Bench) Measure(fn func() error) error {
 	return nil
 }
 
+// Results returns a snapshot of the collected benchmark results.
 func (b *Bench) Results() Results {
 	b.m.Lock()
 	res := Results{
@@ -77,11 +84,13 @@ func (b *Bench) Results() Results {
 	return res
 }
 
+// Results holds the collected timing samples and total duration of a benchmark run.
 type Results struct {
 	Samples     []time.Duration
 	TotDuration time.Duration
 }
 
+// Avg returns the arithmetic mean of all collected samples.
 func (r Results) Avg() time.Duration {
 	sum := time.Duration(0)
 	for _, t := range r.Samples {
@@ -90,6 +99,7 @@ func (r Results) Avg() time.Duration {
 	return time.Duration(float64(sum) / float64(len(r.Samples)))
 }
 
+// Percentile returns the sample value at the given percentile (0.0 to 1.0).
 func (r Results) Percentile(pctile float64) time.Duration {
 	if len(r.Samples) == 0 || pctile < 0 || pctile > 1 {
 		panic("invalid parameters")
