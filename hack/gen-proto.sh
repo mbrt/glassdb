@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2023 The glassdb Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VARIANT=1.26
-FROM mcr.microsoft.com/vscode/devcontainers/go:${VARIANT}-bookworm
+set -e
 
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
-    apt-get -y install --no-install-recommends \
-        protobuf-compiler libprotobuf-dev graphviz
-
-
+protoc -I=. --go_out=. --go_opt=paths=source_relative \
+    --plugin=protoc-gen-go="$(go tool -n protoc-gen-go)" \
+    transaction.proto

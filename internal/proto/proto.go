@@ -14,4 +14,4 @@
 
 package proto
 
-//go:generate protoc -I=. --go_out=. --go_opt=paths=source_relative transaction.proto
+//go:generate ../../hack/gen-proto.sh

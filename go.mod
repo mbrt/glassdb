@@ -5,15 +5,14 @@ go 1.26.1
 require (
 	cloud.google.com/go/storage v1.49.0
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/golang/protobuf v1.5.4
 	github.com/googleapis/gax-go/v2 v2.14.1
 	github.com/gorilla/mux v1.8.1
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.214.0
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -29,6 +28,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
+	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 // indirect
@@ -61,12 +61,13 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/perf v0.0.0-20260312031701-16a31bc5fbd0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
@@ -76,4 +77,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-tool github.com/mgechev/revive
+tool (
+	github.com/mgechev/revive
+	golang.org/x/perf/cmd/benchstat
+	google.golang.org/protobuf/cmd/protoc-gen-go
+)
