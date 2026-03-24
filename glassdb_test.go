@@ -307,10 +307,8 @@ func readIntFromT(tx *glassdb.Tx, c glassdb.Collection, k []byte) (int64, error)
 func rmw(ctx context.Context, db *glassdb.DB, coll glassdb.Collection, key []byte) error {
 	for i := 0; i < 30; i++ {
 		// This is to make sure we catch deadlocks.
-		ctx, cancel := context.WithTimeout(ctx, txTimeout)
-		defer cancel()
-
-		err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+		iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
+		err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 			// Increment the value and write it back.
 			num, err := readIntFromT(tx, coll, key)
 			if err != nil {
@@ -318,6 +316,7 @@ func rmw(ctx context.Context, db *glassdb.DB, coll glassdb.Collection, key []byt
 			}
 			return tx.Write(coll, key, writeInt(num+1))
 		})
+		cancel()
 		if err != nil {
 			return fmt.Errorf("iteration #%d: %w", i, err)
 		}
@@ -413,10 +412,8 @@ func multipleRMW(
 
 	for i := 0; i < 30; i++ {
 		// This is to make sure we catch deadlocks.
-		ctx, cancel := context.WithTimeout(ctx, txTimeout)
-		defer cancel()
-
-		err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+		iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
+		err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 			// Increment key1
 			num, err := readIntFromT(tx, coll, key1)
 			if err != nil {
@@ -433,6 +430,7 @@ func multipleRMW(
 			}
 			return tx.Write(coll, key2, writeInt(num+1))
 		})
+		cancel()
 		if err != nil {
 			return fmt.Errorf("iteration #%d: %w", i, err)
 		}
@@ -505,10 +503,8 @@ func TestReadMulti(t *testing.T) {
 			// Read and write.
 			for i := 0; i < 30; i++ {
 				// This is to make sure we catch deadlocks.
-				ctx, cancel := context.WithTimeout(ctx, txTimeout)
-				defer cancel()
-
-				err = db.Tx(ctx, func(tx *glassdb.Tx) error {
+				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
+				err = db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 					res := tx.ReadMulti(keys)
 					for i, r := range res {
 						if r.Err != nil {
@@ -521,6 +517,7 @@ func TestReadMulti(t *testing.T) {
 					}
 					return nil
 				})
+				cancel()
 				assert.NoError(t, err)
 			}
 
@@ -598,16 +595,16 @@ func TestReadWeak(t *testing.T) {
 
 			for i := 0; i < 30; i++ {
 				// This is to make sure we catch deadlocks.
-				ctx, cancel := context.WithTimeout(ctx, txTimeout)
-				defer cancel()
+				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 
 				// Increment the value.
-				err = db.Tx(ctx, func(tx *glassdb.Tx) error {
+				err = db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 					// Do a read just to avoid making this a blind write.
 					// We don't really need the value, because we can use 'i'.
 					_, _ = readIntFromT(tx, coll, key)
 					return tx.Write(coll, key, writeInt(int64(i)))
 				})
+				cancel()
 				assert.NoError(t, err)
 
 				// Weak read.
@@ -805,10 +802,8 @@ func TestReadonly(t *testing.T) {
 			g.Go(func() error {
 				for i := 0; i < 30; i++ {
 					// This is to make sure we catch deadlocks.
-					ctx, cancel := context.WithTimeout(ctx, txTimeout)
-					defer cancel()
-
-					err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+					iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
+					err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 						for _, k := range keys {
 							num, err := readIntFromT(tx, coll, k)
 							if err != nil {
@@ -820,6 +815,7 @@ func TestReadonly(t *testing.T) {
 						}
 						return nil
 					})
+					cancel()
 					if err != nil {
 						return err
 					}
@@ -830,11 +826,9 @@ func TestReadonly(t *testing.T) {
 			// Readonly transactions.
 			for i := 0; i < 30; i++ {
 				// This is to make sure we catch deadlocks.
-				ctx, cancel := context.WithTimeout(ctx, txTimeout)
-				defer cancel()
-
+				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 				reads := make([]int64, len(keys))
-				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
+				err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
 					for j, k := range keys {
 						num, err := readIntFromT(tx, coll, k)
 						if err != nil {
@@ -844,6 +838,7 @@ func TestReadonly(t *testing.T) {
 					}
 					return nil
 				})
+				cancel()
 				assert.NoError(t, err)
 				requireAllEqual(t, keys, reads)
 			}

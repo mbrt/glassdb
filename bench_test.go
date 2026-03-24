@@ -167,7 +167,7 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 					// We need to ignore context cancel errors, because we
 					// rely on that to stop the test.
 					if err := updateF(db1, db1.Collection(collName)); err != nil && ctx.Err() == nil {
-						b.Fatal(b, err)
+						b.Fatal(err)
 					}
 				}
 			})

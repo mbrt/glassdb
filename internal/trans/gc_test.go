@@ -80,11 +80,6 @@ func newTestGC(t *testing.T) (*GC, gcTestContext) {
 
 func waitForCondition(t *testing.T, cond func() bool) {
 	t.Helper()
-	for start := time.Now(); time.Since(start) < conditionTimeout; {
-		if cond() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Errorf("condition not met within 1s")
+	assert.Eventually(t, cond, conditionTimeout, 10*time.Millisecond,
+		"condition not met within %v", conditionTimeout)
 }

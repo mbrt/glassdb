@@ -300,7 +300,7 @@ func TestWaitForTx(t *testing.T) {
 	// Schedule the read unlock to just after the write starts waiting.
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
-		time.Sleep(time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		err := locker.Unlock(ctx, key, txr)
 		assert.NoError(t, err)
 	})
@@ -316,7 +316,7 @@ func TestWaitForTx(t *testing.T) {
 
 	// Schedule abort of the write Tx for after a new read starts waiting.
 	wg.Go(func() {
-		time.Sleep(time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		err := tctx.Monitor.AbortTx(ctx, txw)
 		assert.NoError(t, err)
 	})
@@ -371,13 +371,13 @@ func TestQueueUp(t *testing.T) {
 	txw0 := data.TxID("txw0")
 	gw := &errgroup.Group{}
 	gw.Go(func() error {
-		time.Sleep(time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		tctx.Monitor.BeginTx(ctx, txw0)
 		return locker.LockWrite(ctx, key, txw0)
 	})
 
 	// Unlock the original write after we know that the following read locks are waiting.
-	time.Sleep(time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	err = locker.Unlock(ctx, key, txw)
 	assert.NoError(t, err)
 
@@ -457,7 +457,7 @@ func TestLockUpgradeWait(t *testing.T) {
 	// Wait before lock write starts locking.
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		err := locker.Unlock(ctx, key, txr)
 		assert.NoError(t, err)
 	})
@@ -535,7 +535,7 @@ func TestWaitRemote(t *testing.T) {
 	// Wait before locker1 starts locking.
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		err := locker2.Unlock(ctx, key, tx2)
 		assert.NoError(t, err)
 	})
@@ -552,7 +552,7 @@ func TestWaitRemote(t *testing.T) {
 
 	// Wait before locker2 starts locking again.
 	wg.Go(func() {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		// This time commit the transaction.
 		err := tctx2.Monitor.CommitTx(ctx, storage.TxLog{
 			ID: tx2,
