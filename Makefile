@@ -1,4 +1,4 @@
-.PHONY: test unit-test lint format build build-docker
+.PHONY: test unit-test lint format
 
 test: lint unit-test
 
