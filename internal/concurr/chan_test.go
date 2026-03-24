@@ -48,7 +48,7 @@ func TestChanInfCap(t *testing.T) {
 				return nil
 			})
 
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wait(tc.waitSend)
 				in <- i
 			}

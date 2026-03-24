@@ -11,11 +11,10 @@ import (
 
 // NewStallBackend wraps a backend so that writes can be paused, stalled, and released.
 func NewStallBackend(inner backend.Backend) *StallBackend {
-	res := &StallBackend{
+	return &StallBackend{
 		Backend: inner,
+		relCh:   make(chan struct{}),
 	}
-	res.cond = sync.NewCond(&res.m)
-	return res
 }
 
 // StallBackend is a backend where writes can be paused and resumed.
@@ -24,11 +23,10 @@ func NewStallBackend(inner backend.Backend) *StallBackend {
 // asynchronously only when released.
 type StallBackend struct {
 	backend.Backend
-	stall   bool
-	release bool
-	m       sync.Mutex
-	cond    *sync.Cond
-	wg      conc.WaitGroup
+	stall bool
+	relCh chan struct{}
+	m     sync.Mutex
+	wg    conc.WaitGroup
 }
 
 // WaitForStalled blocks until all stalled write operations have been queued.
@@ -40,9 +38,8 @@ func (b *StallBackend) WaitForStalled() {
 func (b *StallBackend) StallWrites() {
 	b.m.Lock()
 	b.stall = true
-	b.release = false
+	b.relCh = make(chan struct{})
 	b.m.Unlock()
-	b.cond.Broadcast()
 }
 
 // StopStalling allows new write operations to proceed normally without stalling.
@@ -50,15 +47,25 @@ func (b *StallBackend) StopStalling() {
 	b.m.Lock()
 	b.stall = false
 	b.m.Unlock()
-	b.cond.Broadcast()
 }
 
 // ReleaseStalled allows all previously stalled write operations to complete.
 func (b *StallBackend) ReleaseStalled() {
 	b.m.Lock()
-	b.release = true
+	ch := b.relCh
 	b.m.Unlock()
-	b.cond.Broadcast()
+	close(ch)
+}
+
+func (b *StallBackend) stallOp() (release <-chan struct{}, stalled bool) {
+	b.m.Lock()
+	if !b.stall {
+		b.m.Unlock()
+		return nil, false
+	}
+	ch := b.relCh
+	b.m.Unlock()
+	return ch, true
 }
 
 // SetTagsIf sets tags on a path conditionally, stalling if stalling is enabled.
@@ -68,17 +75,12 @@ func (b *StallBackend) SetTagsIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.SetTagsIf(ctx, path, expected, t)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_, _ = b.Backend.SetTagsIf(ctx, path, expected, t)
 	})
 	return backend.Metadata{}, context.Canceled
@@ -90,17 +92,12 @@ func (b *StallBackend) Write(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.Write(ctx, path, value, t)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_, _ = b.Backend.Write(ctx, path, value, t)
 	})
 	return backend.Metadata{}, context.Canceled
@@ -114,17 +111,12 @@ func (b *StallBackend) WriteIf(
 	expected backend.Version,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.WriteIf(ctx, path, value, expected, t)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_, _ = b.Backend.WriteIf(ctx, path, value, expected, t)
 	})
 	return backend.Metadata{}, context.Canceled
@@ -137,17 +129,12 @@ func (b *StallBackend) WriteIfNotExists(
 	value []byte,
 	t backend.Tags,
 ) (backend.Metadata, error) {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.WriteIfNotExists(ctx, path, value, t)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_, _ = b.Backend.WriteIfNotExists(ctx, path, value, t)
 	})
 	return backend.Metadata{}, context.Canceled
@@ -155,17 +142,12 @@ func (b *StallBackend) WriteIfNotExists(
 
 // Delete removes an object at the given path, stalling if stalling is enabled.
 func (b *StallBackend) Delete(ctx context.Context, path string) error {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.Delete(ctx, path)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_ = b.Backend.Delete(ctx, path)
 	})
 	return context.Canceled
@@ -177,17 +159,12 @@ func (b *StallBackend) DeleteIf(
 	path string,
 	expected backend.Version,
 ) error {
-	b.m.Lock()
-	if !b.stall {
-		b.m.Unlock()
+	rel, stalled := b.stallOp()
+	if !stalled {
 		return b.Backend.DeleteIf(ctx, path, expected)
 	}
-
 	b.wg.Go(func() {
-		for !b.release {
-			b.cond.Wait()
-		}
-		b.m.Unlock()
+		<-rel
 		_ = b.Backend.DeleteIf(ctx, path, expected)
 	})
 	return context.Canceled

@@ -202,7 +202,7 @@ type deleteObjectRequest struct {
 	Conditions objectConditions
 }
 
-func decodeJSONRequest(res interface{}, r io.Reader) error {
+func decodeJSONRequest(res any, r io.Reader) error {
 	decoder := json.NewDecoder(r)
 	if err := decoder.Decode(&res); err != nil {
 		return withStatus(err, http.StatusBadRequest)

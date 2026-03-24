@@ -447,7 +447,7 @@ func TagsLockInfo(tags backend.Tags) (LockInfo, error) {
 	}
 	// LockedBy.
 	if v, ok := tags[lockedByTag]; ok && v != "" {
-		for _, lt := range strings.Split(v, ",") {
+		for lt := range strings.SplitSeq(v, ",") {
 			d, err := tagToTid(lt)
 			if err != nil {
 				return res, fmt.Errorf("invalid locked-by tag: %w", err)

@@ -90,7 +90,6 @@ func (t *Tx) ReadMulti(ks []FQKey) []ReadResult {
 	wg := conc.WaitGroup{}
 
 	for i, key := range ks {
-		i := i // https://golang.org/doc/faq#closures_and_goroutines
 
 		p := paths.FromKey(key.Collection.prefix, key.Key)
 		infos[i].path = p

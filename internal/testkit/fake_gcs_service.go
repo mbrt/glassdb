@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -259,9 +260,7 @@ func (g *gcs) updateMetadata(obj *bucketObject, meta map[string]string) {
 	if obj.Metadata == nil {
 		obj.Metadata = make(map[string]string)
 	}
-	for k, v := range meta {
-		obj.Metadata[k] = v
-	}
+	maps.Copy(obj.Metadata, meta)
 	obj.Metageneration++
 }
 

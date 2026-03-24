@@ -18,7 +18,7 @@ var (
 
 // bufferPool is a pool of bytes.Buffers.
 var bufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &bytes.Buffer{}
 	},
 }
@@ -136,7 +136,7 @@ func (m multi) Is(target error) bool {
 	return false
 }
 
-func (m multi) As(target interface{}) bool {
+func (m multi) As(target any) bool {
 	for _, err := range m {
 		if errors.As(err, target) {
 			return true
@@ -213,7 +213,7 @@ func (e annotated) Is(target error) bool {
 	return errors.Is(e.symptom, target) || errors.Is(e.cause, target)
 }
 
-func (e annotated) As(target interface{}) bool {
+func (e annotated) As(target any) bool {
 	if errors.As(e.symptom, target) {
 		return true
 	}

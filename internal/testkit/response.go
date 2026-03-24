@@ -1,6 +1,7 @@
 package testkit
 
 import (
+	"maps"
 	"path"
 	"sort"
 )
@@ -252,8 +253,6 @@ func copyMeta(m map[string]string) map[string]string {
 		return nil
 	}
 	res := make(map[string]string)
-	for k, v := range m {
-		res[k] = v
-	}
+	maps.Copy(res, m)
 	return res
 }

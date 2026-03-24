@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -79,14 +78,13 @@ type PathLock struct {
 }
 
 // NewTLogger returns a TLogger that stores transaction logs under the given prefix.
-func NewTLogger(c clockwork.Clock, g Global, l Local, prefix string) TLogger {
-	return TLogger{prefix, c, g, l}
+func NewTLogger(g Global, l Local, prefix string) TLogger {
+	return TLogger{prefix, g, l}
 }
 
 // TLogger provides tools to deal with transaction logs.
 type TLogger struct {
 	prefix string
-	clock  clockwork.Clock
 	global Global
 	local  Local
 }
@@ -156,7 +154,7 @@ func (t TLogger) Get(ctx context.Context, id data.TxID) (TxLog, error) {
 // Set creates a new transaction log entry, failing if one already exists.
 func (t TLogger) Set(ctx context.Context, l TxLog) (backend.Version, error) {
 	if l.Timestamp.IsZero() {
-		l.Timestamp = t.clock.Now()
+		l.Timestamp = time.Now()
 	}
 	buf, err := marshalLog(l)
 	if err != nil {
@@ -170,7 +168,7 @@ func (t TLogger) Set(ctx context.Context, l TxLog) (backend.Version, error) {
 // SetIf updates the transaction log only if its current version matches expected.
 func (t TLogger) SetIf(ctx context.Context, l TxLog, expected backend.Version) (backend.Version, error) {
 	if l.Timestamp.IsZero() {
-		l.Timestamp = t.clock.Now()
+		l.Timestamp = time.Now()
 	}
 	buf, err := marshalLog(l)
 	if err != nil {
