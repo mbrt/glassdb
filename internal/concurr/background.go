@@ -21,12 +21,14 @@ import (
 	"github.com/sourcegraph/conc"
 )
 
+// NewBackground creates a new Background goroutine manager.
 func NewBackground() *Background {
 	return &Background{
 		done: make(chan struct{}),
 	}
 }
 
+// Background manages a set of background goroutines that are cancelled together on Close.
 type Background struct {
 	wg     conc.WaitGroup
 	done   chan struct{}
@@ -34,6 +36,7 @@ type Background struct {
 	m      sync.Mutex
 }
 
+// Close signals all background goroutines to stop and waits for them to finish.
 func (b *Background) Close() {
 	b.m.Lock()
 	if b.closed {
@@ -47,6 +50,7 @@ func (b *Background) Close() {
 	b.wg.Wait()
 }
 
+// Go spawns fn as a background goroutine and returns true, or returns false if already closed.
 func (b *Background) Go(ctx context.Context, fn func(context.Context)) bool {
 	b.m.Lock()
 	defer b.m.Unlock()

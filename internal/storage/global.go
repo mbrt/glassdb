@@ -24,6 +24,8 @@ import (
 	"github.com/mbrt/glassdb/internal/errors"
 )
 
+// NewGlobal returns a Global that reads and writes through the given backend,
+// using l as a local cache.
 func NewGlobal(b backend.Backend, l Local, clock clockwork.Clock) Global {
 	return Global{
 		backend: b,
@@ -32,6 +34,8 @@ func NewGlobal(b backend.Backend, l Local, clock clockwork.Clock) Global {
 	}
 }
 
+// Global wraps a backend with a local cache, performing read-through and
+// write-through caching of storage objects and metadata.
 type Global struct {
 	backend backend.Backend
 	local   Local
@@ -85,6 +89,8 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 	}, nil
 }
 
+// GetMetadata fetches the object metadata from the backend and updates the
+// local cache.
 func (s Global) GetMetadata(ctx context.Context, key string) (backend.Metadata, error) {
 	meta, err := s.backend.GetMetadata(ctx, key)
 	if err != nil {
@@ -94,6 +100,8 @@ func (s Global) GetMetadata(ctx context.Context, key string) (backend.Metadata, 
 	return meta, nil
 }
 
+// SetTagsIf conditionally sets tags on the object if its current version
+// matches expected, and updates the local metadata cache.
 func (s Global) SetTagsIf(
 	ctx context.Context,
 	key string,
@@ -122,6 +130,8 @@ func (s Global) Write(
 	return meta, nil
 }
 
+// WriteIf conditionally writes the value if the current version matches
+// expected, and updates the local cache.
 func (s Global) WriteIf(
 	ctx context.Context,
 	key string,
@@ -137,6 +147,8 @@ func (s Global) WriteIf(
 	return meta, nil
 }
 
+// WriteIfNotExists writes the value only if the object does not already exist,
+// and updates the local cache on success.
 func (s Global) WriteIfNotExists(
 	ctx context.Context,
 	key string,
@@ -151,6 +163,7 @@ func (s Global) WriteIfNotExists(
 	return meta, nil
 }
 
+// Delete removes the object from the backend and the local cache.
 func (s Global) Delete(ctx context.Context, key string) error {
 	if err := s.backend.Delete(ctx, key); err != nil {
 		return err
@@ -159,6 +172,8 @@ func (s Global) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// DeleteIf conditionally deletes the object if its version matches expected,
+// and removes it from the local cache on success.
 func (s Global) DeleteIf(ctx context.Context, key string, expected backend.Version) error {
 	if err := s.backend.DeleteIf(ctx, key, expected); err != nil {
 		return err
@@ -167,6 +182,7 @@ func (s Global) DeleteIf(ctx context.Context, key string, expected backend.Versi
 	return nil
 }
 
+// GlobalRead holds the result of reading a value from global storage.
 type GlobalRead struct {
 	Value   []byte
 	Version int64

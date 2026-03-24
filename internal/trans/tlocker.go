@@ -46,6 +46,8 @@ const (
 	txStateExisting
 )
 
+// NewLocker returns a Locker that manages per-key locks using global storage,
+// deduplicating concurrent lock requests and polling for completion.
 func NewLocker(
 	l storage.Local,
 	g storage.Global,
@@ -84,22 +86,29 @@ type Locker struct {
 	nRetries int32
 }
 
+// LockRead acquires a read lock on the given key for the transaction.
 func (v *Locker) LockRead(ctx context.Context, key string, tid data.TxID) error {
 	return v.pushRequest(ctx, key, storage.LockTypeRead, tid)
 }
 
+// LockWrite acquires a write lock on the given key for the transaction.
 func (v *Locker) LockWrite(ctx context.Context, key string, tid data.TxID) error {
 	return v.pushRequest(ctx, key, storage.LockTypeWrite, tid)
 }
 
+// LockCreate acquires a create lock on the given key for the transaction,
+// used when a key is being created for the first time.
 func (v *Locker) LockCreate(ctx context.Context, key string, tid data.TxID) error {
 	return v.pushRequest(ctx, key, storage.LockTypeCreate, tid)
 }
 
+// Unlock releases the lock held by the transaction on the given key.
 func (v *Locker) Unlock(ctx context.Context, key string, tid data.TxID) error {
 	return v.pushRequest(ctx, key, storage.LockTypeNone, tid)
 }
 
+// LockType returns the type of lock currently held by the transaction on the
+// given key, or LockTypeNone if no lock is held.
 func (v *Locker) LockType(key string, tid data.TxID) storage.LockType {
 	v.m.Lock()
 	defer v.m.Unlock()
@@ -115,6 +124,7 @@ func (v *Locker) LockType(key string, tid data.TxID) storage.LockType {
 	return lt
 }
 
+// LockedPaths returns all paths currently locked by the given transaction.
 func (v *Locker) LockedPaths(tid data.TxID) []storage.PathLock {
 	v.m.Lock()
 	defer v.m.Unlock()
@@ -133,6 +143,8 @@ func (v *Locker) LockedPaths(tid data.TxID) []storage.PathLock {
 	return res
 }
 
+// StatsAndReset returns the accumulated lock operation statistics and resets
+// the counters to zero.
 func (v *Locker) StatsAndReset() LockStats {
 	return LockStats{
 		Calls:   int(atomic.SwapInt32(&v.nCalls, 0)),
@@ -320,6 +332,7 @@ func (v *Locker) fetchLockersState(ctx context.Context, key string, info storage
 	return txs, nil
 }
 
+// LockStats holds counters for lock operations performed by a Locker.
 type LockStats struct {
 	Calls   int
 	Hits    int

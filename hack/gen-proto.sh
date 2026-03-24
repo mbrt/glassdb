@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2023 The glassdb Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,35 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-run:
-  deadline: "3m"
+set -e
 
-linters:
-  enable-all: false
-  enable:
-    - asciicheck
-    - bidichk
-    - errcheck
-    - errname
-    - errorlint
-    - exportloopref
-    - gocritic
-    - gofmt
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
-    - misspell
-    - revive
-    - staticcheck
-    - unconvert
-    - unused
-
-linters-settings:
-  errorlint:
-    errorf: false
-
-  revive:
-    rules:
-      - name: "empty-block"
-        disabled: true
+protoc -I=. --go_out=. --go_opt=paths=source_relative \
+    --plugin=protoc-gen-go="$(go tool -n protoc-gen-go)" \
+    transaction.proto

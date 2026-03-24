@@ -19,6 +19,7 @@ import (
 	"sync"
 )
 
+// NewDedup creates a new Dedup that uses the given Worker to execute work.
 func NewDedup(w Worker) *Dedup {
 	return &Dedup{
 		work: w,
@@ -28,24 +29,29 @@ func NewDedup(w Worker) *Dedup {
 	}
 }
 
+// Dedup deduplicates and merges concurrent requests for the same key.
 type Dedup struct {
 	work  Worker
 	contr controller
 }
 
+// Do submits a request for the given key, merging with any in-flight work if possible.
 func (d *Dedup) Do(ctx context.Context, key string, r Request) error {
 	return d.contr.Do(ctx, key, r, d.work)
 }
 
+// Request represents a unit of work that can be merged with other requests.
 type Request interface {
 	Merge(other Request) (Request, bool)
 	CanReorder() bool
 }
 
+// Worker performs the actual work for a deduplicated request.
 type Worker interface {
 	Work(ctx context.Context, key string, cntr DedupContr) error
 }
 
+// DedupContr provides access to the merged request and notification of new incoming requests.
 type DedupContr interface {
 	Request(key string) Request
 	OnNextDo(key string) <-chan struct{}

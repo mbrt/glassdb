@@ -24,6 +24,7 @@ import (
 	"github.com/mbrt/glassdb/internal/stringset"
 )
 
+// New creates a new in-memory Backend.
 func New() *Backend {
 	return &Backend{
 		objects: make(map[string]object),
@@ -31,12 +32,14 @@ func New() *Backend {
 	}
 }
 
+// Backend is an in-memory implementation of backend.Backend.
 type Backend struct {
 	objects map[string]object
 	nextGen int64
 	m       sync.Mutex
 }
 
+// ReadIfModified implements backend.Backend.
 func (b *Backend) ReadIfModified(
 	ctx context.Context,
 	path string,
@@ -80,6 +83,7 @@ func (b *Backend) Read(ctx context.Context, path string) (backend.ReadReply, err
 	}, nil
 }
 
+// GetMetadata implements backend.Backend.
 func (b *Backend) GetMetadata(
 	ctx context.Context,
 	path string,
@@ -101,6 +105,7 @@ func (b *Backend) GetMetadata(
 	}, nil
 }
 
+// SetTagsIf implements backend.Backend.
 func (b *Backend) SetTagsIf(
 	ctx context.Context,
 	path string,
@@ -154,6 +159,7 @@ func (b *Backend) Write(
 	}, nil
 }
 
+// WriteIf implements backend.Backend.
 func (b *Backend) WriteIf(
 	ctx context.Context,
 	path string,
@@ -185,6 +191,7 @@ func (b *Backend) WriteIf(
 	}, nil
 }
 
+// WriteIfNotExists implements backend.Backend.
 func (b *Backend) WriteIfNotExists(
 	ctx context.Context,
 	path string,
@@ -212,6 +219,7 @@ func (b *Backend) WriteIfNotExists(
 	}, nil
 }
 
+// Delete implements backend.Backend.
 func (b *Backend) Delete(ctx context.Context, path string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -228,6 +236,7 @@ func (b *Backend) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteIf implements backend.Backend.
 func (b *Backend) DeleteIf(
 	ctx context.Context,
 	path string,
@@ -251,6 +260,7 @@ func (b *Backend) DeleteIf(
 	return nil
 }
 
+// List implements backend.Backend.
 func (b *Backend) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -269,10 +279,12 @@ func (b *Backend) List(ctx context.Context, dirPath string) (backend.ListIter, e
 			continue
 		}
 		// Drop subdirs from the path.
-		i := len(dirPath)
-		for ; i < len(k) && k[i] != '/'; i++ {
+		rest := k[len(dirPath):]
+		if idx := strings.IndexByte(rest, '/'); idx >= 0 {
+			ps.Add(k[:len(dirPath)+idx])
+		} else {
+			ps.Add(k)
 		}
-		ps.Add(k[:i])
 	}
 
 	paths := ps.ToSlice()

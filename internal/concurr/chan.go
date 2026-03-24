@@ -14,8 +14,8 @@
 
 package concurr
 
-// MakeChainInfCap simulates a channel with infinite capacity. This will never
-// block the sender and grow an internal buffer if necessary.
+// MakeChanInfCap creates a channel with infinite capacity that never blocks the
+// sender, growing an internal buffer if necessary.
 //
 // Close the input channel when finished, to free resources.
 func MakeChanInfCap[T any](expectedCap int) (<-chan T, chan<- T) {

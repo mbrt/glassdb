@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VARIANT=1.21
+ARG VARIANT=1.26
 FROM mcr.microsoft.com/vscode/devcontainers/go:${VARIANT}-bookworm
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     apt-get -y install --no-install-recommends \
         protobuf-compiler libprotobuf-dev graphviz
 
-USER vscode
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
-    go install golang.org/x/perf/cmd/benchstat@latest
+

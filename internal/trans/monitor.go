@@ -17,6 +17,7 @@ package trans
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ const (
 	refreshMultiplier = 0.5
 )
 
+// ErrAlreadyFinalized indicates that a transaction has already been committed or aborted.
 var ErrAlreadyFinalized = errors.New("transaction was already finalized")
 
 type refreshState int
@@ -45,6 +47,8 @@ const (
 	refreshStateStopped
 )
 
+// NewMonitor returns a Monitor that tracks local and remote transaction state
+// using the given transaction logger and background executor.
 func NewMonitor(
 	c clockwork.Clock,
 	l storage.Local,
@@ -62,6 +66,8 @@ func NewMonitor(
 	}
 }
 
+// Monitor tracks the lifecycle of transactions, providing commit, abort,
+// status queries, and asynchronous wait capabilities.
 type Monitor struct {
 	clock      clockwork.Clock
 	local      storage.Local
@@ -73,6 +79,7 @@ type Monitor struct {
 	m          sync.Mutex
 }
 
+// BeginTx registers a new pending transaction with the monitor.
 func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
 	m.m.Lock()
 	m.localTx[string(tid)] = txStatus{
@@ -82,6 +89,8 @@ func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
 	m.m.Unlock()
 }
 
+// StartRefreshTx starts a background goroutine that periodically refreshes
+// the transaction log to prevent the transaction from being considered expired.
 func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 	needStart := false
 
@@ -104,6 +113,8 @@ func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 	}
 }
 
+// CommitTx marks the transaction as committed, writes the final log, updates
+// local storage with the committed values, and notifies any waiters.
 func (m *Monitor) CommitTx(ctx context.Context, tl storage.TxLog) error {
 	m.stopTxRefresh(tl.ID)
 
@@ -136,6 +147,8 @@ func (m *Monitor) CommitTx(ctx context.Context, tl storage.TxLog) error {
 	return nil
 }
 
+// AbortTx marks the transaction as aborted, writes the final log, and
+// notifies any waiters.
 func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
 	m.stopTxRefresh(tid)
 
@@ -152,6 +165,8 @@ func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
 	return err
 }
 
+// TxStatus returns the current commit status of the given transaction,
+// checking locally first and then fetching from remote storage if needed.
 func (m *Monitor) TxStatus(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
 	m.m.Lock()
 	if s, ok := m.localTx[string(tid)]; ok {
@@ -245,6 +260,8 @@ func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxRes
 	return ch
 }
 
+// CommittedValue returns the committed value for a key written by the given
+// transaction, reading from local storage or the transaction log as needed.
 func (m *Monitor) CommittedValue(ctx context.Context, key string, tid data.TxID) (KeyCommitStatus, error) {
 	// TODO: How does this play with the "no-log" optimization?
 
@@ -390,8 +407,11 @@ func (m *Monitor) nextWaiter(tid data.TxID) (waitRequest, bool) {
 	}
 
 	// Find the first non expired waiter.
-	i := 0
-	for ; i < len(ws) && ws[i].Ctx.Err() != nil; i++ {
+	i := slices.IndexFunc(ws, func(w waitRequest) bool {
+		return w.Ctx.Err() == nil
+	})
+	if i < 0 {
+		i = len(ws)
 	}
 	// Trim the expired waiters.
 	if i > 0 {
@@ -535,11 +555,14 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, ticker cloc
 	}
 }
 
+// KeyCommitStatus holds a transaction's commit status for a specific key,
+// along with the value that was written.
 type KeyCommitStatus struct {
 	Status storage.TxCommitStatus
 	Value  storage.TValue
 }
 
+// WaitTxResult holds the outcome of waiting for a transaction to complete.
 type WaitTxResult struct {
 	Status storage.TxCommitStatus
 	Err    error

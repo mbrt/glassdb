@@ -22,6 +22,8 @@ import (
 	"github.com/mbrt/glassdb/internal/storage"
 )
 
+// NewReader returns a Reader that reads from local and global storage, resolving
+// uncommitted create-locks through the transaction monitor.
 func NewReader(l storage.Local, g storage.Global, m *Monitor) Reader {
 	return Reader{
 		local:  l,
@@ -30,6 +32,8 @@ func NewReader(l storage.Local, g storage.Global, m *Monitor) Reader {
 	}
 }
 
+// Reader reads values from local and global storage, handling staleness and
+// correctly resolving values for keys that may be locked in create.
 type Reader struct {
 	local  storage.Local
 	global storage.Global
@@ -66,6 +70,8 @@ func (r Reader) Read(
 	return r.handleLockCreate(ctx, key, gres)
 }
 
+// GetMetadata returns the object metadata, using the local cache when fresh
+// enough and falling back to global storage otherwise.
 func (r Reader) GetMetadata(
 	ctx context.Context,
 	key string,
@@ -126,6 +132,8 @@ func (r Reader) handleLockCreate(ctx context.Context, key string, rv ReadValue) 
 	}, nil
 }
 
+// ReadValue holds the result of reading a key, including the raw value and
+// its storage version.
 type ReadValue struct {
 	Value   []byte
 	Version storage.Version

@@ -22,6 +22,7 @@ import (
 	"github.com/mbrt/glassdb/backend"
 )
 
+// NewBackendLogger creates a BackendLogger that wraps inner with debug logging.
 func NewBackendLogger(inner backend.Backend, id string, log *slog.Logger) BackendLogger {
 	return BackendLogger{
 		inner: inner,
@@ -29,11 +30,13 @@ func NewBackendLogger(inner backend.Backend, id string, log *slog.Logger) Backen
 	}
 }
 
+// BackendLogger is a backend.Backend decorator that logs all operations.
 type BackendLogger struct {
 	inner backend.Backend
 	log   *slog.Logger
 }
 
+// ReadIfModified implements backend.Backend.
 func (b BackendLogger) ReadIfModified(
 	ctx context.Context,
 	path string,
@@ -51,6 +54,7 @@ func (b BackendLogger) Read(ctx context.Context, path string) (backend.ReadReply
 	return r, err
 }
 
+// GetMetadata implements backend.Backend.
 func (b BackendLogger) GetMetadata(
 	ctx context.Context,
 	path string,
@@ -60,6 +64,7 @@ func (b BackendLogger) GetMetadata(
 	return r, err
 }
 
+// SetTagsIf implements backend.Backend.
 func (b BackendLogger) SetTagsIf(
 	ctx context.Context,
 	path string,
@@ -84,6 +89,7 @@ func (b BackendLogger) Write(
 	return r, err
 }
 
+// WriteIf implements backend.Backend.
 func (b BackendLogger) WriteIf(
 	ctx context.Context,
 	path string,
@@ -98,6 +104,7 @@ func (b BackendLogger) WriteIf(
 	return r, err
 }
 
+// WriteIfNotExists implements backend.Backend.
 func (b BackendLogger) WriteIfNotExists(
 	ctx context.Context,
 	path string,
@@ -111,12 +118,14 @@ func (b BackendLogger) WriteIfNotExists(
 	return r, err
 }
 
+// Delete implements backend.Backend.
 func (b BackendLogger) Delete(ctx context.Context, path string) error {
 	err := b.inner.Delete(ctx, path)
 	b.log.LogAttrs(ctx, slog.LevelDebug, "Delete", pathAttr(path), errAttr(err))
 	return err
 }
 
+// DeleteIf implements backend.Backend.
 func (b BackendLogger) DeleteIf(
 	ctx context.Context,
 	path string,
@@ -128,6 +137,7 @@ func (b BackendLogger) DeleteIf(
 	return err
 }
 
+// List implements backend.Backend.
 func (b BackendLogger) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
 	r, err := b.inner.List(ctx, dirPath)
 	b.log.LogAttrs(ctx, slog.LevelDebug, "List", pathAttr(dirPath), errAttr(err))

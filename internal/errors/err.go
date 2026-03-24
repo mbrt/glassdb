@@ -46,6 +46,7 @@ func WithCause(symptom, cause error) error {
 	}
 }
 
+// WithDetails annotates an error with additional detail strings for diagnostics.
 func WithDetails(err error, details ...string) error {
 	if err == nil {
 		return nil
@@ -53,6 +54,7 @@ func WithDetails(err error, details ...string) error {
 	return detailed{err, details}
 }
 
+// WriteDetails writes the detail annotations of err and its chain to w.
 func WriteDetails(w io.Writer, err error) {
 	var dErr detailed
 	for errors.As(err, &dErr) {
@@ -69,6 +71,7 @@ func WriteDetails(w io.Writer, err error) {
 	}
 }
 
+// Details returns the detail annotations of err and its chain as a string.
 func Details(err error) string {
 	buffer := bufferPool.Get().(*bytes.Buffer)
 	WriteDetails(buffer, err)
@@ -78,6 +81,7 @@ func Details(err error) string {
 	return res
 }
 
+// Combine merges multiple errors into a single error, flattening any nested multi-errors.
 func Combine(errs ...error) error {
 	if len(errs) == 0 {
 		return nil
@@ -118,6 +122,7 @@ func Combine(errs ...error) error {
 	return multi(others)
 }
 
+// Errors returns the individual errors from a combined error, or a single-element slice otherwise.
 func Errors(err error) []error {
 	if err == nil {
 		return nil
@@ -250,7 +255,10 @@ func (w indentWriter) Write(b []byte) (int, error) {
 			i++
 		}
 		// Look for the next newline.
-		for j = i; j < len(b) && b[j] != '\n'; j++ {
+		if idx := bytes.IndexByte(b[i:], '\n'); idx >= 0 {
+			j = i + idx
+		} else {
+			j = len(b)
 		}
 		// Write everything up to the newline, or the end of buffer.
 		if err := write(b[i:j]); err != nil {

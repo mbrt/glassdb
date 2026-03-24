@@ -22,12 +22,14 @@ import (
 	"github.com/mbrt/glassdb/internal/data/paths"
 )
 
+// KeysIter iterates over keys in a collection.
 type KeysIter struct {
 	inner  backend.ListIter
 	prefix string
 	err    error
 }
 
+// Next advances the iterator and returns the next key.
 func (it *KeysIter) Next() (key []byte, ok bool) {
 	backendPath, ok := it.inner.Next()
 	if !ok {
@@ -55,6 +57,7 @@ func (it *KeysIter) Next() (key []byte, ok bool) {
 	return k, true
 }
 
+// Err returns the first error encountered during iteration.
 func (it *KeysIter) Err() error {
 	if it.err != nil {
 		return it.err
@@ -62,12 +65,14 @@ func (it *KeysIter) Err() error {
 	return it.inner.Err()
 }
 
+// CollectionsIter iterates over sub-collections within a collection.
 type CollectionsIter struct {
 	inner  backend.ListIter
 	prefix string
 	err    error
 }
 
+// Next advances the iterator and returns the next collection name.
 func (it *CollectionsIter) Next() (name []byte, ok bool) {
 	backendPath, ok := it.inner.Next()
 	if !ok {
@@ -97,6 +102,7 @@ func (it *CollectionsIter) Next() (name []byte, ok bool) {
 	return c, true
 }
 
+// Err returns the first error encountered during iteration.
 func (it *CollectionsIter) Err() error {
 	if it.err != nil {
 		return it.err

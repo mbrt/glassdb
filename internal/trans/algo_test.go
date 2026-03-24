@@ -49,9 +49,9 @@ type nilHandler struct{}
 func (nilHandler) Enabled(context.Context, slog.Level) bool {
 	return false
 }
-func (nilHandler) Handle(context.Context, slog.Record) error  { return nil }
-func (h nilHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
-func (h nilHandler) WithGroup(name string) slog.Handler       { return h }
+func (nilHandler) Handle(context.Context, slog.Record) error { return nil }
+func (h nilHandler) WithAttrs(_ []slog.Attr) slog.Handler    { return h }
+func (h nilHandler) WithGroup(_ string) slog.Handler         { return h }
 
 type testContext struct {
 	backend backend.Backend

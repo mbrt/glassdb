@@ -22,6 +22,7 @@ import (
 	"github.com/mbrt/glassdb/backend"
 )
 
+// Stats holds cumulative performance counters for a database.
 type Stats struct {
 	// Transactions statistics.
 	TxN       int           // number of completed transactions.

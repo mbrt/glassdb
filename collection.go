@@ -27,6 +27,7 @@ import (
 
 var collInfoContents = []byte("__collection__")
 
+// Collection represents a named group of key-value pairs within a database.
 type Collection struct {
 	prefix string
 	global storage.Global
@@ -35,6 +36,7 @@ type Collection struct {
 	db     *DB
 }
 
+// ReadStrong reads the value for key with strong consistency guarantees.
 func (c Collection) ReadStrong(ctx context.Context, key []byte) ([]byte, error) {
 	var (
 		res     []byte
@@ -59,6 +61,7 @@ func (c Collection) ReadStrong(ctx context.Context, key []byte) ([]byte, error) 
 	return res, readErr
 }
 
+// ReadWeak reads the value for key allowing stale results up to maxStaleness.
 func (c Collection) ReadWeak(
 	ctx context.Context,
 	key []byte,
@@ -76,12 +79,14 @@ func (c Collection) Write(ctx context.Context, key, value []byte) error {
 	})
 }
 
+// Delete removes the value associated with key within a transaction.
 func (c Collection) Delete(ctx context.Context, key []byte) error {
 	return c.db.Tx(ctx, func(tx *Tx) error {
 		return tx.Delete(c, key)
 	})
 }
 
+// Update atomically reads the value for key, applies f, and writes the result.
 func (c Collection) Update(
 	ctx context.Context,
 	key []byte,
@@ -104,11 +109,13 @@ func (c Collection) Update(
 	return newb, err
 }
 
+// Collection returns a sub-collection with the given name.
 func (c Collection) Collection(name []byte) Collection {
 	p := paths.FromCollection(c.prefix, name)
 	return c.db.openCollection(p)
 }
 
+// Create ensures the collection exists in the backend, creating it if necessary.
 func (c Collection) Create(ctx context.Context) error {
 	p := paths.CollectionInfo(c.prefix)
 	_, err := c.global.GetMetadata(ctx, p)
@@ -129,6 +136,7 @@ func (c Collection) Create(ctx context.Context) error {
 	return err
 }
 
+// Keys returns an iterator over the keys in the collection.
 func (c Collection) Keys(ctx context.Context) (*KeysIter, error) {
 	keysPrefix := paths.KeysPrefix(c.prefix)
 	iter, err := c.db.backend.List(ctx, keysPrefix)
@@ -138,6 +146,7 @@ func (c Collection) Keys(ctx context.Context) (*KeysIter, error) {
 	return &KeysIter{inner: iter}, nil
 }
 
+// Collections returns an iterator over the sub-collections in this collection.
 func (c Collection) Collections(ctx context.Context) (*CollectionsIter, error) {
 	cprefix := paths.CollectionsPrefix(c.prefix)
 	iter, err := c.db.backend.List(ctx, cprefix)

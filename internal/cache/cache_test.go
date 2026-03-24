@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 	c.Set("a", testEntry("foo"))
 	assert.Equal(t, 3, c.SizeB())
 
-	c.Update("a", func(old Value) Value {
+	c.Update("a", func(_ Value) Value {
 		return testEntry("barbaz")
 	})
 	got, ok := c.Get("a")
@@ -100,7 +100,7 @@ func TestUpdateDelete(t *testing.T) {
 	c.Set("a", testEntry("foo"))
 	assert.Equal(t, 3, c.SizeB())
 
-	c.Update("a", func(old Value) Value {
+	c.Update("a", func(_ Value) Value {
 		return nil
 	})
 	_, ok := c.Get("a")
