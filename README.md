@@ -266,10 +266,6 @@ This is mostly due to a few factors:
   second (some bursting is allowed, but in this case we are consistently trying
   to overwrite the same object).
 
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
-
 ## License
 
 See [`LICENSE`](LICENSE) for details.
