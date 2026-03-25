@@ -24,5 +24,5 @@ case "$#" in
 esac
 
 echo "Comparing old=${OLD} new=${NEW}"
-benchstat <(grep -v 'Stats:' "${OLD}" | grep '^Benchmark') \
+go tool benchstat <(grep -v 'Stats:' "${OLD}" | grep '^Benchmark') \
     <(grep -v 'Stats:' "${NEW}" | grep '^Benchmark')

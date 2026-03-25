@@ -17,5 +17,5 @@ for i in {1..10}; do
     go test -benchmem -bench "${PATTERN}" --print-stats | tee -a "${STATS}"
 done
 
-benchstat "${STATS}"
+go tool benchstat "${STATS}"
 echo "All runs saved in ${STATS}"
