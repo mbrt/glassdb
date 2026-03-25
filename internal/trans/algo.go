@@ -9,8 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
@@ -60,7 +58,6 @@ var (
 // NewAlgo returns an Algo that coordinates transactions using the given
 // storage, locking, monitoring, and garbage collection components.
 func NewAlgo(
-	c clockwork.Clock,
 	g storage.Global,
 	local storage.Local,
 	locker *Locker,
@@ -70,7 +67,6 @@ func NewAlgo(
 	log *slog.Logger,
 ) Algo {
 	return Algo{
-		clock:      c,
 		global:     g,
 		local:      local,
 		reader:     NewReader(local, g, mon),
@@ -85,7 +81,6 @@ func NewAlgo(
 // Algo implements the transaction commit protocol, including read validation,
 // locking, and write application.
 type Algo struct {
-	clock      clockwork.Clock
 	global     storage.Global
 	local      storage.Local
 	reader     Reader
@@ -250,7 +245,7 @@ func (t Algo) commitSingleRW(ctx context.Context, tx *Handle) error {
 	// we could be potentially racing against the last transaction flush and
 	// still be valid.
 	// TODO: Use a flag in tx instead of this loop.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := t.checkReadVersionUnlocked(read.Version, meta); err != nil {
 			if errors.Is(err, ErrRetry) {
 				t.local.MarkValueOutated(write.Path, read.Version.ToStorageVersion())
@@ -1043,8 +1038,7 @@ func (t Algo) asyncCleanup(ctx context.Context, tx *Handle) {
 		// Do everything asynchronously.
 		// First schedule a fanout on all the objects to unlock.
 		f := concurr.NewFanout(backgroundConcurrency)
-		// Make sure we don't have unbound background work here.
-		ctx, cancel := concurr.ContextWithTimeout(ctx, t.clock, bgCleanupTimeout)
+		ctx, cancel := context.WithTimeout(ctx, bgCleanupTimeout)
 		defer cancel()
 
 		w := f.Spawn(ctx, len(ps), func(ctx context.Context, i int) error {
@@ -1105,7 +1099,7 @@ func (t Algo) deadlockTimeoutCtx(
 	// and too late, wasting a lot of time. We give more time to transactions
 	// locking many keys. This is because restarting those can be expensive.
 	timeout := min(4*lockLatency*time.Duration(len(vstate.Paths)), maxDeadlockTimeout)
-	return concurr.ContextWithTimeout(ctx, t.clock, timeout)
+	return context.WithTimeout(ctx, timeout)
 }
 
 // Data holds the reads and writes that make up a transaction.

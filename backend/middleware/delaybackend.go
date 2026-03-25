@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/concurr"
 )
@@ -36,6 +34,9 @@ type DelayOptions struct {
 	// How many writes per second to the same object before being
 	// rate limited?
 	SameObjWritePs int
+	// Scale multiplies all delay durations. Defaults to 1.0 if zero.
+	// Use values < 1 to compress delays (e.g. 0.001 for 1000x speedup).
+	Scale float64
 }
 
 // Latency describes the mean and standard deviation of an operation's duration.
@@ -47,12 +48,15 @@ type Latency struct {
 // NewDelayBackend creates a DelayBackend that adds simulated latency to backend operations.
 func NewDelayBackend(
 	inner backend.Backend,
-	clock clockwork.Clock,
 	opts DelayOptions,
 ) *DelayBackend {
+	scale := opts.Scale
+	if scale == 0 {
+		scale = 1.0
+	}
 	return &DelayBackend{
 		inner:     inner,
-		clock:     clock,
+		scale:     scale,
 		metaRead:  lognormalDelay(opts.MetaRead),
 		metaWrite: lognormalDelay(opts.MetaWrite),
 		objRead:   lognormalDelay(opts.ObjRead),
@@ -60,10 +64,10 @@ func NewDelayBackend(
 		list:      lognormalDelay(opts.List),
 		rlimit: rateLimiter{
 			tokensPerSec: opts.SameObjWritePs,
-			clock:        clock,
+			scale:        scale,
 			buckets:      map[string]bucketState{},
 		},
-		retryDelay: opts.ObjWrite.Mean * 2,
+		retryDelay: time.Duration(float64(opts.ObjWrite.Mean*2) * scale),
 	}
 }
 
@@ -71,7 +75,7 @@ func NewDelayBackend(
 // and per-object write rate limiting.
 type DelayBackend struct {
 	inner      backend.Backend
-	clock      clockwork.Clock
+	scale      float64
 	metaRead   lognormal
 	metaWrite  lognormal
 	objRead    lognormal
@@ -195,7 +199,7 @@ func (b *DelayBackend) List(ctx context.Context, dirPath string) (backend.ListIt
 }
 
 func (b *DelayBackend) backoff(ctx context.Context, path string) error {
-	r := concurr.RetryOptions(b.retryDelay, b.retryDelay*10, b.clock)
+	r := concurr.RetryOptions(b.retryDelay, b.retryDelay*10)
 	return r.Retry(ctx, func() error {
 		if !b.rlimit.TryAcquireToken(path) {
 			return errBackoff
@@ -206,8 +210,8 @@ func (b *DelayBackend) backoff(ctx context.Context, path string) error {
 
 func (b *DelayBackend) delay(ln lognormal) {
 	ms := ln.Rand()
-	d := time.Duration(ms * float64(time.Millisecond))
-	b.clock.Sleep(d)
+	d := time.Duration(ms * float64(time.Millisecond) * b.scale)
+	time.Sleep(d)
 }
 
 func lognormalDelay(l Latency) lognormal {
@@ -237,7 +241,7 @@ func (l lognormal) Rand() float64 {
 
 type rateLimiter struct {
 	tokensPerSec int
-	clock        clockwork.Clock
+	scale        float64
 	buckets      map[string]bucketState
 	m            sync.Mutex
 }
@@ -250,7 +254,9 @@ func (r *rateLimiter) TryAcquireToken(key string) bool {
 	r.m.Lock()
 	defer r.m.Unlock()
 
-	now := r.clock.Now()
+	window := time.Duration(float64(time.Second) * r.scale)
+
+	now := time.Now()
 	entry, ok := r.buckets[key]
 	if !ok {
 		r.buckets[key] = bucketState{
@@ -261,11 +267,8 @@ func (r *rateLimiter) TryAcquireToken(key string) bool {
 	}
 
 	elapsed := now.Sub(entry.LastCheck)
-	if elapsed >= time.Second {
-		newTokens := entry.Tokens + int(elapsed.Seconds()*float64(r.tokensPerSec))
-		if newTokens > r.tokensPerSec {
-			newTokens = r.tokensPerSec
-		}
+	if elapsed >= window {
+		newTokens := min(entry.Tokens+int(float64(elapsed)/float64(window)*float64(r.tokensPerSec)), r.tokensPerSec)
 		if newTokens <= 0 {
 			return false
 		}

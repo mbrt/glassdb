@@ -23,8 +23,7 @@ func (o Fanout) Spawn(ctx context.Context, num int, f func(context.Context, int)
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(o.limit)
 
-	for i := 0; i < num; i++ {
-		i := i // https://golang.org/doc/faq#closures_and_goroutines
+	for i := range num {
 		g.Go(func() error {
 			return f(ctx, i)
 		})

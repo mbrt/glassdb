@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/storage"
@@ -20,23 +19,20 @@ const (
 // NewGC returns a GC that periodically deletes finalized transaction logs
 // using the given background executor.
 func NewGC(
-	clock clockwork.Clock,
 	bg *concurr.Background,
 	tl storage.TLogger,
 	log *slog.Logger,
 ) *GC {
 	return &GC{
-		clock: clock,
-		bg:    bg,
-		tl:    tl,
-		log:   log,
+		bg:  bg,
+		tl:  tl,
+		log: log,
 	}
 }
 
 // GC periodically garbage-collects finalized transaction logs that are no
 // longer needed.
 type GC struct {
-	clock clockwork.Clock
 	bg    *concurr.Background
 	tl    storage.TLogger
 	log   *slog.Logger
@@ -48,13 +44,14 @@ type GC struct {
 // regular intervals.
 func (g *GC) Start(ctx context.Context) {
 	g.bg.Go(ctx, func(ctx context.Context) {
-		tick := g.clock.NewTicker(cleanupInterval)
+		tick := time.NewTicker(cleanupInterval)
+		defer tick.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-tick.Chan():
+			case <-tick.C:
 				g.cleanupRound(ctx)
 			}
 		}
@@ -63,7 +60,7 @@ func (g *GC) Start(ctx context.Context) {
 
 // ScheduleTxCleanup enqueues a transaction log for deletion after a delay.
 func (g *GC) ScheduleTxCleanup(txid data.TxID) {
-	t := g.clock.Now().Add(cleanupInterval)
+	t := time.Now().Add(cleanupInterval)
 
 	g.m.Lock()
 	// Avoid growing indefinitely.
@@ -80,7 +77,7 @@ func (g *GC) ScheduleTxCleanup(txid data.TxID) {
 }
 
 func (g *GC) cleanupRound(ctx context.Context) {
-	now := g.clock.Now()
+	now := time.Now()
 	toCleanup := g.filterDueItems(now)
 
 	for _, item := range toCleanup {

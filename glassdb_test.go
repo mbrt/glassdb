@@ -10,9 +10,9 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -27,8 +27,11 @@ import (
 )
 
 const (
-	txTimeout       = 10 * time.Second
-	clockMultiplier = 1000
+	// txTimeout is generous because synctest's fake clock advances in large
+	// jumps (e.g. 5s per lock-poll cycle). Real-time tests (GCS backend) are
+	// fast enough that this doesn't slow anything down.
+	txTimeout         = 10 * time.Minute
+	readonlyTxTimeout = 10 * time.Minute
 )
 
 // debug flags.
@@ -68,7 +71,15 @@ func initMemoryBackend(t testing.TB) backend.Backend {
 	return backend
 }
 
-func allBackends(t testing.TB, clock clockwork.Clock) []testBackend {
+// gcsDelaysForTest compresses simulated GCS latency (~1000x) for wall-clock
+// runs: GCS subtests (HTTP cannot use synctest) and package benchmarks.
+func gcsDelaysForTest() middleware.DelayOptions {
+	opts := middleware.GCSDelays
+	opts.Scale = 1.0 / 1000
+	return opts
+}
+
+func allBackends(t testing.TB) []testBackend {
 	t.Helper()
 	return []testBackend{
 		{
@@ -77,7 +88,7 @@ func allBackends(t testing.TB, clock clockwork.Clock) []testBackend {
 		},
 		{
 			Name: "gcs",
-			B:    middleware.NewDelayBackend(initGCSBackend(t), clock, middleware.GCSDelays),
+			B:    middleware.NewDelayBackend(initGCSBackend(t), gcsDelaysForTest()),
 		},
 	}
 }
@@ -87,11 +98,10 @@ type testBackend struct {
 	B    backend.Backend
 }
 
-func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
+func initDB(t testing.TB, b backend.Backend) *glassdb.DB {
 	t.Helper()
 	ctx := context.Background()
 	opts := glassdb.DefaultOptions()
-	opts.Clock = c
 	if *debugLogs {
 		opts.Logger = newDebugLogger(t)
 	} else {
@@ -107,13 +117,27 @@ func initDB(t testing.TB, b backend.Backend, c clockwork.Clock) *glassdb.DB {
 	return db
 }
 
+// runSubtest creates a subtest named after tb and runs fn inside it. For
+// in-process backends the subtest runs in a synctest bubble; the GCS subtest
+// uses loopback HTTP and must run without synctest because goroutines blocked
+// on network I/O prevent the bubble from becoming idle.
+func runSubtest(t *testing.T, tb testBackend, fn func(t *testing.T)) {
+	t.Helper()
+	t.Run(tb.Name, func(t *testing.T) {
+		if tb.Name == "gcs" {
+			fn(t)
+			return
+		}
+		synctest.Test(t, fn)
+	})
+}
+
 func TestRW(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 
 			key := []byte("key1")
 			val := []byte("value1")
@@ -139,11 +163,10 @@ func TestRW(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 			key := []byte("key1")
 			val := []byte("value1")
 
@@ -170,12 +193,11 @@ func TestDelete(t *testing.T) {
 
 func TestReadFromAnother(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db1 := initDB(t, tb.B, clock)
-			db2 := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db1 := initDB(t, tb.B)
+			db2 := initDB(t, tb.B)
 
 			coll := []byte("rw-another")
 			key := []byte("key1")
@@ -197,12 +219,11 @@ func TestReadFromAnother(t *testing.T) {
 
 func TestReadDeletedFromAnother(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db1 := initDB(t, tb.B, clock)
-			db2 := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db1 := initDB(t, tb.B)
+			db2 := initDB(t, tb.B)
 
 			coll := []byte("rw-delete-another")
 			key1 := []byte("key1")
@@ -291,7 +312,7 @@ func readIntFromT(tx *glassdb.Tx, c glassdb.Collection, k []byte) (int64, error)
 }
 
 func rmw(ctx context.Context, db *glassdb.DB, coll glassdb.Collection, key []byte) error {
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		// This is to make sure we catch deadlocks.
 		iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 		err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
@@ -313,11 +334,10 @@ func rmw(ctx context.Context, db *glassdb.DB, coll glassdb.Collection, key []byt
 
 func TestRMW(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 			coll := []byte("rmw-c")
 			key := []byte("key")
 
@@ -350,12 +370,11 @@ func TestRMW(t *testing.T) {
 
 func TestConcurrentRMW(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db1 := initDB(t, tb.B, clock)
-			db2 := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db1 := initDB(t, tb.B)
+			db2 := initDB(t, tb.B)
 
 			coll := []byte("rmw-c")
 			key := []byte("key")
@@ -396,7 +415,7 @@ func multipleRMW(
 	key1, key2 []byte,
 ) error {
 
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		// This is to make sure we catch deadlocks.
 		iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 		err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
@@ -427,11 +446,10 @@ func multipleRMW(
 
 func TestMultipleRMW(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 
 			coll := []byte("multiple-rmw-c")
 			key1 := []byte("key1")
@@ -459,21 +477,20 @@ func TestMultipleRMW(t *testing.T) {
 // TODO: Fix deadlock with gcp backend.
 func TestReadMulti(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 
 			coll := db.Collection([]byte("demo-coll"))
 			err := coll.Create(ctx)
 			assert.NoError(t, err)
 
 			keys := make([]glassdb.FQKey, 15)
-			for i := 0; i < len(keys); i++ {
+			for i := range keys {
 				keys[i] = glassdb.FQKey{
 					Collection: coll,
-					Key:        []byte(fmt.Sprintf("key%d", i)),
+					Key:        fmt.Appendf(nil, "key%d", i),
 				}
 			}
 
@@ -487,7 +504,7 @@ func TestReadMulti(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Read and write.
-			for i := 0; i < 30; i++ {
+			for range 30 {
 				// This is to make sure we catch deadlocks.
 				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 				err = db.Tx(iterCtx, func(tx *glassdb.Tx) error {
@@ -510,7 +527,7 @@ func TestReadMulti(t *testing.T) {
 			assert.Equal(t, 31, db.Stats().TxN)
 			assert.Equal(t, 0, db.Stats().TxRetries)
 
-			for i := 0; i < len(keys); i++ {
+			for i := range keys {
 				b, err := coll.ReadStrong(ctx, keys[i].Key)
 				assert.NoError(t, err)
 				assert.Equal(t, int64(30), readInt(b))
@@ -521,12 +538,11 @@ func TestReadMulti(t *testing.T) {
 
 func TestConcurrentMultipleRMW(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db1 := initDB(t, tb.B, clock)
-			db2 := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db1 := initDB(t, tb.B)
+			db2 := initDB(t, tb.B)
 
 			coll := []byte("rmw-c")
 			key1 := []byte("key1")
@@ -566,20 +582,23 @@ func TestConcurrentMultipleRMW(t *testing.T) {
 
 func TestReadWeak(t *testing.T) {
 	ctx := context.Background()
-	// This test relies on timing. Relax the speed a bit to allow for slower
-	// machines to complete correctly.
-	clock := testkit.NewAcceleratedClock(clockMultiplier / 10)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 
 			coll := db.Collection([]byte("demo-coll"))
 			err := coll.Create(ctx)
 			assert.NoError(t, err)
 			key := []byte("key")
 
-			for i := 0; i < 30; i++ {
+			const (
+				staleness = 300 * time.Millisecond
+				sleepTime = 100 * time.Millisecond
+			)
+			maxBehind := int64(staleness/sleepTime) + 1
+
+			for i := range 30 {
 				// This is to make sure we catch deadlocks.
 				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
 
@@ -594,17 +613,16 @@ func TestReadWeak(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Weak read.
-				val, err := coll.ReadWeak(ctx, key, 3*time.Second)
+				val, err := coll.ReadWeak(ctx, key, staleness)
 				assert.NoError(t, err)
 				readNum := readInt(val)
-				// This can be max 3 seconds behind, which means i - 3.
 				assert.LessOrEqual(t, readNum, int64(i))
-				if i >= 3 {
-					assert.GreaterOrEqual(t, readNum, int64(i-3))
+				if int64(i) >= maxBehind {
+					assert.GreaterOrEqual(t, readNum, int64(i)-maxBehind)
 				}
 
 				// Let some time pass.
-				clock.Sleep(time.Second)
+				time.Sleep(sleepTime)
 			}
 
 			stats := db.Stats()
@@ -616,11 +634,10 @@ func TestReadWeak(t *testing.T) {
 
 func TestListKeys(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 			coll := db.Collection([]byte("demo-coll"))
 			err := coll.Create(ctx)
 			assert.NoError(t, err)
@@ -628,7 +645,7 @@ func TestListKeys(t *testing.T) {
 			// Generate a random but deterministic set of keys.
 			rnd := rand.New(rand.NewSource(424242)) // #nosec
 			keys := make([][]byte, 100)
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				keys[i] = make([]byte, 4)
 				rnd.Read(keys[i])
 			}
@@ -675,11 +692,10 @@ func TestListKeys(t *testing.T) {
 
 func TestListCollections(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db := initDB(t, tb.B)
 
 			coll := db.Collection([]byte("demo-coll"))
 			err := coll.Create(ctx)
@@ -688,7 +704,7 @@ func TestListCollections(t *testing.T) {
 			// Generate a random but deterministic set of collections.
 			rnd := rand.New(rand.NewSource(424242)) // #nosec
 			colls := make([][]byte, 100)
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				colls[i] = make([]byte, 4)
 				rnd.Read(colls[i])
 			}
@@ -757,93 +773,89 @@ func TestListCollections(t *testing.T) {
 }
 
 func TestReadonly(t *testing.T) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
+	// This test exercises concurrent read/write contention, which involves
+	// multi-second lock polling cycles. Only the memory backend (with synctest)
+	// runs fast; the GCS backend would take 25+ seconds of real time per run.
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		db := initDB(t, initMemoryBackend(t))
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			t.Cleanup(cancel)
-			db := initDB(t, tb.B, clock)
+		coll := db.Collection([]byte("demo-coll"))
+		err := coll.Create(ctx)
+		assert.NoError(t, err)
 
-			coll := db.Collection([]byte("demo-coll"))
-			err := coll.Create(ctx)
-			assert.NoError(t, err)
+		keys := make([][]byte, 15)
+		for i := range keys {
+			keys[i] = fmt.Appendf(nil, "key%d", i)
+		}
 
-			keys := make([][]byte, 15)
-			for i := 0; i < len(keys); i++ {
-				keys[i] = []byte(fmt.Sprintf("key%d", i))
+		// Initialize the values.
+		err = db.Tx(ctx, func(tx *glassdb.Tx) error {
+			for _, k := range keys {
+				_ = tx.Write(coll, k, writeInt(0))
 			}
+			return nil
+		})
+		assert.NoError(t, err)
 
-			// Initialize the values.
-			err = db.Tx(ctx, func(tx *glassdb.Tx) error {
-				for _, k := range keys {
-					_ = tx.Write(coll, k, writeInt(0))
-				}
-				return nil
-			})
-			assert.NoError(t, err)
-
-			// Concurrently update the values.
-			g := errgroup.Group{}
-			g.Go(func() error {
-				for i := 0; i < 30; i++ {
-					// This is to make sure we catch deadlocks.
-					iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
-					err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
-						for _, k := range keys {
-							num, err := readIntFromT(tx, coll, k)
-							if err != nil {
-								return err
-							}
-							if err := tx.Write(coll, k, writeInt(num+1)); err != nil {
-								return err
-							}
-						}
-						return nil
-					})
-					cancel()
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-
-			// Readonly transactions.
-			for i := 0; i < 30; i++ {
-				// This is to make sure we catch deadlocks.
-				iterCtx, cancel := context.WithTimeout(ctx, txTimeout)
-				reads := make([]int64, len(keys))
+		// Concurrently update the values.
+		g := errgroup.Group{}
+		g.Go(func() error {
+			for range 30 {
+				iterCtx, cancel := context.WithTimeout(ctx, readonlyTxTimeout)
 				err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
-					for j, k := range keys {
+					for _, k := range keys {
 						num, err := readIntFromT(tx, coll, k)
 						if err != nil {
 							return err
 						}
-						reads[j] = num
+						if err := tx.Write(coll, k, writeInt(num+1)); err != nil {
+							return err
+						}
 					}
 					return nil
 				})
 				cancel()
-				assert.NoError(t, err)
-				requireAllEqual(t, keys, reads)
+				if err != nil {
+					return err
+				}
 			}
-
-			// Wait for the updates to finish.
-			err = g.Wait()
-			assert.NoError(t, err)
+			return nil
 		})
-	}
+
+		// Readonly transactions.
+		for range 30 {
+			iterCtx, cancel := context.WithTimeout(ctx, readonlyTxTimeout)
+			reads := make([]int64, len(keys))
+			err := db.Tx(iterCtx, func(tx *glassdb.Tx) error {
+				for j, k := range keys {
+					num, err := readIntFromT(tx, coll, k)
+					if err != nil {
+						return err
+					}
+					reads[j] = num
+				}
+				return nil
+			})
+			cancel()
+			assert.NoError(t, err)
+			requireAllEqual(t, keys, reads)
+		}
+
+		// Wait for the updates to finish.
+		err = g.Wait()
+		assert.NoError(t, err)
+	})
 }
 
 func TestStaleAbort(t *testing.T) {
 	ctx := context.Background()
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 
-	for _, tb := range allBackends(t, clock) {
-		t.Run(tb.Name, func(t *testing.T) {
-			db1 := initDB(t, tb.B, clock)
-			db2 := initDB(t, tb.B, clock)
+	for _, tb := range allBackends(t) {
+		runSubtest(t, tb, func(t *testing.T) {
+			db1 := initDB(t, tb.B)
+			db2 := initDB(t, tb.B)
 
 			key1 := []byte("key1")
 			key2 := []byte("key2")

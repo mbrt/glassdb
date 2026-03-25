@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mbrt/glassdb/backend"
@@ -16,70 +16,63 @@ import (
 	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/errors"
 	"github.com/mbrt/glassdb/internal/storage"
-	"github.com/mbrt/glassdb/internal/testkit"
 )
 
-const conditionTimeout = time.Second
-
 func TestGC(t *testing.T) {
-	gc, tctx := newTestGC(t)
-	start := tctx.clock.Now()
-	txid := data.TxID([]byte("tx1"))
+	synctest.Test(t, func(t *testing.T) {
+		gc, tctx := newTestGC(t)
+		txid := data.TxID([]byte("tx1"))
 
-	// Create a transaction log.
-	_, err := gc.tl.Set(tctx.ctx, storage.TxLog{
-		ID:        txid,
-		Timestamp: start,
-		Status:    storage.TxCommitStatusOK,
-	})
-	assert.NoError(t, err)
+		_, err := gc.tl.Set(tctx.ctx, storage.TxLog{
+			ID:        txid,
+			Timestamp: time.Now(),
+			Status:    storage.TxCommitStatusOK,
+		})
+		assert.NoError(t, err)
 
-	// Make sure the log is there.
-	tl, err := gc.tl.Get(tctx.ctx, txid)
-	assert.NoError(t, err)
-	assert.Equal(t, txid, tl.ID)
+		tl, err := gc.tl.Get(tctx.ctx, txid)
+		assert.NoError(t, err)
+		assert.Equal(t, txid, tl.ID)
 
-	gc.ScheduleTxCleanup(txid)
+		gc.ScheduleTxCleanup(txid)
 
-	// Wait for the GC to run.
-	tctx.clock.Sleep(cleanupInterval * 2)
+		waitForCondition(t, func() bool {
+			_, err := gc.tl.Get(tctx.ctx, txid)
+			return errors.Is(err, backend.ErrNotFound)
+		})
 
-	waitForCondition(t, func() bool {
-		_, err := gc.tl.Get(tctx.ctx, txid)
-		return errors.Is(err, backend.ErrNotFound)
+		// Cancel the context to stop the GC goroutine before the bubble exits.
+		tctx.cancel()
+		synctest.Wait()
 	})
 }
 
 type gcTestContext struct {
-	ctx   context.Context
-	clock clockwork.Clock
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func newTestGC(t *testing.T) (*GC, gcTestContext) {
 	t.Helper()
 
-	// It's important to close the context at the end to stop
-	// any background tasks.
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
 
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
 	log := slog.New(nilHandler{})
 	cache := cache.New(1024)
-	local := storage.NewLocal(cache, clock)
-	global := storage.NewGlobal(memory.New(), local, clock)
-	tlogger := storage.NewTLogger(clock, global, local, testCollName)
+	local := storage.NewLocal(cache)
+	global := storage.NewGlobal(memory.New(), local)
+	tlogger := storage.NewTLogger(global, local, testCollName)
 	background := concurr.NewBackground()
-	gc := NewGC(clock, background, tlogger, log)
+	t.Cleanup(background.Close)
+	gc := NewGC(background, tlogger, log)
 	gc.Start(ctx)
 
-	return gc, gcTestContext{
-		ctx, clock,
-	}
+	return gc, gcTestContext{ctx, cancel}
 }
 
 func waitForCondition(t *testing.T, cond func() bool) {
 	t.Helper()
-	assert.Eventually(t, cond, conditionTimeout, 10*time.Millisecond,
-		"condition not met within %v", conditionTimeout)
+	time.Sleep(cleanupInterval * 3)
+	synctest.Wait()
+	assert.True(t, cond(), "condition not met")
 }

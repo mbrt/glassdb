@@ -179,7 +179,7 @@ func statusFromError(err error) int {
 
 type jsonResponse struct {
 	Header http.Header
-	Data   interface{}
+	Data   any
 	Status int
 }
 
@@ -197,7 +197,7 @@ func jsonToHTTPHandler(h jsonHandler) http.HandlerFunc {
 
 		var (
 			status int
-			data   interface{}
+			data   any
 		)
 
 		if err != nil {

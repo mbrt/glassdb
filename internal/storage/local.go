@@ -4,8 +4,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/cache"
 )
@@ -14,16 +12,15 @@ import (
 // meaning that any cached value is acceptable regardless of age.
 const MaxStaleness = time.Duration(math.MaxInt64)
 
-// NewLocal returns a Local backed by the given cache and clock.
-func NewLocal(c *cache.Cache, clock clockwork.Clock) Local {
-	return Local{c, clock}
+// NewLocal returns a Local backed by the given cache.
+func NewLocal(c *cache.Cache) Local {
+	return Local{c}
 }
 
 // Local provides a local in-memory cache for storage objects, including both
 // values and metadata with staleness tracking.
 type Local struct {
 	cache *cache.Cache
-	clock clockwork.Clock
 }
 
 func (c Local) Read(key string, maxStale time.Duration) (LocalRead, bool) {
@@ -62,7 +59,7 @@ func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool)
 
 // WriteWithMeta stores both the value and its metadata in the cache atomically.
 func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
-	updated := c.clock.Now()
+	updated := time.Now()
 	newEntry := cacheEntry{
 		V: &cacheValue{
 			Value:   value,
@@ -81,7 +78,7 @@ func (c Local) Write(key string, value []byte, v Version) {
 	newValue := &cacheValue{
 		Value:   value,
 		Version: v,
-		Updated: c.clock.Now(),
+		Updated: time.Now(),
 	}
 	c.cache.Update(key, func(v cache.Value) cache.Value {
 		if v == nil {
@@ -97,7 +94,7 @@ func (c Local) Write(key string, value []byte, v Version) {
 func (c Local) SetMeta(key string, meta backend.Metadata) {
 	newMeta := &cacheMeta{
 		Meta:    meta,
-		Updated: c.clock.Now(),
+		Updated: time.Now(),
 	}
 
 	c.cache.Update(key, func(v cache.Value) cache.Value {
@@ -139,7 +136,7 @@ func (c Local) MarkDeleted(key string, v Version) {
 	newValue := &cacheValue{
 		Deleted: true,
 		Version: v,
-		Updated: c.clock.Now(),
+		Updated: time.Now(),
 	}
 	c.cache.Update(key, func(v cache.Value) cache.Value {
 		if v == nil {
@@ -165,7 +162,7 @@ func (c Local) entry(key string) (cacheEntry, bool) {
 }
 
 func (c Local) isStale(updated time.Time, maxStaleness time.Duration) bool {
-	staleness := c.clock.Now().Sub(updated)
+	staleness := time.Since(updated)
 	return staleness > maxStaleness
 }
 

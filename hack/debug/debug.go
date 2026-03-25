@@ -275,7 +275,7 @@ func buildGraphData(calls []call) graphData {
 	}
 
 	tc := make([]graphEdge, len(calls))
-	for i := 0; i < len(tc); i++ {
+	for i := range tc {
 		tc[i] = graphEdge{
 			fmt.Sprintf("t%d", i),
 			fmt.Sprintf("c%d", i),

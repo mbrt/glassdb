@@ -12,20 +12,37 @@ import (
 
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
-	"github.com/mbrt/glassdb/internal/testkit"
+	"github.com/mbrt/glassdb/backend/middleware"
 )
 
 var printStats = flag.Bool("print-stats", false, "print DB stats after benchmarking")
 
+func gcsDelaysForBench() middleware.DelayOptions {
+	opts := middleware.GCSDelays
+	opts.Scale = 1.0 / 1000
+	return opts
+}
+
+func benchBackends(tb testing.TB) []testBackend {
+	tb.Helper()
+	return []testBackend{
+		{
+			Name: "memory",
+			B:    initMemoryBackend(tb),
+		},
+		{
+			Name: "gcs",
+			B:    middleware.NewDelayBackend(initGCSBackend(tb), gcsDelaysForBench()),
+		},
+	}
+}
+
 func BenchmarkSingleRMW(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := b.Context()
 
-			db := initDB(b, tb.B, clock)
+			db := initDB(b, tb.B)
 			collName := []byte("single-rmw")
 			key := []byte("key")
 
@@ -57,14 +74,11 @@ func BenchmarkSingleRMW(b *testing.B) {
 }
 
 func Benchmark10RMW(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := b.Context()
 
-			db := initDB(b, tb.B, clock)
+			db := initDB(b, tb.B)
 			collName := []byte("rmw-mb")
 
 			// Initialize.
@@ -73,10 +87,10 @@ func Benchmark10RMW(b *testing.B) {
 			require.NoError(b, err)
 
 			keys := make([]glassdb.FQKey, 10)
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				keys[i] = glassdb.FQKey{
 					Collection: coll,
-					Key:        []byte(fmt.Sprintf("key%d", i)),
+					Key:        fmt.Appendf(nil, "key%d", i),
 				}
 			}
 
@@ -112,15 +126,13 @@ func Benchmark10RMW(b *testing.B) {
 }
 
 func BenchmarkConcurrMultipleRMW(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			db1 := initDB(b, tb.B, clock)
-			db2 := initDB(b, tb.B, clock)
+			db1 := initDB(b, tb.B)
+			db2 := initDB(b, tb.B)
 
 			collName := []byte("rmw-b")
 			key1 := []byte("key1")
@@ -178,14 +190,11 @@ func BenchmarkConcurrMultipleRMW(b *testing.B) {
 }
 
 func Benchmark10R(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := b.Context()
 
-			db := initDB(b, tb.B, clock)
+			db := initDB(b, tb.B)
 			collName := []byte("rmw-mb")
 
 			// Initialize.
@@ -194,10 +203,10 @@ func Benchmark10R(b *testing.B) {
 			require.NoError(b, err)
 
 			keys := make([]glassdb.FQKey, 10)
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				keys[i] = glassdb.FQKey{
 					Collection: coll,
-					Key:        []byte(fmt.Sprintf("key%d", i)),
+					Key:        fmt.Appendf(nil, "key%d", i),
 				}
 			}
 
@@ -236,14 +245,12 @@ func Benchmark10R(b *testing.B) {
 }
 
 func BenchmarkSharedR(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			db := initDB(b, tb.B, clock)
+			db := initDB(b, tb.B)
 			keyR := []byte("key-r")
 			keyW1 := []byte("key-w1")
 			keyW2 := []byte("key-w2")
@@ -302,14 +309,11 @@ func BenchmarkSharedR(b *testing.B) {
 }
 
 func Benchmark100W(b *testing.B) {
-	clock := testkit.NewAcceleratedClock(clockMultiplier)
-
-	for _, tb := range allBackends(b, clock) {
+	for _, tb := range benchBackends(b) {
 		b.Run(tb.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := b.Context()
 
-			db := initDB(b, tb.B, clock)
+			db := initDB(b, tb.B)
 			collName := []byte("mw")
 
 			// Initialize.
@@ -322,7 +326,7 @@ func Benchmark100W(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				err := db.Tx(ctx, func(tx *glassdb.Tx) error {
 					// Increment all the keys together in the transaction.
-					for j := 0; j < 100; j++ {
+					for j := range 100 {
 						k := fmt.Sprintf("k%d", i*100+j)
 						if err := tx.Write(coll, []byte(k), writeInt(int64(j))); err != nil {
 							return err

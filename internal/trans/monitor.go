@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
@@ -36,13 +34,11 @@ const (
 // NewMonitor returns a Monitor that tracks local and remote transaction state
 // using the given transaction logger and background executor.
 func NewMonitor(
-	c clockwork.Clock,
 	l storage.Local,
 	tl storage.TLogger,
 	b *concurr.Background,
 ) *Monitor {
 	return &Monitor{
-		clock:      c,
 		local:      l,
 		tl:         tl,
 		background: b,
@@ -55,7 +51,6 @@ func NewMonitor(
 // Monitor tracks the lifecycle of transactions, providing commit, abort,
 // status queries, and asynchronous wait capabilities.
 type Monitor struct {
-	clock      clockwork.Clock
 	local      storage.Local
 	tl         storage.TLogger
 	background *concurr.Background
@@ -91,10 +86,9 @@ func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 
 	if needStart {
 		m.background.Go(ctx, func(ctx context.Context) {
-			ticker := m.clock.NewTicker(refreshTimeout())
-			// Make sure we always stop the timer at the end of the refresh.
+			ticker := time.NewTicker(refreshTimeout())
 			defer ticker.Stop()
-			m.refreshPending(ctx, tid, ticker)
+			m.refreshPending(ctx, tid, ticker.C)
 		})
 	}
 }
@@ -305,7 +299,7 @@ func (m *Monitor) fetchRemoteTxStatus(ctx context.Context, tid data.TxID) (stora
 	case storage.TxCommitStatusUnknown:
 		return m.handleUnknownTx(ctx, tid)
 	case storage.TxCommitStatusPending:
-		if isExpired(status.LastUpdate, m.clock.Now()) {
+		if isExpired(status.LastUpdate, time.Now()) {
 			return m.tryAbortRemoteTx(ctx, tid, status.Version)
 		}
 		return storage.TxCommitStatusPending, nil
@@ -315,7 +309,7 @@ func (m *Monitor) fetchRemoteTxStatus(ctx context.Context, tid data.TxID) (stora
 }
 
 func (m *Monitor) handleUnknownTx(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
-	now := m.clock.Now()
+	now := time.Now()
 
 	m.m.Lock()
 	st, ok := m.unknownTx[string(tid)]
@@ -370,7 +364,7 @@ func (m *Monitor) tryAbortRemoteTx(
 func (m *Monitor) pollTxStatus(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
 	res := storage.TxCommitStatusUnknown
 
-	err := concurr.RetryWithBackoff(ctx, m.clock, func() error {
+	err := concurr.RetryWithBackoff(ctx, func() error {
 		s, err := m.fetchRemoteTxStatus(ctx, tid)
 		if err != nil {
 			return concurr.Permanent(fmt.Errorf("in get commit status: %w", err))
@@ -436,7 +430,7 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 	m.m.Unlock()
 
 	// TODO: Add timeout ~= refreshTimeout here.
-	err := concurr.RetryWithBackoff(ctx, m.clock, func() error {
+	err := concurr.RetryWithBackoff(ctx, func() error {
 		var err error
 		if lastV.IsNull() {
 			_, err = m.tl.Set(ctx, tlog)
@@ -486,7 +480,7 @@ func (m *Monitor) stopTxRefresh(tid data.TxID) bool {
 	return true
 }
 
-func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, ticker clockwork.Ticker) {
+func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, tickCh <-chan time.Time) {
 	var (
 		err           error
 		lastVersion   backend.Version
@@ -509,14 +503,14 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, ticker cloc
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.Chan():
+		case <-tickCh:
 		}
 
 		if !m.shouldRefresh(tid) {
 			return
 		}
 
-		startT := m.clock.Now()
+		startT := time.Now()
 		tl := storage.TxLog{
 			ID:        tid,
 			Timestamp: startT,

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/jonboulle/clockwork"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/mbrt/glassdb"
@@ -55,7 +54,7 @@ func initBackend() (backend.Backend, error) {
 			// Effectively disable throttling.
 			delays.SameObjWritePs = 100000
 		}
-		return middleware.NewDelayBackend(backend, clockwork.NewRealClock(), delays), nil
+		return middleware.NewDelayBackend(backend, delays), nil
 	case "gcs":
 		return initGCS(ctx)
 	}
@@ -161,11 +160,10 @@ func independentSingleRMW(b *benchmarker, db *glassdb.DB, nwriters int) error {
 	b.Start(db, nwriters, nwriters, 1)
 	defer b.End(db)
 
-	for i := 0; i < nwriters; i++ {
-		i := i
+	for i := range nwriters {
 
 		eg.Go(func() error {
-			coll := db.Collection([]byte(fmt.Sprintf("c%d", i)))
+			coll := db.Collection(fmt.Appendf(nil, "c%d", i))
 			if err := coll.Create(ctx); err != nil {
 				return err
 			}
@@ -199,20 +197,19 @@ func independentMultiRMW(b *benchmarker, db *glassdb.DB, nwriters, numkeys int) 
 	b.Start(db, numkeys*nwriters, nwriters, numkeys)
 	defer b.End(db)
 
-	for i := 0; i < nwriters; i++ {
-		i := i
+	for i := range nwriters {
 
 		eg.Go(func() error {
-			coll := db.Collection([]byte(fmt.Sprintf("c%d", i)))
+			coll := db.Collection(fmt.Appendf(nil, "c%d", i))
 			if err := coll.Create(ctx); err != nil {
 				return err
 			}
 
 			keys := make([]glassdb.FQKey, numkeys)
-			for j := 0; j < numkeys; j++ {
+			for j := range numkeys {
 				keys[j] = glassdb.FQKey{
 					Collection: coll,
-					Key:        []byte(fmt.Sprintf("key%d", j)),
+					Key:        fmt.Appendf(nil, "key%d", j),
 				}
 			}
 
@@ -253,14 +250,14 @@ func overlappingMultiRMW(b *benchmarker, db *glassdb.DB, nWriters, nKeysPerWrite
 
 	nKeys := nWriters*nKeysPerWriter - nOverlap
 	allKeys := make([]glassdb.FQKey, nKeys)
-	for i := 0; i < len(allKeys); i++ {
+	for i := range allKeys {
 		allKeys[i] = glassdb.FQKey{
 			Collection: coll,
-			Key:        []byte(fmt.Sprintf("key%d", i)),
+			Key:        fmt.Appendf(nil, "key%d", i),
 		}
 	}
 	err := db.Tx(ctx, func(tx *glassdb.Tx) error {
-		for i := 0; i < len(allKeys); i++ {
+		for i := range allKeys {
 			if err := tx.Write(coll, allKeys[i].Key, rand1K()); err != nil {
 				return err
 			}
@@ -275,7 +272,7 @@ func overlappingMultiRMW(b *benchmarker, db *glassdb.DB, nWriters, nKeysPerWrite
 	b.Start(db, nKeys, nWriters, nKeysPerWriter)
 	defer b.End(db)
 
-	for i := 0; i < nWriters; i++ {
+	for i := range nWriters {
 		// Keys are structured this way:
 		// The overlapping keys at the beginning, then the unique
 		// (per worker) keys.
@@ -416,7 +413,7 @@ func readWrite9010AllDBs(rnd *mrand.Rand, b backend.Backend, keys [][]byte, numd
 	resCh := make(chan dbResults, numdb)
 	eg := errgroup.Group{}
 
-	for i := 0; i < numdb; i++ {
+	for range numdb {
 		eg.Go(func() error {
 			db := initDB(b)
 			defer db.Close(context.Background())
@@ -495,7 +492,7 @@ func readWrite9010(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) (benchResults
 
 	// Run the sequence of transactions 10 times in parallel.
 	// Each sequence has 10 operations.
-	for i := 0; i < readWrite9010NumConcurrTx; i++ {
+	for range readWrite9010NumConcurrTx {
 		eg.Go(func() error {
 			// 10 transactions in series.
 			// - 1 writer.
@@ -616,8 +613,8 @@ func initKeys(b backend.Backend, num int) ([][]byte, error) {
 	for i := 0; i < num; i += 100 {
 		log.Printf("keys %d - %d", i, i+100)
 		err := db.Tx(ctx, func(tx *glassdb.Tx) error {
-			for j := 0; j < 100; j++ {
-				k := []byte(fmt.Sprintf("key%d", i+j))
+			for j := range 100 {
+				k := fmt.Appendf(nil, "key%d", i+j)
 				keys[i+j] = k
 				if err := tx.Write(coll, k, rand1K()); err != nil {
 					return err

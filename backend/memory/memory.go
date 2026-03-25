@@ -3,6 +3,7 @@ package memory
 
 import (
 	"context"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -288,9 +289,7 @@ func (b *Backend) updateTags(obj *object, t backend.Tags) {
 	if obj.Tags == nil {
 		obj.Tags = make(backend.Tags)
 	}
-	for k, v := range t {
-		obj.Tags[k] = v
-	}
+	maps.Copy(obj.Tags, t)
 	obj.Version.Meta++
 }
 
@@ -335,9 +334,7 @@ func copyTags(t backend.Tags) backend.Tags {
 		return nil
 	}
 	res := make(backend.Tags)
-	for k, v := range t {
-		res[k] = v
-	}
+	maps.Copy(res, t)
 	return res
 }
 

@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
@@ -38,14 +36,12 @@ func NewLocker(
 	l storage.Local,
 	g storage.Global,
 	tl storage.TLogger,
-	clock clockwork.Clock,
 	tmon *Monitor,
 ) *Locker {
 	res := &Locker{
 		local:  l,
 		global: g,
 		tl:     tl,
-		clock:  clock,
 		tmon:   tmon,
 		tlocks: make(map[string]txLocks),
 	}
@@ -61,7 +57,6 @@ type Locker struct {
 	global storage.Global
 	tl     storage.TLogger
 	tmon   *Monitor
-	clock  clockwork.Clock
 
 	dedup  *concurr.Dedup
 	tlocks map[string]txLocks
@@ -331,7 +326,7 @@ type lockerWorker struct {
 
 func (l lockerWorker) Work(ctx context.Context, key string, cntr concurr.DedupContr) error {
 	counter := 0
-	wctx := &waitCtx{clock: l.locker.clock}
+	wctx := &waitCtx{}
 
 	defer func() {
 		if counter > 1 {
@@ -393,7 +388,7 @@ func (l lockerWorker) waitForTx(ctx context.Context, key string, txs []data.TxID
 			return ctx.Err()
 		case <-l.locker.tmon.WaitForTx(ctx, tx):
 		case <-wctx.nextReqCh:
-		case <-wctx.clock.After(waitPollDuration):
+		case <-time.After(waitPollDuration):
 		}
 
 		break
@@ -461,7 +456,6 @@ type lockOpResult struct {
 }
 
 type waitCtx struct {
-	clock     clockwork.Clock
 	nextReqCh <-chan struct{}
 }
 

@@ -6,19 +6,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/errors"
 )
 
 // NewGlobal returns a Global that reads and writes through the given backend,
 // using l as a local cache.
-func NewGlobal(b backend.Backend, l Local, clock clockwork.Clock) Global {
+func NewGlobal(b backend.Backend, l Local) Global {
 	return Global{
 		backend: b,
 		local:   l,
-		clock:   clock,
 	}
 }
 
@@ -27,7 +24,6 @@ func NewGlobal(b backend.Backend, l Local, clock clockwork.Clock) Global {
 type Global struct {
 	backend backend.Backend
 	local   Local
-	clock   clockwork.Clock
 }
 
 func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {

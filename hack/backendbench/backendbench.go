@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/jonboulle/clockwork"
 
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/backend/gcs"
@@ -34,8 +33,7 @@ func initBackend() (backend.Backend, error) {
 	switch *backendType {
 	case "memory":
 		backend := memory.New()
-		clock := clockwork.NewRealClock()
-		return middleware.NewDelayBackend(backend, clock, middleware.GCSDelays), nil
+		return middleware.NewDelayBackend(backend, middleware.GCSDelays), nil
 	case "gcs":
 		return initGCSBackend(ctx)
 	}

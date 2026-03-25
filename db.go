@@ -9,8 +9,7 @@ import (
 	"log/slog"
 	"regexp"
 	"sync"
-
-	"github.com/jonboulle/clockwork"
+	"time"
 
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/cache"
@@ -27,7 +26,6 @@ var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 // middle ground for a production deployment.
 func DefaultOptions() Options {
 	return Options{
-		Clock:     clockwork.NewRealClock(),
 		Logger:    slog.Default(),
 		CacheSize: 5012 * 1024 * 1024, // 512 MiB
 	}
@@ -37,7 +35,6 @@ func DefaultOptions() Options {
 //
 // TODO: Add retry timing options.
 type Options struct {
-	Clock  clockwork.Clock
 	Logger *slog.Logger
 	// Cache size is the number of bytes dedicated to caching objects and
 	// and metadata. Setting this too small may impact performance, as
@@ -63,15 +60,14 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 	bg := concurr.NewBackground()
 
 	backend := &statsBackend{inner: b}
-	local := storage.NewLocal(cache, opts.Clock)
-	global := storage.NewGlobal(backend, local, opts.Clock)
-	tl := storage.NewTLogger(opts.Clock, global, local, name)
-	tmon := trans.NewMonitor(opts.Clock, local, tl, bg)
-	locker := trans.NewLocker(local, global, tl, opts.Clock, tmon)
-	gc := trans.NewGC(opts.Clock, bg, tl, opts.Logger)
+	local := storage.NewLocal(cache)
+	global := storage.NewGlobal(backend, local)
+	tl := storage.NewTLogger(global, local, name)
+	tmon := trans.NewMonitor(local, tl, bg)
+	locker := trans.NewLocker(local, global, tl, tmon)
+	gc := trans.NewGC(bg, tl, opts.Logger)
 	gc.Start(ctx)
 	ta := trans.NewAlgo(
-		opts.Clock,
 		global,
 		local,
 		locker,
@@ -89,7 +85,6 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 		tmon:       tmon,
 		gc:         gc,
 		algo:       ta,
-		clock:      opts.Clock,
 		logger:     opts.Logger,
 	}
 	res.root = res.openCollection(name)
@@ -106,7 +101,6 @@ type DB struct {
 	tmon       *trans.Monitor
 	gc         *trans.GC
 	algo       trans.Algo
-	clock      clockwork.Clock
 	logger     *slog.Logger
 	root       Collection
 	stats      Stats
@@ -128,11 +122,11 @@ func (d *DB) Collection(name []byte) Collection {
 // Tx executes f within a serializable transaction, retrying on conflicts.
 func (d *DB) Tx(ctx context.Context, f func(tx *Tx) error) error {
 	stats := &Stats{TxN: 1}
-	begin := d.clock.Now()
+	begin := time.Now()
 	ctx, task := trace.NewTask(ctx, "tx")
 	err := d.txImpl(ctx, f, stats)
 	task.End()
-	stats.TxTime = d.clock.Now().Sub(begin)
+	stats.TxTime = time.Since(begin)
 	d.updateStats(stats)
 	return err
 }
@@ -153,14 +147,14 @@ func (d *DB) Stats() Stats {
 }
 
 func (d *DB) openCollection(prefix string) Collection {
-	local := storage.NewLocal(d.cache, d.clock)
-	global := storage.NewGlobal(d.backend, local, d.clock)
+	local := storage.NewLocal(d.cache)
+	global := storage.NewGlobal(d.backend, local)
 	return Collection{prefix, global, local, d.algo, d}
 }
 
 func (d *DB) txImpl(ctx context.Context, fn func(tx *Tx) error, stats *Stats) (err error) {
-	local := storage.NewLocal(d.cache, d.clock)
-	global := storage.NewGlobal(d.backend, local, d.clock)
+	local := storage.NewLocal(d.cache)
+	global := storage.NewGlobal(d.backend, local)
 
 	tx := newTx(ctx, global, local, d.tmon)
 	var handle *trans.Handle

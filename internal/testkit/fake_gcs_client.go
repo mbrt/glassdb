@@ -1,3 +1,5 @@
+// Package testkit provides testing utilities including in-memory GCS clients
+// and controllable backends.
 package testkit
 
 import (
