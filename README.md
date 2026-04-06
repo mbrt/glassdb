@@ -20,8 +20,11 @@ Apple's [FoundationDB](https://github.com/apple/foundationdb).
 
 Transactions _should_ be working correctly and performance could definitely
 improve. Interfaces and file formats are _not_ stable and can still change at
-any point. Documentation is almost nil, but I'm planning to work on it very
-soon.
+any point.
+
+For a deep dive into the internals, see the
+[architecture doc](docs/architecture.md) and the companion
+[blog post](https://blog.mbrt.dev/posts/transactional-object-storage).
 
 Note also that currently we only support
 [Google GCS](https://cloud.google.com/storage/), but adding
