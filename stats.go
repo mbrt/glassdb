@@ -80,10 +80,10 @@ func (b *statsBackend) StatsAndReset() Stats {
 }
 
 func (b *statsBackend) ReadIfModified(
-	ctx context.Context, path string, version int64,
+	ctx context.Context, path string, expectedWriter backend.WriterID,
 ) (backend.ReadReply, error) {
 	atomic.AddInt32(&b.objReads, 1)
-	return b.inner.ReadIfModified(ctx, path, version)
+	return b.inner.ReadIfModified(ctx, path, expectedWriter)
 }
 
 func (b *statsBackend) Read(

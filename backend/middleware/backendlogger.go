@@ -28,11 +28,12 @@ type BackendLogger struct {
 func (b BackendLogger) ReadIfModified(
 	ctx context.Context,
 	path string,
-	version int64,
+	expectedWriter backend.WriterID,
 ) (backend.ReadReply, error) {
-	r, err := b.inner.ReadIfModified(ctx, path, version)
+	r, err := b.inner.ReadIfModified(ctx, path, expectedWriter)
 	b.log.LogAttrs(ctx, slog.LevelDebug, "ReadIfModified",
-		argsAttr("v:%d", version), pathAttr(path), resAttr(r), errAttr(err))
+		argsAttr("w:%s", backend.EncodeWriterTag(expectedWriter)),
+		pathAttr(path), resAttr(r), errAttr(err))
 	return r, err
 }
 

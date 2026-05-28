@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/mbrt/glassdb/backend"
+	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/errors"
 )
 
@@ -34,7 +35,7 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 		// outdated, it's better to do a regular read.
 		if !e.Outdated && !e.Version.B.IsNull() {
 			modified := true
-			r, err := s.backend.ReadIfModified(ctx, key, e.Version.B.Contents)
+			r, err := s.backend.ReadIfModified(ctx, key, backend.WriterID(e.Version.Writer))
 			if err != nil {
 				if !errors.Is(err, backend.ErrPrecondition) {
 					return GlobalRead{}, fmt.Errorf("backend read of %q: %w", key, err)
@@ -43,18 +44,18 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 			}
 			if modified {
 				// The local value was stale. Take the updated value from the backend.
-				// Update local storage.
-				s.local.Write(key, r.Contents, Version{B: r.Version})
+				meta := backend.Metadata{Tags: r.Tags, Version: r.Version}
+				s.local.WriteWithMeta(key, r.Contents, meta)
 
 				return GlobalRead{
 					Value:   r.Contents,
-					Version: r.Version.Contents,
+					Version: VersionFromMeta(meta),
 				}, nil
 			}
 			// The cached value is up to date, use that.
 			return GlobalRead{
 				Value:   e.Value,
-				Version: e.Version.B.Contents,
+				Version: e.Version,
 			}, nil
 		}
 	}
@@ -64,12 +65,12 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 	if err != nil {
 		return GlobalRead{}, fmt.Errorf("backend read of %q: %w", key, err)
 	}
-	// Update local storage.
-	s.local.Write(key, r.Contents, Version{B: r.Version})
+	meta := backend.Metadata{Tags: r.Tags, Version: r.Version}
+	s.local.WriteWithMeta(key, r.Contents, meta)
 
 	return GlobalRead{
 		Value:   r.Contents,
-		Version: r.Version.Contents,
+		Version: VersionFromMeta(meta),
 	}, nil
 }
 
@@ -169,5 +170,12 @@ func (s Global) DeleteIf(ctx context.Context, key string, expected backend.Versi
 // GlobalRead holds the result of reading a value from global storage.
 type GlobalRead struct {
 	Value   []byte
-	Version int64
+	Version Version
+}
+
+// Writer returns the transaction ID of the last writer of the value, as
+// recorded in the metadata tags. Returns nil if the value has no recorded
+// writer (e.g. an externally-created object).
+func (r GlobalRead) Writer() data.TxID {
+	return r.Version.Writer
 }

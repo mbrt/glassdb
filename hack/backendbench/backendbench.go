@@ -114,8 +114,10 @@ func benchWriteFailPre(b backend.Backend, ben *bench.Bench) error {
 	}
 	count := 0
 
-	expected := meta.Version
-	expected.Meta++
+	// Use a clearly-bogus version so the WriteIf is guaranteed to fail the
+	// precondition.
+	expected := backend.Version{Token: "0/0"}
+	_ = meta
 
 	for !ben.IsTestFinished() {
 		err := ben.Measure(func() error {
@@ -161,14 +163,18 @@ func benchReadUnchanged(b backend.Backend, ben *bench.Bench) error {
 	data := randomData(1024)
 
 	p := path.Join(testRoot, "read")
-	meta, err := b.Write(ctx, p, data, backend.Tags{"key": "val"})
+	writer := backend.WriterID("benchmark-writer")
+	_, err := b.Write(ctx, p, data, backend.Tags{
+		"key":                 "val",
+		backend.LastWriterTag: backend.EncodeWriterTag(writer),
+	})
 	if err != nil {
 		return err
 	}
 
 	for !ben.IsTestFinished() {
 		err := ben.Measure(func() error {
-			_, err := b.ReadIfModified(ctx, p, meta.Version.Contents)
+			_, err := b.ReadIfModified(ctx, p, writer)
 			return err
 		})
 		if err != nil {

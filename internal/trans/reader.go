@@ -48,10 +48,8 @@ func (r Reader) Read(
 		return ReadValue{}, err
 	}
 	gres := ReadValue{
-		Value: gr.Value,
-		Version: storage.Version{
-			B: backend.Version{Contents: gr.Version},
-		},
+		Value:   gr.Value,
+		Version: gr.Version,
 	}
 	return r.handleLockCreate(ctx, key, gres)
 }

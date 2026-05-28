@@ -23,23 +23,20 @@ func (v Version) IsLocal() bool {
 	return v.Writer != nil
 }
 
-// EqualContents reports whether v and other refer to the same version content,
-// comparing backend contents or writer IDs as appropriate.
+// EqualContents reports whether v and other refer to the same value, by
+// comparing the writer transaction IDs. Two versions with no writer (i.e.
+// never written by GlassDB) compare equal.
 func (v Version) EqualContents(other Version) bool {
-	if !v.B.IsNull() {
-		return v.B.Contents == other.B.Contents
-	}
 	return v.Writer.Equal(other.Writer)
 }
 
 // EqualMetaContents reports whether v matches the version described by the
-// given backend metadata.
+// given backend metadata. It compares the last-writer transaction ID found in
+// the metadata tags against v's writer. Two versions with no writer compare
+// equal (covers never-written or externally-created keys).
 func (v Version) EqualMetaContents(m backend.Metadata) bool {
-	if !v.B.IsNull() {
-		return v.B.Contents == m.Version.Contents
-	}
 	writer, _ := lastWriterFromTags(m.Tags)
-	return writer != nil && v.Writer.Equal(writer)
+	return v.Writer.Equal(writer)
 }
 
 // VersionFromMeta constructs a Version from backend metadata, extracting the

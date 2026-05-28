@@ -207,7 +207,7 @@ func TestSingleReadWrite(t *testing.T) {
 			Reads: []ReadAccess{
 				{
 					Path:    keyp,
-					Version: ReadVersion{Version: gr.Version},
+					Version: ReadVersion{LastWriter: gr.Version.Writer},
 					Found:   true,
 				},
 			},
@@ -257,7 +257,7 @@ func TestReadWriteWhileLockCreate(t *testing.T) {
 			Reads: []ReadAccess{
 				{
 					Path:    keyp,
-					Version: ReadVersion{Version: gr.Version},
+					Version: ReadVersion{LastWriter: gr.Version.Writer},
 					Found:   true,
 				},
 			},
@@ -281,7 +281,7 @@ func TestReadWriteWhileLockCreate(t *testing.T) {
 			Reads: []ReadAccess{
 				{
 					Path:    keyp,
-					Version: ReadVersion{Version: gr.Version},
+					Version: ReadVersion{LastWriter: gr.Version.Writer},
 					Found:   true,
 				},
 			},
@@ -338,7 +338,7 @@ func TestReadonly(t *testing.T) {
 			Reads: []ReadAccess{
 				{
 					Path:    keyp,
-					Version: ReadVersion{Version: gr.Version},
+					Version: ReadVersion{LastWriter: gr.Version.Writer},
 					Found:   true,
 				},
 			},
@@ -550,7 +550,6 @@ func TestReadonlyFromUncommitted(t *testing.T) {
 		// We should know the new value now.
 		ra2, err := doRead(ctx, tctx, keyp)
 		assert.NoError(t, err)
-		assert.True(t, ra2.Version.IsLocal())
 		assert.Equal(t, ra2.Version.LastWriter, wh.id)
 	})
 }
@@ -853,7 +852,7 @@ func TestSingleRWRetry(t *testing.T) {
 		// Read the value.
 		ra, err := doRead(ctx, tctx, keyp)
 		assert.NoError(t, err)
-		assert.True(t, ra.Version.IsLocal())
+		assert.NotNil(t, ra.Version.LastWriter)
 
 		// Modify the value from another algo.
 		// It's important that this is a single RW transaction.
@@ -1020,7 +1019,6 @@ func doRead(ctx context.Context, tctx testContext, path string) (ReadAccess, err
 	return ReadAccess{
 		Path: path,
 		Version: ReadVersion{
-			Version:    rv.Version.B.Contents,
 			LastWriter: rv.Version.Writer,
 		},
 		Found: true,

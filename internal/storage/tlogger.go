@@ -203,8 +203,11 @@ func (t TLogger) readLog(ctx context.Context, id data.TxID) (*pb.TransactionLog,
 			return log, nil
 		}
 		// The transaction is pending, so we can't trust the locally cached
-		// value. This could have been overwritten in the meantime.
-		// Do a global read instead.
+		// value: tx-log writes update content but don't change the
+		// last-writer tag, so writer-based ReadIfModified would not detect
+		// the change. Mark the cache outdated so global.Read bypasses
+		// ReadIfModified and fetches the fresh value.
+		t.local.MarkValueOutated(p, lr.Version)
 	}
 	// We can't use the local read (either we don't have it, or it may be stale).
 	gr, err := t.global.Read(ctx, p)

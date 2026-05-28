@@ -89,10 +89,10 @@ type DelayBackend struct {
 func (b *DelayBackend) ReadIfModified(
 	ctx context.Context,
 	path string,
-	version int64,
+	expectedWriter backend.WriterID,
 ) (backend.ReadReply, error) {
 	b.delay(b.objRead)
-	return b.inner.ReadIfModified(ctx, path, version)
+	return b.inner.ReadIfModified(ctx, path, expectedWriter)
 }
 
 func (b *DelayBackend) Read(ctx context.Context, path string) (backend.ReadReply, error) {
