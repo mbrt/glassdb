@@ -23,6 +23,12 @@ func gcsDelaysForBench() middleware.DelayOptions {
 	return opts
 }
 
+func s3DelaysForBench() middleware.DelayOptions {
+	opts := middleware.S3Delays
+	opts.Scale = 1.0 / 1000
+	return opts
+}
+
 func benchBackends(tb testing.TB) []testBackend {
 	tb.Helper()
 	return []testBackend{
@@ -33,6 +39,10 @@ func benchBackends(tb testing.TB) []testBackend {
 		{
 			Name: "gcs",
 			B:    middleware.NewDelayBackend(initGCSBackend(tb), gcsDelaysForBench()),
+		},
+		{
+			Name: "s3",
+			B:    middleware.NewDelayBackend(initS3Backend(tb), s3DelaysForBench()),
 		},
 	}
 }

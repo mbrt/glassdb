@@ -22,6 +22,7 @@ import (
 	"github.com/mbrt/glassdb/backend/gcs"
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/backend/middleware"
+	"github.com/mbrt/glassdb/backend/s3"
 	"github.com/mbrt/glassdb/internal/stringset"
 	"github.com/mbrt/glassdb/internal/testkit"
 )
@@ -71,10 +72,28 @@ func initMemoryBackend(t testing.TB) backend.Backend {
 	return backend
 }
 
+func initS3Backend(t testing.TB) backend.Backend {
+	t.Helper()
+	ctx := context.Background()
+	client := testkit.NewS3Client(ctx, t, *debugBackend)
+	b := s3.New(client, testkit.S3TestBucket)
+	if *debugBackend {
+		return middleware.NewBackendLogger(b, "Backend", newDebugLogger(t))
+	}
+	return b
+}
+
 // gcsDelaysForTest compresses simulated GCS latency (~1000x) for wall-clock
 // runs: GCS subtests (HTTP cannot use synctest) and package benchmarks.
 func gcsDelaysForTest() middleware.DelayOptions {
 	opts := middleware.GCSDelays
+	opts.Scale = 1.0 / 1000
+	return opts
+}
+
+// s3DelaysForTest is the S3 analog of gcsDelaysForTest.
+func s3DelaysForTest() middleware.DelayOptions {
+	opts := middleware.S3Delays
 	opts.Scale = 1.0 / 1000
 	return opts
 }
@@ -89,6 +108,10 @@ func allBackends(t testing.TB) []testBackend {
 		{
 			Name: "gcs",
 			B:    middleware.NewDelayBackend(initGCSBackend(t), gcsDelaysForTest()),
+		},
+		{
+			Name: "s3",
+			B:    middleware.NewDelayBackend(initS3Backend(t), s3DelaysForTest()),
 		},
 	}
 }
@@ -118,13 +141,13 @@ func initDB(t testing.TB, b backend.Backend) *glassdb.DB {
 }
 
 // runSubtest creates a subtest named after tb and runs fn inside it. For
-// in-process backends the subtest runs in a synctest bubble; the GCS subtest
-// uses loopback HTTP and must run without synctest because goroutines blocked
-// on network I/O prevent the bubble from becoming idle.
+// in-process backends the subtest runs in a synctest bubble; the GCS and S3
+// subtests use loopback HTTP and must run without synctest because goroutines
+// blocked on network I/O prevent the bubble from becoming idle.
 func runSubtest(t *testing.T, tb testBackend, fn func(t *testing.T)) {
 	t.Helper()
 	t.Run(tb.Name, func(t *testing.T) {
-		if tb.Name == "gcs" {
+		if tb.Name == "gcs" || tb.Name == "s3" {
 			fn(t)
 			return
 		}
