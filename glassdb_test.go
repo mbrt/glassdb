@@ -38,7 +38,8 @@ const (
 // debug flags.
 var (
 	debugBackend = flag.Bool("debug-backend", false, "debug backend requests")
-	debugLogs    = flag.Bool("debug-logs", false, "debug db logs")
+	debugLogs    = flag.Bool("debug-logs", false,
+		"stream debug db logs live (by default failing tests dump buffered debug logs automatically)")
 )
 
 func newDebugLogger(t testing.TB) *slog.Logger {
@@ -46,6 +47,29 @@ func newDebugLogger(t testing.TB) *slog.Logger {
 	return testkit.NewLogger(t, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
+}
+
+// testLogger selects how DB logs are handled for a given test or benchmark:
+//   - with --debug-logs: stream everything live (useful for hangs/timeouts/panics
+//     where cleanup never runs);
+//   - benchmarks: discard, to avoid skewing measurements;
+//   - otherwise: buffer at debug level and dump only if the test fails.
+func testLogger(tb testing.TB) *slog.Logger {
+	switch {
+	case *debugLogs:
+		return newDebugLogger(tb)
+	case isBenchmark(tb):
+		return slog.New(nilHandler{})
+	default:
+		return testkit.NewFailureLogger(tb, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+	}
+}
+
+func isBenchmark(tb testing.TB) bool {
+	_, ok := tb.(*testing.B)
+	return ok
 }
 
 func initGCSBackend(t testing.TB) backend.Backend {
@@ -125,11 +149,7 @@ func initDB(t testing.TB, b backend.Backend) *glassdb.DB {
 	t.Helper()
 	ctx := context.Background()
 	opts := glassdb.DefaultOptions()
-	if *debugLogs {
-		opts.Logger = newDebugLogger(t)
-	} else {
-		opts.Logger = slog.New(nilHandler{})
-	}
+	opts.Logger = testLogger(t)
 	db, err := glassdb.OpenWith(ctx, "example", b, opts)
 	if err != nil {
 		t.Fatalf("Failed creating DB: %v", err)
