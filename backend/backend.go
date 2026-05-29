@@ -4,6 +4,7 @@ package backend
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 )
 
@@ -16,10 +17,46 @@ var (
 	ErrEOF = errors.New("end of file")
 )
 
+// WriterID is the opaque identifier of the transaction that last wrote an
+// object. It mirrors internal/data.TxID, redeclared here to keep the backend
+// package independent of internal packages.
+type WriterID []byte
+
+// Equal reports whether two writer IDs refer to the same transaction. Two
+// empty (nil) writers compare equal.
+func (w WriterID) Equal(other WriterID) bool {
+	if len(w) != len(other) {
+		return false
+	}
+	for i := range w {
+		if w[i] != other[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// LastWriterTag is the name of the tag that records the transaction ID of the
+// most recent writer of an object. Backends that implement writer-based
+// ReadIfModified read this tag to compare against the expected writer.
+const LastWriterTag = "last-writer"
+
+// EncodeWriterTag encodes a WriterID into the string form used in object
+// tags. Returns the empty string when the writer is nil.
+func EncodeWriterTag(w WriterID) string {
+	if len(w) == 0 {
+		return ""
+	}
+	return base64.URLEncoding.EncodeToString(w)
+}
+
 // Backend defines the interface for object storage operations with
 // conditional reads, writes, and listing capabilities.
 type Backend interface {
-	ReadIfModified(ctx context.Context, path string, version int64) (ReadReply, error)
+	// ReadIfModified returns the object's contents, version, and tags if the
+	// last-writer recorded in the tags differs from expectedWriter. Otherwise
+	// returns ErrPrecondition.
+	ReadIfModified(ctx context.Context, path string, expectedWriter WriterID) (ReadReply, error)
 	Read(ctx context.Context, path string) (ReadReply, error)
 	GetMetadata(ctx context.Context, path string) (Metadata, error)
 	SetTagsIf(ctx context.Context, path string, expected Version, t Tags) (Metadata, error)
@@ -44,11 +81,11 @@ type ListIter interface {
 	Err() error
 }
 
-// ReadReply holds the contents and version of a read object.
+// ReadReply holds the contents, version, and tags of a read object.
 type ReadReply struct {
 	Contents []byte
-	// TODO: Consider only exposing contents version.
-	Version Version
+	Version  Version
+	Tags     Tags
 }
 
 // Tags represents key-value metadata pairs associated with an object.
@@ -60,13 +97,15 @@ type Metadata struct {
 	Version Version
 }
 
-// Version represents the content and metadata generation numbers of an object.
+// Version is an opaque CAS token identifying a particular generation of an
+// object. The exact format is backend-specific; consumers should treat it as
+// an opaque string and only use it for equality (via IsNull) or by passing it
+// back unchanged to conditional operations.
 type Version struct {
-	Contents int64
-	Meta     int64
+	Token string
 }
 
 // IsNull reports whether the version is unset (zero value).
 func (v Version) IsNull() bool {
-	return v.Contents == 0
+	return v.Token == ""
 }

@@ -92,7 +92,6 @@ func fuzzRead(ctx context.Context, env fuzzAlgoEnv, key string) (ReadAccess, int
 	ra := ReadAccess{
 		Path: key,
 		Version: ReadVersion{
-			Version:    rv.Version.B.Contents,
 			LastWriter: rv.Version.Writer,
 		},
 		Found: true,

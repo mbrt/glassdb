@@ -71,7 +71,6 @@ func (t *Tx) Read(c Collection, key []byte) ([]byte, error) {
 	t.staged[p] = tvalue{val: rv.Value}
 	t.reads[p] = readInfo{
 		version: trans.ReadVersion{
-			Version:    rv.Version.B.Contents,
 			LastWriter: rv.Version.Writer,
 		},
 		found: true,
@@ -120,7 +119,6 @@ func (t *Tx) ReadMulti(ks []FQKey) []ReadResult {
 				return
 			}
 			infos[i].version = trans.ReadVersion{
-				Version:    rv.Version.B.Contents,
 				LastWriter: rv.Version.Writer,
 			}
 			infos[i].found = true

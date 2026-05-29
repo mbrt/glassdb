@@ -10,9 +10,13 @@ import (
 
 	"cloud.google.com/go/storage"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/backend/gcs"
+	"github.com/mbrt/glassdb/backend/s3"
 )
 
 func env(k string) (string, error) {
@@ -22,29 +26,34 @@ func env(k string) (string, error) {
 	return "", fmt.Errorf("environment variable $%v is required", k)
 }
 
-func initStorage(ctx context.Context) (*storage.Client, error) {
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-	return client, nil
-}
-
-func initBackend(client *storage.Client) (backend.Backend, error) {
+// initBackend selects the storage backend based on the BACKEND environment
+// variable ("gcs" by default, or "s3"). Both read the bucket from $BUCKET.
+func initBackend(ctx context.Context) (backend.Backend, error) {
 	bucket, err := env("BUCKET")
 	if err != nil {
 		return nil, err
 	}
-	return gcs.New(client.Bucket(bucket)), nil
+	switch os.Getenv("BACKEND") {
+	case "", "gcs":
+		client, err := storage.NewClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("creating GCS client: %w", err)
+		}
+		return gcs.New(client.Bucket(bucket)), nil
+	case "s3":
+		cfg, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading AWS config: %w", err)
+		}
+		return s3.New(awss3.NewFromConfig(cfg), bucket), nil
+	default:
+		return nil, fmt.Errorf("unknown backend %q", os.Getenv("BACKEND"))
+	}
 }
 
 func do() error {
 	ctx := context.Background()
-	client, err := initStorage(ctx)
-	if err != nil {
-		return err
-	}
-	b, err := initBackend(client)
+	b, err := initBackend(ctx)
 	if err != nil {
 		return err
 	}

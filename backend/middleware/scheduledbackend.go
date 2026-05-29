@@ -67,10 +67,10 @@ func (b *ScheduledBackend) wait(ctx context.Context) {
 func (b *ScheduledBackend) ReadIfModified(
 	ctx context.Context,
 	path string,
-	version int64,
+	expectedWriter backend.WriterID,
 ) (backend.ReadReply, error) {
 	b.wait(ctx)
-	return b.inner.ReadIfModified(ctx, path, version)
+	return b.inner.ReadIfModified(ctx, path, expectedWriter)
 }
 
 // Read implements backend.Backend.

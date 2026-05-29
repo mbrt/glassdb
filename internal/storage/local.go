@@ -6,6 +6,7 @@ import (
 
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/cache"
+	"github.com/mbrt/glassdb/internal/data"
 )
 
 // MaxStaleness is the maximum duration a cached value can be stale, effectively
@@ -60,14 +61,19 @@ func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool)
 // WriteWithMeta stores both the value and its metadata in the cache atomically.
 func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 	updated := time.Now()
+	writer, _ := lastWriterFromTags(meta.Tags)
 	newEntry := cacheEntry{
 		V: &cacheValue{
-			Value:   value,
-			Version: VersionFromMeta(meta),
+			Value: value,
+			Version: Version{
+				B:      meta.Version,
+				Writer: writer,
+			},
 			Updated: updated,
 		},
 		M: &cacheMeta{
 			Meta:    meta,
+			Writer:  writer,
 			Updated: updated,
 		},
 	}
@@ -92,8 +98,10 @@ func (c Local) Write(key string, value []byte, v Version) {
 
 // SetMeta updates only the cached metadata for the given key.
 func (c Local) SetMeta(key string, meta backend.Metadata) {
+	writer, _ := lastWriterFromTags(meta.Tags)
 	newMeta := &cacheMeta{
 		Meta:    meta,
+		Writer:  writer,
 		Updated: time.Now(),
 	}
 
@@ -204,13 +212,11 @@ func (c cacheEntry) isMetaOutdated() bool {
 	if c.V == nil || c.V.Version.B.IsNull() {
 		return false
 	}
-	valVersion := c.V.Version.B
-	metaVersion := c.M.Meta.Version
-	if valVersion == metaVersion {
+	if c.V.Version.Writer.Equal(c.M.Writer) {
 		return false
 	}
-	// The versions are different. If the value was updated last,
-	// then metadata is definitely outdated.
+	// The writers differ. If the value was updated last, the metadata is
+	// definitely outdated.
 	return c.V.Updated.After(c.M.Updated)
 }
 
@@ -223,18 +229,16 @@ func (c cacheEntry) isValueOutdated() bool {
 	if c.M == nil {
 		return false
 	}
-	valVersion := c.V.Version.B
-	metaVersion := c.M.Meta.Version
-	if valVersion.IsNull() {
-		// We have a local override (only version.Writer != nil).
+	if c.V.Version.B.IsNull() {
+		// We have a purely local override (no backend confirmation yet).
 		// We don't know whether it's outdated.
 		return false
 	}
-	if valVersion.Contents == metaVersion.Contents {
+	if c.V.Version.Writer.Equal(c.M.Writer) {
 		return false
 	}
-	// The versions are different. If metadata was updated last,
-	// then the value is definitely outdated.
+	// The writers differ. If the metadata was updated last, the value is
+	// definitely outdated.
 	return c.M.Updated.After(c.V.Updated)
 }
 
@@ -249,6 +253,9 @@ type cacheValue struct {
 }
 
 type cacheMeta struct {
-	Meta    backend.Metadata
+	Meta backend.Metadata
+	// Writer is the decoded last-writer parsed from Meta.Tags, cached here to
+	// avoid re-parsing on every cache lookup. Nil when the tag is absent.
+	Writer  data.TxID
 	Updated time.Time
 }

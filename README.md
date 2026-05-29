@@ -26,10 +26,31 @@ For a deep dive into the internals, see the
 [architecture doc](docs/architecture.md) and the companion
 [blog post](https://blog.mbrt.dev/posts/transactional-object-storage).
 
-Note also that currently we only support
-[Google GCS](https://cloud.google.com/storage/), but adding
+We support both [Google GCS](https://cloud.google.com/storage/) and
+[Amazon S3](https://aws.amazon.com/s3/).[^1] Adding
 [Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs/)
-and [Amazon S3](https://aws.amazon.com/s3/) should be very easy.[^1]
+should be very easy.
+
+To use S3, build a client with the [AWS SDK for Go
+v2](https://aws.github.io/aws-sdk-go-v2/) and pass it to the `s3` backend:
+
+```go
+import (
+	"github.com/aws/aws-sdk-go-v2/config"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/mbrt/glassdb"
+	"github.com/mbrt/glassdb/backend/s3"
+)
+
+func openS3DB(ctx context.Context, bucket, dbName string) (*glassdb.DB, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	backend := s3.New(awss3.NewFromConfig(cfg), bucket)
+	return glassdb.Open(ctx, dbName, backend)
+}
+```
 
 ## Usage example
 

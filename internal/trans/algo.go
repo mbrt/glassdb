@@ -297,10 +297,7 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 		if item.NotFound {
 			return t.validateReadNotFound(ctx, item)
 		}
-		if item.ReadVersion.IsLocal() {
-			return t.validateLocalRead(ctx, item)
-		}
-		return t.validateBackendRead(ctx, item)
+		return t.validateRead(ctx, item)
 	})
 
 	if err != nil {
@@ -315,7 +312,9 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 	return err
 }
 
-func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
+// validateRead validates that the item is still consistent with the read we
+// did earlier, without holding any lock on it.
+func (t Algo) validateRead(ctx context.Context, item *pathState) error {
 	// We need the freshest possible meta, because we don't have a lock.
 	meta, err := t.global.GetMetadata(ctx, item.Path)
 	if err != nil {
@@ -334,8 +333,8 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		return err
 	}
 
-	// If the item is unlocked or locked in read, the last writer must be
-	// the one we read from.
+	// If the item is unlocked or locked in read, the last writer must still
+	// be the one we read from.
 	if li.Type == storage.LockTypeNone || li.Type == storage.LockTypeRead {
 		if !li.LastWriter.Equal(readFromT) {
 			item.Result = vResultRetry
@@ -345,6 +344,8 @@ func (t Algo) validateLocalRead(ctx context.Context, item *pathState) error {
 		return nil
 	}
 
+	// Locked in write or create: defer to the more elaborate path, which
+	// inspects the locker's commit status to determine the expected writer.
 	return t.validateLockedRead(ctx, item, li, readFromT)
 }
 
@@ -381,8 +382,16 @@ func (t Algo) validateLockedRead(
 		case v.Value.NotWritten:
 			expectedWriter = li.LastWriter
 		case v.Value.Deleted:
-			// We expected something but this was deleted.
+			// We expected something but this was deleted. Update the local
+			// cache and retry.
 			item.Result = vResultRetry
+			t.updateLocal(
+				WriteAccess{
+					Path:   item.Path,
+					Val:    v.Value.Value,
+					Delete: true,
+				},
+				locker)
 			return nil
 		default:
 			expectedWriter = locker
@@ -501,90 +510,6 @@ func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
 	return nil
 }
 
-func (t Algo) validateBackendRead(ctx context.Context, item *pathState) error {
-	// Here the item was found.
-	// We need the freshest possible meta, because we don't have a lock.
-	meta, err := t.global.GetMetadata(ctx, item.Path)
-	if err != nil {
-		if errors.Is(err, backend.ErrNotFound) {
-			item.Result = vResultRetry
-			return nil
-		}
-		return err
-	}
-	readVersion := item.ReadVersion.B.Contents
-
-	// We read from the backend directly.
-	// The read was inconsistent if the contents already changed in the
-	// meantime.
-	if readVersion != meta.Version.Contents {
-		item.Result = vResultRetry
-		return nil
-	}
-
-	// If not, we need to make sure no other transaction is locking the
-	// item in write or create and already committed.
-
-	// Check the current lock state of the item.
-	li, err := storage.TagsLockInfo(meta.Tags)
-	if err != nil {
-		return err
-	}
-	switch li.Type {
-	case storage.LockTypeNone, storage.LockTypeRead:
-		// The item is not being changed right now.
-		item.Result = vResultOK
-		return nil
-	case storage.LockTypeCreate:
-		// We should have read a NotFound here, but we read an empty value.
-		// Get rid of inconsistent value in local cache.
-		item.Result = vResultRetry
-		return nil
-	}
-
-	// This was locked in write.
-	if len(li.LockedBy) != 1 {
-		return fmt.Errorf("bad lock: %v with %d lockers", li.Type, len(li.LockedBy))
-	}
-	locker := li.LockedBy[0]
-	status, err := t.mon.TxStatus(ctx, locker)
-	if err != nil {
-		return err
-	}
-	switch status {
-	case storage.TxCommitStatusOK:
-		// Continue below.
-	case storage.TxCommitStatusAborted, storage.TxCommitStatusPending:
-		item.Result = vResultOK
-		return nil
-	default:
-		return fmt.Errorf("unknown status for locker %v: %v", locker, status)
-	}
-
-	// This was committed. Let's fetch the value and check whether it was
-	// modified.
-	v, err := t.mon.CommittedValue(ctx, item.Path, locker)
-	if err != nil {
-		return err
-	}
-	if v.Value.NotWritten {
-		// It was not updated by the transaction.
-		item.Result = vResultOK
-		return nil
-	}
-	// The value was committed, but we read the previous version.
-	// Let's update our local copy and retry.
-	item.Result = vResultRetry
-	t.updateLocal(
-		WriteAccess{
-			Path:   item.Path,
-			Val:    v.Value.Value,
-			Delete: v.Value.Deleted},
-		locker)
-	item.Result = vResultRetry
-	return nil
-}
-
 func (t Algo) checkReadVersionUnlocked(rv ReadVersion, meta backend.Metadata) error {
 	// Get info about the state of the lock.
 	linfo, err := storage.TagsLockInfo(meta.Tags)
@@ -592,28 +517,18 @@ func (t Algo) checkReadVersionUnlocked(rv ReadVersion, meta backend.Metadata) er
 		return err
 	}
 
-	if rv.IsLocal() {
-		// We read from cache. We don't have a well defined backend version to
-		// check, but we can verify that the last writer is still actual.
-		// The last writer committed and flushed and no other transaction locked it.
-		sameLastWriter := linfo.LastWriter.Equal(rv.LastWriter) &&
-			linfo.Type == storage.LockTypeNone
-		// The last writer committed, but didn't flush yet.
-		lockedByWriter := len(linfo.LockedBy) == 1 &&
-			linfo.LockedBy[0].Equal(rv.LastWriter)
+	// Verify that the writer we read from is still the current one. Two
+	// acceptable states:
+	// - Unlocked and the last-writer tag still matches.
+	// - Locked by the writer we read from (committed but not yet flushed).
+	sameLastWriter := linfo.LastWriter.Equal(rv.LastWriter) &&
+		linfo.Type == storage.LockTypeNone
+	lockedByWriter := len(linfo.LockedBy) == 1 &&
+		linfo.LockedBy[0].Equal(rv.LastWriter)
 
-		if !sameLastWriter && !lockedByWriter {
-			return ErrRetry
-		}
-		return nil
-	}
-
-	// We read directly from the backend. Make sure the item wasn't locked
-	// and the read version is the same.
-	if linfo.Type != storage.LockTypeNone || meta.Version.Contents != rv.Version {
+	if !sameLastWriter && !lockedByWriter {
 		return ErrRetry
 	}
-
 	return nil
 }
 
@@ -1116,23 +1031,15 @@ type ReadAccess struct {
 	Found   bool
 }
 
-// ReadVersion identifies the version of a value read by a transaction, either
-// by backend version number or by the local writer's transaction ID.
+// ReadVersion identifies the version of a value read by a transaction, by
+// the transaction ID of the writer that produced the value.
 type ReadVersion struct {
-	Version    int64
 	LastWriter data.TxID
-}
-
-// IsLocal reports whether this version refers to a locally committed value
-// that has not yet been persisted to the backend.
-func (r ReadVersion) IsLocal() bool {
-	return r.Version == 0
 }
 
 // ToStorageVersion converts the read version to a storage.Version.
 func (r ReadVersion) ToStorageVersion() storage.Version {
 	return storage.Version{
-		B:      backend.Version{Contents: r.Version},
 		Writer: r.LastWriter,
 	}
 }

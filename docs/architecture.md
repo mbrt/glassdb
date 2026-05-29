@@ -68,6 +68,7 @@ glassdb/
 ├── backend/
 │   ├── backend.go                 Backend interface definition
 │   ├── gcs/                       Google Cloud Storage implementation
+│   ├── s3/                        Amazon S3 implementation
 │   ├── memory/                    In-memory implementation (testing)
 │   └── middleware/                 Logging and delay injection wrappers
 └── internal/
@@ -104,7 +105,7 @@ The `backend.Backend` interface defines the contract with object storage:
 ```go
 type Backend interface {
     Read(ctx context.Context, path string) (ReadReply, error)
-    ReadIfModified(ctx context.Context, path string, version int64) (ReadReply, error)
+    ReadIfModified(ctx context.Context, path string, expectedWriter WriterID) (ReadReply, error)
     GetMetadata(ctx context.Context, path string) (Metadata, error)
     SetTagsIf(ctx context.Context, path string, expected Version, t Tags) (Metadata, error)
     Write(ctx context.Context, path string, value []byte, t Tags) (Metadata, error)
@@ -118,12 +119,18 @@ type Backend interface {
 
 ### Key concepts
 
-**Versions.** Every object has a two-part version:
+**Versions.** Every object has an opaque CAS token (`Version.Token`), assigned
+by the backend and used only for conditional operations. The format is
+backend-specific: GCS encodes generation and metageneration, while S3 uses the
+object's ETag. Consumers never interpret it — they pass it back unchanged to
+`WriteIf` / `SetTagsIf` / `DeleteIf`.
 
-- `Contents` — incremented on data writes.
-- `Meta` — incremented on metadata/tag changes.
-
-These are assigned by the storage backend and used for conditional operations.
+**Change detection.** To decide whether a value changed since it was read, the
+algorithm compares the `last-writer` tag (the transaction that last wrote the
+key) rather than the storage version. `ReadIfModified` takes the expected
+writer and returns `ErrPrecondition` when it still matches. This keeps the
+backend abstraction independent of GCS-style monotonic versions and is what
+allows the single-object S3 layout. See [docs/s3.md](s3.md) for the rationale.
 
 **Tags.** Key-value string pairs stored in object metadata. GlassDB uses tags to
 store lock state (`lock-type`, `locked-by`, `last-writer`) without modifying the
@@ -144,7 +151,8 @@ distributed coordination — it provides compare-and-swap (CAS) semantics.
 
 | Backend | Purpose | Notes |
 |---------|---------|-------|
-| `gcs/` | Production | Maps to GCS objects; uses object metadata for versions and custom metadata for tags |
+| `gcs/` | Production | Maps to GCS objects; encodes generation/metageneration in the version token and stores tags in custom metadata |
+| `s3/` | Production | One S3 object per key; user value (with an 8-byte nonce) in the body, tags in user metadata, ETag as the version token. See [docs/s3.md](s3.md) |
 | `memory/` | Testing | In-process hash map simulating GCS semantics |
 | `middleware/` | Debugging | Wrappers for logging all operations and injecting artificial delays |
 
@@ -478,14 +486,15 @@ keys are created or deleted, ensuring consistency for key enumeration:
 
 The `Version` type in `internal/storage/` combines two sources of truth:
 
-- **Backend version** (`backend.Version`): the version assigned by object
-  storage, used for conditional operations.
-- **Local writer** (`data.TxID`): if the value was written by a local
-  (not-yet-committed) transaction, this tracks which one.
+- **Backend version** (`backend.Version`): the opaque CAS token assigned by
+  object storage, used for conditional operations.
+- **Local writer** (`data.TxID`): the transaction that last wrote the value,
+  taken from the `last-writer` tag (or tracked locally for not-yet-committed
+  writes).
 
-During validation, the algorithm checks both: the backend version must match
-what was read, and the last writer (from the `last-writer` tag) must match
-expectations.
+During validation, the algorithm detects concurrent modifications by comparing
+the last writer against what it observed when reading. The backend version is
+used purely as the CAS token for the conditional write that takes the lock.
 
 ## Garbage Collection
 

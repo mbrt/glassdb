@@ -24,6 +24,37 @@ var GCSDelays = DelayOptions{
 	SameObjWritePs: 1,
 }
 
+// S3Delays contains typical latency values for Amazon S3 Standard accessed
+// in-region, derived from AWS guidance and public benchmarks (p50 GET ~30 ms,
+// p50 PUT ~70 ms, with a long right tail captured by the lognormal model).
+//
+// MetaWrite is higher than the other backends because S3 has no metadata-only
+// update: SetTagsIf re-uploads the object (a GET followed by a PUT), so its
+// latency is roughly the sum of the two. See docs/s3.md.
+//
+// Unlike GCS, S3 has no per-object write limit; throughput scales per prefix
+// (at least 3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD requests per second
+// per partitioned prefix). SameObjWritePs is therefore set to the documented
+// per-prefix PUT rate rather than 1, which effectively removes the per-object
+// write bottleneck.
+//
+// Limitation: the per-prefix request-rate limit itself is not modeled. Doing
+// so faithfully would require emulating S3's dynamic prefix partitioning (a hot
+// prefix scales up over time, returning 503 SlowDown meanwhile), so a static
+// cap would be more pessimistic than reality. It also rarely binds at the
+// concurrency levels these tests and benchmarks reach. The limiter therefore
+// only throttles per object, which for S3 is effectively unlimited.
+//
+// https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html
+var S3Delays = DelayOptions{
+	MetaRead:       Latency{28 * time.Millisecond, 12 * time.Millisecond},
+	MetaWrite:      Latency{100 * time.Millisecond, 25 * time.Millisecond},
+	ObjRead:        Latency{30 * time.Millisecond, 12 * time.Millisecond},
+	ObjWrite:       Latency{74 * time.Millisecond, 25 * time.Millisecond},
+	List:           Latency{30 * time.Millisecond, 10 * time.Millisecond},
+	SameObjWritePs: 3500,
+}
+
 // DelayOptions configures simulated latency for each type of backend operation.
 type DelayOptions struct {
 	MetaRead  Latency
@@ -89,10 +120,10 @@ type DelayBackend struct {
 func (b *DelayBackend) ReadIfModified(
 	ctx context.Context,
 	path string,
-	version int64,
+	expectedWriter backend.WriterID,
 ) (backend.ReadReply, error) {
 	b.delay(b.objRead)
-	return b.inner.ReadIfModified(ctx, path, version)
+	return b.inner.ReadIfModified(ctx, path, expectedWriter)
 }
 
 func (b *DelayBackend) Read(ctx context.Context, path string) (backend.ReadReply, error) {

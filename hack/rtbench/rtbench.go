@@ -19,11 +19,15 @@ import (
 	"cloud.google.com/go/storage"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/mbrt/glassdb"
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/backend/gcs"
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/backend/middleware"
+	"github.com/mbrt/glassdb/backend/s3"
 	"github.com/mbrt/glassdb/internal/testkit/bench"
 )
 
@@ -36,7 +40,7 @@ const (
 )
 
 var (
-	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs]")
+	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs|s3]")
 	enableThrottling = flag.Bool("enable-throttling", true, "enable throttling with memory backend")
 	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010]")
 	samplesOut       = flag.String("samples-out", "samples.csv", "output file with raw samples data")
@@ -57,6 +61,8 @@ func initBackend() (backend.Backend, error) {
 		return middleware.NewDelayBackend(backend, delays), nil
 	case "gcs":
 		return initGCS(ctx)
+	case "s3":
+		return initS3(ctx)
 	}
 
 	return nil, fmt.Errorf("unknown backend type %q", *backendType)
@@ -79,6 +85,18 @@ func initGCS(ctx context.Context) (backend.Backend, error) {
 		return nil, err
 	}
 	return gcs.New(client.Bucket(bucket)), nil
+}
+
+func initS3(ctx context.Context) (backend.Backend, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("loading AWS config: %v", err)
+	}
+	bucket, err := env("BUCKET")
+	if err != nil {
+		return nil, err
+	}
+	return s3.New(awss3.NewFromConfig(cfg), bucket), nil
 }
 
 func initDB(b backend.Backend) *glassdb.DB {
