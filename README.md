@@ -31,27 +31,6 @@ We support both [Google GCS](https://cloud.google.com/storage/) and
 [Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs/)
 should be very easy.
 
-To use S3, build a client with the [AWS SDK for Go
-v2](https://aws.github.io/aws-sdk-go-v2/) and pass it to the `s3` backend:
-
-```go
-import (
-	"github.com/aws/aws-sdk-go-v2/config"
-	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/mbrt/glassdb"
-	"github.com/mbrt/glassdb/backend/s3"
-)
-
-func openS3DB(ctx context.Context, bucket, dbName string) (*glassdb.DB, error) {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-	backend := s3.New(awss3.NewFromConfig(cfg), bucket)
-	return glassdb.Open(ctx, dbName, backend)
-}
-```
-
 ## Usage example
 
 This short example demonstrates how a transaction can read and modify a single
@@ -100,6 +79,27 @@ func example(db *glassdb.DB) (string, error) {
 	})
 
 	return res, err
+}
+```
+
+To use S3, build a client with the [AWS SDK for Go
+v2](https://aws.github.io/aws-sdk-go-v2/) and pass it to the `s3` backend:
+
+```go
+import (
+	"github.com/aws/aws-sdk-go-v2/config"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/mbrt/glassdb"
+	"github.com/mbrt/glassdb/backend/s3"
+)
+
+func openS3DB(ctx context.Context, bucket, dbName string) (*glassdb.DB, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	backend := s3.New(awss3.NewFromConfig(cfg), bucket)
+	return glassdb.Open(ctx, dbName, backend)
 }
 ```
 

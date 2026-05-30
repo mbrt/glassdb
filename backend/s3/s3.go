@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	smithy "github.com/aws/smithy-go"
 
@@ -35,15 +36,81 @@ const nonceSize = 8
 // retried after S3 reports a 409 ConditionalRequestConflict (see put).
 const maxConflictRetries = 5
 
+// defaultMaxRetryAttempts is how many times each S3 operation is attempted by
+// default before giving up. It is intentionally higher than the SDK default
+// (3) because S3 throttles a hot prefix (notably the transaction-log subtree)
+// with 503 SlowDown while it reactively splits the partition, a window that
+// can outlast a handful of attempts. Retries remain bounded by the caller's
+// context deadline.
+const defaultMaxRetryAttempts = 10
+
+// Option configures a Backend.
+type Option func(*options)
+
+type options struct {
+	maxAttempts int
+	// retryer, when set, builds the aws.Retryer used for every S3 call,
+	// overriding the adaptive-mode default.
+	retryer func() aws.Retryer
+}
+
+// WithRetryMaxAttempts sets the maximum number of attempts per S3 operation
+// (including the first). It is ignored when WithRetryer is also provided.
+func WithRetryMaxAttempts(n int) Option {
+	return func(o *options) { o.maxAttempts = n }
+}
+
+// WithRetryer overrides the retry strategy applied to every S3 operation. Pass
+// a factory returning aws.NopRetryer{} to disable backend-level retries.
+func WithRetryer(f func() aws.Retryer) Option {
+	return func(o *options) { o.retryer = f }
+}
+
 // New creates a Backend backed by the given S3 client and bucket.
-func New(client *s3.Client, bucket string) Backend {
-	return Backend{client: client, bucket: bucket}
+//
+// By default every operation uses an adaptive retryer that backs off and
+// retries throttling/transient errors (503 SlowDown, 5xx) and applies a
+// client-side rate limit once throttling is observed. This retryer is applied
+// per call, so it takes effect regardless of how the injected client was
+// configured. Use WithRetryMaxAttempts or WithRetryer to tune it.
+func New(client *s3.Client, bucket string, opts ...Option) Backend {
+	o := options{maxAttempts: defaultMaxRetryAttempts}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	var retryer aws.Retryer
+	if o.retryer != nil {
+		retryer = o.retryer()
+	} else {
+		// Adaptive mode wraps the standard retryer (whose retryable set already
+		// covers 503 SlowDown and other 5xx) with a shared, concurrency-safe
+		// token bucket that proactively slows requests when throttling is seen.
+		retryer = retry.NewAdaptiveMode(func(am *retry.AdaptiveModeOptions) {
+			am.StandardOptions = append(am.StandardOptions, func(s *retry.StandardOptions) {
+				s.MaxAttempts = o.maxAttempts
+			})
+		})
+	}
+
+	return Backend{client: client, bucket: bucket, retryer: retryer}
 }
 
 // Backend implements backend.Backend using Amazon S3.
 type Backend struct {
 	client *s3.Client
 	bucket string
+	// retryer is shared across all operations: adaptive mode's rate limiter
+	// only works when the same instance observes every request.
+	retryer aws.Retryer
+}
+
+// applyOpts is passed as a per-operation option to every S3 call so they share
+// the Backend's retryer instead of the client's default one.
+func (b Backend) applyOpts(o *s3.Options) {
+	if b.retryer != nil {
+		o.Retryer = b.retryer
+	}
 }
 
 // Read implements backend.Backend.
@@ -51,7 +118,7 @@ func (b Backend) Read(ctx context.Context, path string) (backend.ReadReply, erro
 	out, err := b.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return backend.ReadReply{}, annotate(fmt.Errorf("Read(%q): %w", path, err))
 	}
@@ -78,7 +145,7 @@ func (b Backend) ReadIfModified(
 	head, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return backend.ReadReply{}, annotate(fmt.Errorf("ReadIfModified(%q): %w", path, err))
 	}
@@ -93,7 +160,7 @@ func (b Backend) GetMetadata(ctx context.Context, path string) (backend.Metadata
 	out, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return backend.Metadata{}, annotate(fmt.Errorf("GetMetadata(%q): %w", path, err))
 	}
@@ -118,7 +185,7 @@ func (b Backend) SetTagsIf(
 	out, err := b.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return backend.Metadata{}, annotate(fmt.Errorf("SetTagsIf(%q): %w", path, err))
 	}
@@ -185,7 +252,7 @@ func (b Backend) Delete(ctx context.Context, path string) error {
 	_, err := b.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return annotate(fmt.Errorf("Delete(%q): %w", path, err))
 	}
@@ -201,7 +268,7 @@ func (b Backend) DeleteIf(ctx context.Context, path string, expected backend.Ver
 	head, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	})
+	}, b.applyOpts)
 	if err != nil {
 		return annotate(fmt.Errorf("DeleteIf(%q): %w", path, err))
 	}
@@ -211,7 +278,7 @@ func (b Backend) DeleteIf(ctx context.Context, path string, expected backend.Ver
 	if _, err := b.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: &b.bucket,
 		Key:    &path,
-	}); err != nil {
+	}, b.applyOpts); err != nil {
 		return annotate(fmt.Errorf("DeleteIf(%q): %w", path, err))
 	}
 	return nil
@@ -224,10 +291,11 @@ func (b Backend) DeleteIf(ctx context.Context, path string, expected backend.Ver
 // materialised in full.
 func (b Backend) List(ctx context.Context, dirPath string) (backend.ListIter, error) {
 	return &listIter{
-		ctx:    ctx,
-		client: b.client,
-		bucket: b.bucket,
-		prefix: ensureTrailingSlash(dirPath),
+		ctx:       ctx,
+		client:    b.client,
+		bucket:    b.bucket,
+		prefix:    ensureTrailingSlash(dirPath),
+		applyOpts: b.applyOpts,
 	}, nil
 }
 
@@ -268,10 +336,14 @@ func (b Backend) put(
 		in.IfNoneMatch = aws.String("*")
 	}
 
+	// Two retry layers compose here. The Backend retryer (applyOpts) handles
+	// transient/throttling failures (503 SlowDown, 5xx) inside each PutObject
+	// call. This outer loop handles 409 ConditionalRequestConflict, which the
+	// SDK does not treat as retryable, by re-issuing the request.
 	for attempt := 0; ; attempt++ {
 		// PutObject consumes the body, so hand it a fresh reader each attempt.
 		in.Body = bytes.NewReader(payload)
-		out, err := b.client.PutObject(ctx, in)
+		out, err := b.client.PutObject(ctx, in, b.applyOpts)
 		if err == nil {
 			return backend.Metadata{
 				Tags:    tagsFromMeta(t),
@@ -409,10 +481,11 @@ func ensureTrailingSlash(a string) string {
 // merging each page's Contents and CommonPrefixes (which arrive in separate
 // arrays) is enough to keep the overall stream sorted.
 type listIter struct {
-	ctx    context.Context
-	client *s3.Client
-	bucket string
-	prefix string
+	ctx       context.Context
+	client    *s3.Client
+	bucket    string
+	prefix    string
+	applyOpts func(*s3.Options)
 
 	token *string // continuation token for the next page
 	page  []string
@@ -441,7 +514,7 @@ func (l *listIter) fetch() {
 		Prefix:            &l.prefix,
 		Delimiter:         aws.String("/"),
 		ContinuationToken: l.token,
-	})
+	}, l.applyOpts)
 	if err != nil {
 		l.err = annotate(fmt.Errorf("List(%q): %w", l.prefix, err))
 		return
