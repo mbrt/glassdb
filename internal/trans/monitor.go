@@ -11,6 +11,7 @@ import (
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/errors"
+	"github.com/mbrt/glassdb/internal/shard"
 	"github.com/mbrt/glassdb/internal/storage"
 )
 
@@ -42,9 +43,13 @@ func NewMonitor(
 		local:      l,
 		tl:         tl,
 		background: b,
-		localTx:    make(map[string]txStatus),
-		waiters:    make(map[string][]waitRequest),
-		unknownTx:  make(map[string]txUnknown),
+		shards: shard.New(func(int) *monitorShard {
+			return &monitorShard{
+				localTx:   make(map[string]txStatus),
+				waiters:   make(map[string][]waitRequest),
+				unknownTx: make(map[string]txUnknown),
+			}
+		}),
 	}
 }
 
@@ -54,20 +59,34 @@ type Monitor struct {
 	local      storage.Local
 	tl         storage.TLogger
 	background *concurr.Background
-	localTx    map[string]txStatus
-	waiters    map[string][]waitRequest
-	unknownTx  map[string]txUnknown
-	m          sync.Mutex
+	shards     shard.Sharded[monitorShard]
+}
+
+// monitorShard is one independent partition of the transaction tracking maps,
+// keyed by transaction ID. Grouping the three maps under a single lock keeps
+// their cross-map updates (e.g. removing a tx and notifying its waiters)
+// atomic for a given transaction.
+type monitorShard struct {
+	mu        sync.Mutex
+	localTx   map[string]txStatus
+	waiters   map[string][]waitRequest
+	unknownTx map[string]txUnknown
+}
+
+// shardFor returns the shard responsible for the given transaction ID.
+func (m *Monitor) shardFor(tid data.TxID) *monitorShard {
+	return m.shards.For(string(tid))
 }
 
 // BeginTx registers a new pending transaction with the monitor.
 func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
-	m.m.Lock()
-	m.localTx[string(tid)] = txStatus{
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	sh.localTx[string(tid)] = txStatus{
 		Status:       storage.TxCommitStatusPending,
 		RefreshState: refreshStateNotStarted,
 	}
-	m.m.Unlock()
+	sh.mu.Unlock()
 }
 
 // StartRefreshTx starts a background goroutine that periodically refreshes
@@ -75,14 +94,15 @@ func (m *Monitor) BeginTx(_ context.Context, tid data.TxID) {
 func (m *Monitor) StartRefreshTx(ctx context.Context, tid data.TxID) {
 	needStart := false
 
-	m.m.Lock()
-	st, ok := m.localTx[string(tid)]
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	st, ok := sh.localTx[string(tid)]
 	if ok && st.RefreshState == refreshStateNotStarted {
 		needStart = true
 		st.RefreshState = refreshStateRunning
-		m.localTx[string(tid)] = st
+		sh.localTx[string(tid)] = st
 	}
-	m.m.Unlock()
+	sh.mu.Unlock()
 
 	if needStart {
 		m.background.Go(ctx, func(ctx context.Context) {
@@ -119,10 +139,11 @@ func (m *Monitor) CommitTx(ctx context.Context, tl storage.TxLog) error {
 		}
 	}
 
-	m.m.Lock()
-	delete(m.localTx, string(tl.ID))
-	m.notifyWaiters(tl.ID, WaitTxResult{Status: storage.TxCommitStatusOK})
-	m.m.Unlock()
+	sh := m.shardFor(tl.ID)
+	sh.mu.Lock()
+	delete(sh.localTx, string(tl.ID))
+	m.notifyWaiters(sh, tl.ID, WaitTxResult{Status: storage.TxCommitStatusOK})
+	sh.mu.Unlock()
 
 	return nil
 }
@@ -137,10 +158,11 @@ func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
 		Status: storage.TxCommitStatusAborted,
 	})
 
-	m.m.Lock()
-	delete(m.localTx, string(tid))
-	m.notifyWaiters(tid, WaitTxResult{Status: storage.TxCommitStatusAborted})
-	m.m.Unlock()
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	delete(sh.localTx, string(tid))
+	m.notifyWaiters(sh, tid, WaitTxResult{Status: storage.TxCommitStatusAborted})
+	sh.mu.Unlock()
 
 	return err
 }
@@ -148,12 +170,13 @@ func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
 // TxStatus returns the current commit status of the given transaction,
 // checking locally first and then fetching from remote storage if needed.
 func (m *Monitor) TxStatus(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
-	m.m.Lock()
-	if s, ok := m.localTx[string(tid)]; ok {
-		m.m.Unlock()
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	if s, ok := sh.localTx[string(tid)]; ok {
+		sh.mu.Unlock()
 		return s.Status, nil
 	}
-	m.m.Unlock()
+	sh.mu.Unlock()
 
 	return m.fetchRemoteTxStatus(ctx, tid)
 }
@@ -165,10 +188,11 @@ func (m *Monitor) TxStatus(ctx context.Context, tid data.TxID) (storage.TxCommit
 func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxResult {
 	ch := make(chan WaitTxResult, 1)
 
-	m.m.Lock()
-	defer m.m.Unlock()
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
-	txs, isLocal := m.localTx[string(tid)]
+	txs, isLocal := sh.localTx[string(tid)]
 	s := txs.Status
 	if isLocal && s == storage.TxCommitStatusOK || s == storage.TxCommitStatusAborted {
 		// The value is already available.
@@ -179,10 +203,10 @@ func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxRes
 		return ch
 	}
 
-	if ws, ok := m.waiters[string(tid)]; ok {
+	if ws, ok := sh.waiters[string(tid)]; ok {
 		// There is already a worker waiting for the request.
 		// Enqueue ourselves in the waiters.
-		m.waiters[string(tid)] = append(ws, waitRequest{
+		sh.waiters[string(tid)] = append(ws, waitRequest{
 			Ctx: ctx,
 			Ch:  ch,
 		})
@@ -194,13 +218,13 @@ func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxRes
 		// No need to spawn a worker, as the transition is local.
 		// We can just enqueue ourselves until we get notified through CommitTx
 		// or AbortTx.
-		m.waiters[string(tid)] = []waitRequest{{Ctx: ctx, Ch: ch}}
+		sh.waiters[string(tid)] = []waitRequest{{Ctx: ctx, Ch: ch}}
 		return ch
 	}
 
 	// This is a remote transaction. Let's spawn a worker to poll its log.
 	// Make sure to initialize the waiters while locked (empty list).
-	m.waiters[string(tid)] = nil
+	sh.waiters[string(tid)] = nil
 
 	go func(ctx context.Context) {
 		// Start with the given context. Update it below.
@@ -214,9 +238,9 @@ func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxRes
 					Err:    err,
 				}
 
-				m.m.Lock()
-				m.notifyWaiters(tid, res)
-				m.m.Unlock()
+				sh.mu.Lock()
+				m.notifyWaiters(sh, tid, res)
+				sh.mu.Unlock()
 
 				ch <- res
 				return
@@ -224,9 +248,9 @@ func (m *Monitor) WaitForTx(ctx context.Context, tid data.TxID) <-chan WaitTxRes
 
 			// The context expired. Try and see wether somebody else is
 			// interested in this tx.
-			m.m.Lock()
-			w, ok := m.nextWaiter(tid)
-			m.m.Unlock()
+			sh.mu.Lock()
+			w, ok := m.nextWaiter(sh, tid)
+			sh.mu.Unlock()
 			if !ok {
 				// Nothing more to do.
 				return
@@ -311,22 +335,23 @@ func (m *Monitor) fetchRemoteTxStatus(ctx context.Context, tid data.TxID) (stora
 func (m *Monitor) handleUnknownTx(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
 	now := time.Now()
 
-	m.m.Lock()
-	st, ok := m.unknownTx[string(tid)]
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	st, ok := sh.unknownTx[string(tid)]
 	if !ok {
-		m.unknownTx[string(tid)] = txUnknown{FirstCheck: now}
-		m.m.Unlock()
+		sh.unknownTx[string(tid)] = txUnknown{FirstCheck: now}
+		sh.mu.Unlock()
 		return storage.TxCommitStatusPending, nil
 	}
-	m.m.Unlock()
+	sh.mu.Unlock()
 
 	if isExpired(st.FirstCheck, now) {
 		st, err := m.tryAbortRemoteTx(ctx, tid, backend.Version{})
 		if err == nil {
 			// We now have a permanent state. We can remove the tx from the map.
-			m.m.Lock()
-			delete(m.unknownTx, string(tid))
-			m.m.Unlock()
+			sh.mu.Lock()
+			delete(sh.unknownTx, string(tid))
+			sh.mu.Unlock()
 		}
 		return st, err
 	}
@@ -380,8 +405,10 @@ func (m *Monitor) pollTxStatus(ctx context.Context, tid data.TxID) (storage.TxCo
 	return res, err
 }
 
-func (m *Monitor) nextWaiter(tid data.TxID) (waitRequest, bool) {
-	ws, ok := m.waiters[string(tid)]
+// nextWaiter returns the first non-expired waiter for tid. The caller must
+// hold sh.mu, and sh must be the shard responsible for tid.
+func (m *Monitor) nextWaiter(sh *monitorShard, tid data.TxID) (waitRequest, bool) {
+	ws, ok := sh.waiters[string(tid)]
 	if !ok {
 		return waitRequest{}, false
 	}
@@ -396,7 +423,7 @@ func (m *Monitor) nextWaiter(tid data.TxID) (waitRequest, bool) {
 	// Trim the expired waiters.
 	if i > 0 {
 		ws = ws[i:]
-		m.waiters[string(tid)] = ws
+		sh.waiters[string(tid)] = ws
 	}
 	if len(ws) == 0 {
 		return waitRequest{}, false
@@ -405,8 +432,10 @@ func (m *Monitor) nextWaiter(tid data.TxID) (waitRequest, bool) {
 	return ws[0], true
 }
 
-func (m *Monitor) notifyWaiters(tid data.TxID, res WaitTxResult) {
-	ws, ok := m.waiters[string(tid)]
+// notifyWaiters sends res to every live waiter for tid and clears them. The
+// caller must hold sh.mu, and sh must be the shard responsible for tid.
+func (m *Monitor) notifyWaiters(sh *monitorShard, tid data.TxID, res WaitTxResult) {
+	ws, ok := sh.waiters[string(tid)]
 	if !ok {
 		return
 	}
@@ -415,7 +444,7 @@ func (m *Monitor) notifyWaiters(tid data.TxID, res WaitTxResult) {
 			w.Ch <- res
 		}
 	}
-	delete(m.waiters, string(tid))
+	delete(sh.waiters, string(tid))
 }
 
 func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
@@ -424,10 +453,11 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 		return errors.New("missing required tlog ID")
 	}
 
-	m.m.Lock()
-	stat := m.localTx[string(tid)]
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	stat := sh.localTx[string(tid)]
 	lastV := stat.LastVersion
-	m.m.Unlock()
+	sh.mu.Unlock()
 
 	// TODO: Add timeout ~= refreshTimeout here.
 	err := concurr.RetryWithBackoff(ctx, func() error {
@@ -461,22 +491,24 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 }
 
 func (m *Monitor) shouldRefresh(tid data.TxID) bool {
-	m.m.Lock()
-	defer m.m.Unlock()
-	st, ok := m.localTx[string(tid)]
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	st, ok := sh.localTx[string(tid)]
 	return ok && st.RefreshState == refreshStateRunning
 }
 
 func (m *Monitor) stopTxRefresh(tid data.TxID) bool {
-	m.m.Lock()
-	defer m.m.Unlock()
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
-	s, ok := m.localTx[string(tid)]
+	s, ok := sh.localTx[string(tid)]
 	if !ok || s.RefreshState != refreshStateRunning {
 		return false
 	}
 	s.RefreshState = refreshStateStopped
-	m.localTx[string(tid)] = s
+	sh.localTx[string(tid)] = s
 	return true
 }
 
@@ -487,13 +519,14 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, tickCh <-ch
 		shouldRefresh bool
 	)
 
-	m.m.Lock()
-	st, ok := m.localTx[string(tid)]
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	st, ok := sh.localTx[string(tid)]
 	if ok && st.RefreshState == refreshStateRunning {
 		shouldRefresh = true
-		m.localTx[string(tid)] = st
+		sh.localTx[string(tid)] = st
 	}
-	m.m.Unlock()
+	sh.mu.Unlock()
 
 	if !shouldRefresh {
 		return
@@ -526,12 +559,12 @@ func (m *Monitor) refreshPending(ctx context.Context, tid data.TxID, tickCh <-ch
 		}
 
 		// Update the cached last version.
-		m.m.Lock()
-		if st, ok := m.localTx[string(tid)]; ok {
+		sh.mu.Lock()
+		if st, ok := sh.localTx[string(tid)]; ok {
 			st.LastVersion = lastVersion
-			m.localTx[string(tid)] = st
+			sh.localTx[string(tid)] = st
 		}
-		m.m.Unlock()
+		sh.mu.Unlock()
 	}
 }
 

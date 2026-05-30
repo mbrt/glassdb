@@ -3,27 +3,31 @@ package concurr
 import (
 	"context"
 	"sync"
+
+	"github.com/mbrt/glassdb/internal/shard"
 )
 
 // NewDedup creates a new Dedup that uses the given Worker to execute work.
 func NewDedup(w Worker) *Dedup {
 	return &Dedup{
 		work: w,
-		contr: controller{
-			calls: make(map[string]*call),
-		},
+		contr: shard.New(func(int) *controller {
+			return &controller{calls: make(map[string]*call)}
+		}),
 	}
 }
 
-// Dedup deduplicates and merges concurrent requests for the same key.
+// Dedup deduplicates and merges concurrent requests for the same key. Requests
+// are partitioned across independent controllers by key hash to reduce lock
+// contention.
 type Dedup struct {
 	work  Worker
-	contr controller
+	contr shard.Sharded[controller]
 }
 
 // Do submits a request for the given key, merging with any in-flight work if possible.
 func (d *Dedup) Do(ctx context.Context, key string, r Request) error {
-	return d.contr.Do(ctx, key, r, d.work)
+	return d.contr.For(key).Do(ctx, key, r, d.work)
 }
 
 // Request represents a unit of work that can be merged with other requests.
