@@ -11,6 +11,7 @@ import (
 	"github.com/mbrt/glassdb/internal/concurr"
 	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/errors"
+	"github.com/mbrt/glassdb/internal/shard"
 	"github.com/mbrt/glassdb/internal/storage"
 )
 
@@ -43,7 +44,9 @@ func NewLocker(
 		global: g,
 		tl:     tl,
 		tmon:   tmon,
-		tlocks: make(map[string]txLocks),
+		tlocks: shard.New(func(int) *lockerShard {
+			return &lockerShard{tlocks: make(map[string]txLocks)}
+		}),
 	}
 	res.dedup = concurr.NewDedup(lockerWorker{res})
 	return res
@@ -59,12 +62,18 @@ type Locker struct {
 	tmon   *Monitor
 
 	dedup  *concurr.Dedup
-	tlocks map[string]txLocks
-	m      sync.Mutex
+	tlocks shard.Sharded[lockerShard]
 
 	nCalls   int32
 	nHits    int32
 	nRetries int32
+}
+
+// lockerShard is one independent partition of the per-transaction locks,
+// keyed by transaction ID.
+type lockerShard struct {
+	mu     sync.Mutex
+	tlocks map[string]txLocks
 }
 
 // LockRead acquires a read lock on the given key for the transaction.
@@ -91,10 +100,11 @@ func (v *Locker) Unlock(ctx context.Context, key string, tid data.TxID) error {
 // LockType returns the type of lock currently held by the transaction on the
 // given key, or LockTypeNone if no lock is held.
 func (v *Locker) LockType(key string, tid data.TxID) storage.LockType {
-	v.m.Lock()
-	defer v.m.Unlock()
+	sh := v.tlocks.For(string(tid))
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
-	locks, ok := v.tlocks[string(tid)]
+	locks, ok := sh.tlocks[string(tid)]
 	if !ok {
 		return storage.LockTypeNone
 	}
@@ -107,10 +117,11 @@ func (v *Locker) LockType(key string, tid data.TxID) storage.LockType {
 
 // LockedPaths returns all paths currently locked by the given transaction.
 func (v *Locker) LockedPaths(tid data.TxID) []storage.PathLock {
-	v.m.Lock()
-	defer v.m.Unlock()
+	sh := v.tlocks.For(string(tid))
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
-	locks, ok := v.tlocks[string(tid)]
+	locks, ok := sh.tlocks[string(tid)]
 	if !ok {
 		return nil
 	}
@@ -180,11 +191,12 @@ func (v *Locker) pushRequest(ctx context.Context, key string, lt storage.LockTyp
 }
 
 func (v *Locker) needsProcessing(key string, tid data.TxID, lt storage.LockType) (txState, bool) {
-	v.m.Lock()
-	defer v.m.Unlock()
+	sh := v.tlocks.For(string(tid))
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
 	st := txStateUnknown
-	txl, ok := v.tlocks[string(tid)]
+	txl, ok := sh.tlocks[string(tid)]
 	if ok {
 		st = txStateExisting
 	}
@@ -200,27 +212,28 @@ func (v *Locker) needsProcessing(key string, tid data.TxID, lt storage.LockType)
 }
 
 func (v *Locker) updateTxLocks(key string, tid data.TxID, lt storage.LockType) {
-	v.m.Lock()
-	defer v.m.Unlock()
+	sh := v.tlocks.For(string(tid))
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
 	if lt == storage.LockTypeNone {
 		// We need to delete the item.
-		txl, ok := v.tlocks[string(tid)]
+		txl, ok := sh.tlocks[string(tid)]
 		if !ok {
 			return
 		}
 		delete(txl, key)
 		if len(txl) == 0 {
 			// Delete transactions with no locked items.
-			delete(v.tlocks, string(tid))
+			delete(sh.tlocks, string(tid))
 		}
 		return
 	}
 
-	txl, ok := v.tlocks[string(tid)]
+	txl, ok := sh.tlocks[string(tid)]
 	if !ok {
 		txl = make(txLocks)
-		v.tlocks[string(tid)] = txl
+		sh.tlocks[string(tid)] = txl
 	}
 	txl[key] = lt
 }

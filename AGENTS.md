@@ -2,6 +2,9 @@
 
 ## Development
 
+Create an ADR (in `docs/adr/xxx-adr-slug.md`) for every important feature
+implemented.
+
 ### Tests
 
 Always use `make test` to run tests. This runs linting, type checking, and format checks:
