@@ -3,8 +3,12 @@ package s3_test
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -244,4 +248,90 @@ func TestList(t *testing.T) {
 			assert.Equal(t, tc.expected, got)
 		})
 	}
+}
+
+// flakyBackend builds a Backend whose HTTP transport returns 503 SlowDown for
+// the first n requests matching match, then delegates. It returns the
+// transport so tests can assert how many injected failures were consumed.
+func flakyBackend(
+	ctx context.Context,
+	t *testing.T,
+	n int,
+	match func(*http.Request) bool,
+	opts ...s3backend.Option,
+) (s3backend.Backend, *testkit.SlowDownTransport) {
+	t.Helper()
+	var flaky *testkit.SlowDownTransport
+	client := testkit.NewS3ClientWithTransport(ctx, t, func(inner http.RoundTripper) http.RoundTripper {
+		flaky = testkit.NewSlowDownTransport(inner, n, match)
+		return flaky
+	})
+	return s3backend.New(client, testkit.S3TestBucket, opts...), flaky
+}
+
+func methodIs(m string) func(*http.Request) bool {
+	return func(r *http.Request) bool { return r.Method == m }
+}
+
+// fastRetryer retries the same errors as the default (incl. 503 SlowDown) but
+// with negligible backoff, keeping tests quick and deterministic.
+func fastRetryer() aws.Retryer {
+	return retry.NewStandard(func(o *retry.StandardOptions) {
+		o.MaxAttempts = 5
+		o.MaxBackoff = time.Millisecond
+	})
+}
+
+func TestWriteRetriesThroughSlowDown(t *testing.T) {
+	ctx := context.Background()
+	b, flaky := flakyBackend(ctx, t, 2, methodIs(http.MethodPut),
+		s3backend.WithRetryer(fastRetryer))
+
+	// The first two PUTs are throttled, but the retryer rides it out.
+	_, err := b.Write(ctx, "k", []byte("v"), nil)
+	require.NoError(t, err)
+	assert.Equal(t, 0, flaky.Remaining())
+
+	r, err := b.Read(ctx, "k")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("v"), r.Contents)
+}
+
+func TestReadRetriesThroughSlowDown(t *testing.T) {
+	ctx := context.Background()
+	b, flaky := flakyBackend(ctx, t, 2, methodIs(http.MethodGet),
+		s3backend.WithRetryer(fastRetryer))
+
+	// The write is a PUT, so it is not throttled here.
+	_, err := b.Write(ctx, "k", []byte("v"), nil)
+	require.NoError(t, err)
+
+	// The first two GETs are throttled; the retryer rides it out.
+	r, err := b.Read(ctx, "k")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("v"), r.Contents)
+	assert.Equal(t, 0, flaky.Remaining())
+}
+
+func TestDefaultRetryerRidesOutSlowDown(t *testing.T) {
+	ctx := context.Background()
+	// No WithRetryer: exercises the adaptive default that New installs. A single
+	// injected failure is enough to confirm the default retries (and keeps the
+	// adaptive backoff cost low).
+	b, flaky := flakyBackend(ctx, t, 1, methodIs(http.MethodPut))
+
+	_, err := b.Write(ctx, "k", []byte("v"), nil)
+	require.NoError(t, err)
+	assert.Equal(t, 0, flaky.Remaining())
+}
+
+func TestNopRetryerSurfacesSlowDown(t *testing.T) {
+	ctx := context.Background()
+	b, _ := flakyBackend(ctx, t, 1, methodIs(http.MethodPut),
+		s3backend.WithRetryer(func() aws.Retryer { return aws.NopRetryer{} }))
+
+	// With retries disabled, a single throttle surfaces to the caller.
+	_, err := b.Write(ctx, "k", []byte("v"), nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "SlowDown")
 }
