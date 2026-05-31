@@ -39,12 +39,19 @@ const (
 	readWrite9010NumKeys      = 50000
 )
 
+const deadlockNumWriters = 5
+
 var (
 	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs|s3]")
 	enableThrottling = flag.Bool("enable-throttling", true, "enable throttling with memory backend")
-	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010]")
+	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010|deadlock]")
 	samplesOut       = flag.String("samples-out", "samples.csv", "output file with raw samples data")
 	statsOut         = flag.String("stats-out", "stats.csv", "output file with db stats")
+	throughputOut    = flag.String("throughput-out", "throughput.csv", "output file with per-db throughput data")
+	deadlockOut      = flag.String("deadlock-out", "deadlock.csv", "output file with deadlock latency samples")
+	maxDBs           = flag.Int("max-dbs", readWrite9010MaxDBs, "max concurrent DBs for the rw9010 test")
+	numKeys          = flag.Int("num-keys", readWrite9010NumKeys, "number of keys for the rw9010 test")
+	duration         = flag.Duration("duration", readWrite9010Duration, "duration of each rw9010 step")
 )
 
 func initBackend() (backend.Backend, error) {
@@ -335,7 +342,7 @@ func runReadWrite9010() error {
 
 	// Initialize all the keys once and for all the tests.
 	log.Printf("Initialize keys")
-	keys, err := initKeys(b, readWrite9010NumKeys)
+	keys, err := initKeys(b, *numKeys)
 	if err != nil {
 		return err
 	}
@@ -359,10 +366,19 @@ func runReadWrite9010() error {
 		return err
 	}
 
+	fThroughput, err := os.Create(*throughputOut)
+	if err != nil {
+		return err
+	}
+	_, err = fThroughput.WriteString("num-db,db,tx-type,count,duration-ms,tx-per-sec\n")
+	if err != nil {
+		return err
+	}
+
 	// Deterministic random source. Helps with reproducibility.
 	rnd := mrand.New(mrand.NewSource(42)) // #nosec
 
-	for i := 0; i <= readWrite9010MaxDBs; i += 5 {
+	for i := 0; i <= *maxDBs; i += 5 {
 		numdb := max(1, i)
 		log.Printf("Testing %d dbs", numdb)
 		res, err := readWrite9010AllDBs(rnd, b, keys, numdb)
@@ -373,6 +389,9 @@ func runReadWrite9010() error {
 			return err
 		}
 		if err := dumpStats(fStats, res, numdb); err != nil {
+			return err
+		}
+		if err := dumpThroughput(fThroughput, res, numdb); err != nil {
 			return err
 		}
 	}
@@ -422,6 +441,37 @@ func dumpStats(out io.Writer, results []dbResults, numdb int) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// dumpThroughput writes the per-DB, per-transaction-type throughput. The
+// transaction count divided by the measured run duration gives the throughput
+// each individual DB sustained; the plotting script aggregates these into the
+// total system throughput.
+func dumpThroughput(out io.Writer, results []dbResults, numdb int) error {
+	for i, res := range results {
+		byType := []struct {
+			name string
+			r    bench.Results
+		}{
+			{"strong-read", res.Bench.Read},
+			{"weak-read", res.Bench.WeakRead},
+			{"write", res.Bench.Write},
+		}
+		for _, t := range byType {
+			count := len(t.r.Samples)
+			durMs := float64(t.r.TotDuration) / float64(time.Millisecond)
+			var tps float64
+			if t.r.TotDuration > 0 {
+				tps = float64(count) / float64(t.r.TotDuration) * float64(time.Second)
+			}
+			_, err := fmt.Fprintf(out, "%d,%d,%s,%d,%.2f,%.4f\n",
+				numdb, i, t.name, count, durMs, tps)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -498,11 +548,11 @@ func readWrite9010(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) (benchResults
 	eg := errgroup.Group{}
 
 	wbench := bench.Bench{}
-	wbench.SetDuration(readWrite9010Duration)
+	wbench.SetDuration(*duration)
 	srbench := bench.Bench{}
-	srbench.SetDuration(readWrite9010Duration)
+	srbench.SetDuration(*duration)
 	wrbench := bench.Bench{}
-	wrbench.SetDuration(readWrite9010Duration)
+	wrbench.SetDuration(*duration)
 
 	wbench.Start()
 	srbench.Start()
@@ -730,14 +780,66 @@ func runSimple() error {
 	return nil
 }
 
+// runDeadlock reproduces the deadlock-latency scenario: deadlockNumWriters
+// workers contend on the same set of keys (1 to 6) with up to 100% overlap.
+// It dumps the raw per-transaction latency samples so the plotting script can
+// compute percentiles and show the tail behavior under contention.
+func runDeadlock() error {
+	back, err := initBackend()
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(*deadlockOut)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.WriteString("num-keys,overlap,overlap-pct,latency-ms\n"); err != nil {
+		return err
+	}
+
+	for k := 1; k <= 6; k++ {
+		for overlap := 1; overlap <= k; overlap++ {
+			ctx := context.Background()
+			db := initDB(back)
+
+			ben := benchmarker{}
+			ben.SetDuration(*duration)
+			err := overlappingMultiRMW(&ben, db, deadlockNumWriters, k, overlap)
+			db.Close(ctx)
+			runtime.GC()
+			if err != nil {
+				return err
+			}
+
+			res := ben.Bench.Results()
+			overlapPct := 100 * overlap / k
+			for _, s := range res.Samples {
+				latMs := float64(s) / float64(time.Millisecond)
+				if _, err := fmt.Fprintf(f, "%d,%d,%d,%.2f\n", k, overlap, overlapPct, latMs); err != nil {
+					return err
+				}
+			}
+			log.Printf("deadlock: keys=%d overlap=%d (%d%%) samples=%d p50=%v p90=%v",
+				k, overlap, overlapPct, len(res.Samples),
+				res.Percentile(0.5), res.Percentile(0.9))
+		}
+	}
+
+	return nil
+}
+
 func do() error {
 	switch *testName {
 	case "simple":
 		return runSimple()
 	case "rw9010":
 		return runReadWrite9010()
+	case "deadlock":
+		return runDeadlock()
 	}
-	return nil
+	return fmt.Errorf("unknown test name %q", *testName)
 }
 
 func main() {

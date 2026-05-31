@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  GlassDB S3 benchmark runner. Creates a dedicated VPC with private subnets and
+  fully private connectivity (no Internet Gateway, no NAT Gateway). An EC2
+  instance reaches S3 via a gateway endpoint and is reachable via SSM Session
+  Manager through interface endpoints. The instance pulls a prebuilt rtbench
+  binary from the bucket, runs the rw9010 and deadlock benchmarks against S3,
+  uploads the result CSVs to the results/ prefix, and then stops itself.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: c7i.2xlarge
+    Description: EC2 instance type (must be x86_64 to match the amd64 binary).
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for the dedicated VPC.
+  SubnetCidr:
+    Type: String
+    Default: 10.0.0.0/24
+  BinaryS3Key:
+    Type: String
+    Default: bin/rtbench
+    Description: Key under which deploy.sh uploads the prebuilt rtbench binary.
+  MaxDBs:
+    Type: Number
+    Default: 50
+    Description: Max concurrent DBs for the rw9010 benchmark (README uses 50).
+  NumKeys:
+    Type: Number
+    Default: 50000
+    Description: Number of keys for the rw9010 benchmark (README uses 50000).
+  RunDuration:
+    Type: String
+    Default: 60s
+    Description: Duration of each rw9010 concurrency step.
+  DeadlockDuration:
+    Type: String
+    Default: 20s
+    Description: Duration of each deadlock contention configuration.
+  AutoStop:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Stop the instance automatically when the benchmark finishes.
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Resolved at deploy time to the latest Amazon Linux 2023 AMI.
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-private"
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-private-rt"
+
+  SubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  # Egress is open, but with no IGW/NAT there is no internet path: traffic is
+  # confined to the VPC and the S3 prefix list reachable via the gateway
+  # endpoint. No inbound rules are needed (access is via SSM).
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: GlassDB benchmark instance
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-instance-sg"
+
+  # Allows the instance to reach the interface endpoints over HTTPS.
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: GlassDB benchmark VPC interface endpoints
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-endpoint-sg"
+
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref RouteTable
+
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref Subnet]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  SsmMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref Subnet]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  Ec2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2messages"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref Subnet]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  Ec2Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref Subnet]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  BenchBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: bench-bucket-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "${BenchBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !GetAtt BenchBucket.Arn
+        - PolicyName: self-stop
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ec2:StopInstances
+                Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  BenchInstance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - S3GatewayEndpoint
+      - SsmEndpoint
+      - SsmMessagesEndpoint
+      - Ec2MessagesEndpoint
+      - Ec2Endpoint
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      SubnetId: !Ref Subnet
+      SecurityGroupIds: [!Ref InstanceSecurityGroup]
+      IamInstanceProfile: !Ref InstanceProfile
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-runner"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -uxo pipefail
+          exec > /var/log/rtbench-bootstrap.log 2>&1
+
+          export AWS_REGION="${AWS::Region}"
+          export AWS_DEFAULT_REGION="${AWS::Region}"
+          export BUCKET="${BenchBucket}"
+          BIN_KEY="${BinaryS3Key}"
+          cd /root
+
+          # Wait for the prebuilt binary that deploy.sh uploads after the stack
+          # is created (every 15s, up to ~30 minutes).
+          i=0
+          while [ $i -lt 120 ]; do
+            if aws s3 cp "s3://$BUCKET/$BIN_KEY" ./rtbench; then
+              break
+            fi
+            echo "waiting for s3://$BUCKET/$BIN_KEY (attempt $i)"
+            i=$((i + 1))
+            sleep 15
+          done
+          chmod +x ./rtbench
+
+          TS=$(date +%Y%m%dT%H%M%S)
+          OUT="results/$TS"
+          mkdir -p out
+
+          ./rtbench -backend=s3 -test-name=rw9010 \
+            -max-dbs=${MaxDBs} -num-keys=${NumKeys} -duration=${RunDuration} \
+            -samples-out=out/samples.csv \
+            -stats-out=out/stats.csv \
+            -throughput-out=out/throughput.csv
+
+          ./rtbench -backend=s3 -test-name=deadlock \
+            -duration=${DeadlockDuration} \
+            -deadlock-out=out/deadlock.csv
+
+          aws s3 cp out/ "s3://$BUCKET/$OUT/" --recursive
+          aws s3 cp /var/log/rtbench-bootstrap.log "s3://$BUCKET/$OUT/bootstrap.log" || true
+
+          if [ "${AutoStop}" = "true" ]; then
+            TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+              -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+            IID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" \
+              http://169.254.169.254/latest/meta-data/instance-id)
+            aws ec2 stop-instances --instance-ids "$IID"
+          fi
+
+Outputs:
+  BucketName:
+    Description: Bucket holding the binary, DB objects, and results.
+    Value: !Ref BenchBucket
+  BinaryUploadTarget:
+    Description: Where deploy.sh must upload the prebuilt binary.
+    Value: !Sub "s3://${BenchBucket}/${BinaryS3Key}"
+  ResultsPrefix:
+    Description: Result CSVs are written here under a timestamped subdir.
+    Value: !Sub "s3://${BenchBucket}/results/"
+  InstanceId:
+    Description: Benchmark runner instance id (connect via SSM Session Manager).
+    Value: !Ref BenchInstance
+  SsmSessionCommand:
+    Description: Open a shell on the runner.
+    Value: !Sub "aws ssm start-session --target ${BenchInstance} --region ${AWS::Region}"
