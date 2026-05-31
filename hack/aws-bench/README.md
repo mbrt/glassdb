@@ -165,9 +165,12 @@ uv run hack/aws-bench/plot.py --input ./results-dir --out ./out
 ## Reproducing locally with the fake backend (no AWS)
 
 The committed real-S3 CSVs in [`out/`](out/) can be reproduced locally with the
-in-memory backend wrapped in simulated S3 latencies and a per-prefix request-rate
-ceiling (see [ADR-004](../../docs/adr/004-fake-s3-backend-fidelity.md)). No AWS
-access is required:
+in-memory backend wrapped in simulated S3 latencies and S3's documented
+per-prefix request-rate limit (see
+[ADR-004](../../docs/adr/004-fake-s3-backend-fidelity.md)). The model favors
+faithful *relative* behavior under algorithm changes over matching one run's
+absolute numbers, so expect the curves to track the shape, not every point. No
+AWS access is required:
 
 ```bash
 go build -o /tmp/rtbench ./hack/rtbench
@@ -188,6 +191,10 @@ uv run hack/aws-bench/compare.py
 
 For quick iteration, scale down (e.g. `-max-dbs=5 -num-keys=500 -duration=10s`).
 `out-fake/` CSVs and plots are generated locally and not committed.
+
+To explore how prefix partitioning affects throughput, add `-prefix-depth=N`
+(default 2: the transaction-log and data subtrees are throttled separately;
+higher N models S3 splitting hot prefixes into more partitions).
 
 ## Cost & cleanup
 

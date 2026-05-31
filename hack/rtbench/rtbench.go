@@ -45,6 +45,7 @@ var (
 	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs|s3]")
 	memoryDelays     = flag.String("delays", "gcs", "delay profile for the memory backend [gcs|s3]")
 	enableThrottling = flag.Bool("enable-throttling", true, "enable throttling with memory backend")
+	prefixDepth      = flag.Int("prefix-depth", 0, "override per-prefix throttling depth for the memory backend (0 = profile default; higher = more partitions, more throughput)")
 	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010|deadlock]")
 	samplesOut       = flag.String("samples-out", "samples.csv", "output file with raw samples data")
 	statsOut         = flag.String("stats-out", "stats.csv", "output file with db stats")
@@ -88,13 +89,21 @@ func initBackend() (backend.Backend, *httpMetrics, error) {
 // backend should emulate. This lets the memory backend stand in for either GCS
 // or S3 ("fake backend") without touching a real bucket.
 func memoryDelayProfile() (middleware.DelayOptions, error) {
+	var delays middleware.DelayOptions
 	switch *memoryDelays {
 	case "gcs":
-		return middleware.GCSDelays, nil
+		delays = middleware.GCSDelays
 	case "s3":
-		return middleware.S3Delays, nil
+		delays = middleware.S3Delays
+	default:
+		return middleware.DelayOptions{}, fmt.Errorf("unknown delay profile %q", *memoryDelays)
 	}
-	return middleware.DelayOptions{}, fmt.Errorf("unknown delay profile %q", *memoryDelays)
+	// Let experiments vary how finely the key space is partitioned across
+	// throttled prefixes without recompiling (see middleware.S3Delays).
+	if *prefixDepth > 0 {
+		delays.PrefixDepth = *prefixDepth
+	}
+	return delays, nil
 }
 
 func env(k string) (string, error) {

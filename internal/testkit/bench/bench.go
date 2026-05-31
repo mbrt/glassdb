@@ -43,7 +43,12 @@ func (b *Bench) End() {
 
 // IsTestFinished reports whether the benchmark has run long enough and collected enough samples.
 func (b *Bench) IsTestFinished() bool {
-	return time.Since(b.startTime) >= b.expectedDuration && len(b.samples) >= minSamples
+	if time.Since(b.startTime) < b.expectedDuration {
+		return false
+	}
+	b.m.Lock()
+	defer b.m.Unlock()
+	return len(b.samples) >= minSamples
 }
 
 // Measure times the execution of fn and records the duration as a sample.
