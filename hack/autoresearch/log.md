@@ -117,3 +117,28 @@ The full gate now passes (`check.sh --full`: `make test` + 120s FuzzConcurrentTx
   mutexWaitNs 1249.
 - `baseline.json` and `best.json` written (both = 435.23). New experiments must
   beat `best.json`.
+
+## 2. Skip metadata fetch on the create-lock path - KEPT
+- Hypothesis: blind writes to non-existent keys do two backend metadata reads
+  per key - one in the failed write-lock attempt (round 1) and one in
+  `lockCreate`'s `fetchLockInfo` (round 2). The create read is wasted:
+  `ComputeLockUpdate` ignores current lock info for create (it always resolves
+  to a single `WriteIfNotExists`), and `needsProcessing` already filters
+  already-held locks. So skipping it should halve `batchWrite100` metaReads
+  (200->100/tx) with no behavior change.
+- Change: `internal/trans/tlocker.go` `doLockOp` - for `LockTypeCreate` requests
+  skip `fetchLockInfo`/`fetchLockersState` and feed an empty (None) lock info to
+  `ComputeLockUpdate`. Create requests never merge with unlocks, so there is no
+  unlock to compute.
+- Correctness: fast gate pass, full gate pass (make test + 120s FuzzConcurrentTx
+  + 120s FuzzAlgoConcurrentTx), judge approved.
+- Primary: 435.23 -> 420.51 (-3.38%).
+- Secondary: alloc ~flat, ns 47733 -> 42656 (-10.6%), cpu 111112 -> 99679
+  (-10.3%), mutexWait 1249 -> 688 (-44.9%). No regressions.
+- Outcome & why: KEPT. `batchWrite100` cost dropped 15.4% (20191 -> 17091),
+  exactly the ~100 metaReads/tx removed; other workloads unchanged (they create
+  few keys in the measured body). Confirms the create path's metadata read was
+  pure overhead. Lesson: the lock layer fetches metadata uniformly even when the
+  computed update doesn't depend on it - other always-one-shot operations may
+  have similar redundant reads.
+- Commit: f56a4a3

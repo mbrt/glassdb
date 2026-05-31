@@ -245,14 +245,26 @@ func (v *Locker) updateTxLocks(key string, tid data.TxID, lt storage.LockType) {
 }
 
 func (v *Locker) doLockOp(ctx context.Context, key string, req storage.LockRequest) (lockOpResult, error) {
-	ldata, err := v.fetchLockInfo(ctx, key)
-	if err != nil {
-		return lockOpResult{}, err
-	}
-
-	txs, err := v.fetchLockersState(ctx, key, ldata.Info)
-	if err != nil {
-		return lockOpResult{}, err
+	// A create request always resolves to a single WriteIfNotExists, regardless
+	// of the object's current lock state: ComputeLockUpdate ignores the current
+	// info for create, and an object that already exists is handled by the
+	// WriteIfNotExists precondition failure below. Create requests never merge
+	// with unlocks, so there is no unlock to compute either. Skipping the
+	// metadata fetch here removes a redundant backend read on the create path -
+	// e.g. bulk inserts, where it would re-read metadata the write-lock attempt
+	// already found to be absent.
+	ldata := lockData{Info: storage.LockInfo{Type: storage.LockTypeNone}}
+	var txs []storage.TxPathState
+	if req.Type != storage.LockTypeCreate {
+		var err error
+		ldata, err = v.fetchLockInfo(ctx, key)
+		if err != nil {
+			return lockOpResult{}, err
+		}
+		txs, err = v.fetchLockersState(ctx, key, ldata.Info)
+		if err != nil {
+			return lockOpResult{}, err
+		}
 	}
 	ops, err := storage.ComputeLockUpdate(ldata.Info, req, txs)
 	if err != nil {
