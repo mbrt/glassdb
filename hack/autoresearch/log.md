@@ -142,3 +142,27 @@ The full gate now passes (`check.sh --full`: `make test` + 120s FuzzConcurrentTx
   computed update doesn't depend on it - other always-one-shot operations may
   have similar redundant reads.
 - Commit: f56a4a3
+
+## 3. Run single-element fanouts inline - KEPT (secondary)
+- Hypothesis: `Algo.fanout` spawns a goroutine + errgroup even for one item.
+  Single-element fanouts happen every transaction (`validateReadonly` for a
+  1-key read; `lockCollections` for the single collection of multiRMW /
+  batchRead / batchWrite), so a `num==1` inline fast path should cut per-tx
+  goroutine churn (CPU, ns, allocs, mutex wait) with no change to backend ops
+  (primary stays flat: fanout is execution strategy, not an op generator).
+- Change: `internal/trans/algo.go` `fanout` - return `fn(ctx, 0)` directly when
+  `num==1`. Equivalent behavior: with no siblings there is nothing to run
+  concurrently or to cancel.
+- Correctness: fast + full gate pass, judge approved.
+- Primary: 420.51 -> 420.56 (+0.01%, noise; op counts unchanged - verified
+  singleRMW/multiRMW counts identical across runs, only async-cleanup metaWrite
+  +-1 jitter).
+- Secondary: allocs 272.4 -> 255.9 (-6.2%), allocBytes -6.4%, ns 42656 -> 30371
+  (-20%+), cpuNs 99679 -> 66745 (-27%+), mutexWait 688 -> 528 (-24%). No
+  regressions.
+- Outcome & why: KEPT under the secondary-axis rule (primary within noise, every
+  secondary axis clearly improves, none regress). The single-element goroutine
+  spawn was pure overhead on the hot per-tx path. Lesson: fan-out helpers should
+  short-circuit trivial sizes; worth auditing the background fanout in
+  asyncCleanup too (left for later - it is off the measured critical path).
+- Commit: 42e2696
