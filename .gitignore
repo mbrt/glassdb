@@ -2,3 +2,6 @@
 /docs/profile/*.prof
 /docs/profile/trace.out
 /glassdb.test
+
+/hack/aws-bench/out/*.png
+/hack/aws-bench/out-fake/

@@ -39,33 +39,71 @@ const (
 	readWrite9010NumKeys      = 50000
 )
 
+const deadlockNumWriters = 5
+
 var (
 	backendType      = flag.String("backend", "memory", "select backend type [memory|gcs|s3]")
+	memoryDelays     = flag.String("delays", "gcs", "delay profile for the memory backend [gcs|s3]")
 	enableThrottling = flag.Bool("enable-throttling", true, "enable throttling with memory backend")
-	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010]")
+	prefixDepth      = flag.Int("prefix-depth", 0, "override per-prefix throttling depth for the memory backend (0 = profile default; higher = more partitions, more throughput)")
+	testName         = flag.String("test-name", "simple", "which test to run [simple|rw9010|deadlock]")
 	samplesOut       = flag.String("samples-out", "samples.csv", "output file with raw samples data")
 	statsOut         = flag.String("stats-out", "stats.csv", "output file with db stats")
+	throughputOut    = flag.String("throughput-out", "throughput.csv", "output file with per-db throughput data")
+	clientStatsOut   = flag.String("client-stats-out", "client-stats.csv", "output file with per-step client resource metrics (CPU, HTTP, connections)")
+	deadlockOut      = flag.String("deadlock-out", "deadlock.csv", "output file with deadlock latency samples")
+	maxDBs           = flag.Int("max-dbs", readWrite9010MaxDBs, "max concurrent DBs for the rw9010 test")
+	numKeys          = flag.Int("num-keys", readWrite9010NumKeys, "number of keys for the rw9010 test")
+	duration         = flag.Duration("duration", readWrite9010Duration, "duration of each rw9010 step")
 )
 
-func initBackend() (backend.Backend, error) {
+// initBackend builds the configured backend. For the s3 backend it also returns
+// an httpMetrics handle that the rw9010 loop snapshots per step; it is nil for
+// other backends, which have no instrumented HTTP client.
+func initBackend() (backend.Backend, *httpMetrics, error) {
 	ctx := context.Background()
 
 	switch *backendType {
 	case "memory":
 		backend := memory.New()
-		delays := middleware.GCSDelays
+		delays, err := memoryDelayProfile()
+		if err != nil {
+			return nil, nil, err
+		}
 		if !*enableThrottling {
 			// Effectively disable throttling.
 			delays.SameObjWritePs = 100000
 		}
-		return middleware.NewDelayBackend(backend, delays), nil
+		return middleware.NewDelayBackend(backend, delays), nil, nil
 	case "gcs":
-		return initGCS(ctx)
+		b, err := initGCS(ctx)
+		return b, nil, err
 	case "s3":
 		return initS3(ctx)
 	}
 
-	return nil, fmt.Errorf("unknown backend type %q", *backendType)
+	return nil, nil, fmt.Errorf("unknown backend type %q", *backendType)
+}
+
+// memoryDelayProfile selects which simulated-latency profile the in-memory
+// backend should emulate. This lets the memory backend stand in for either GCS
+// or S3 ("fake backend") without touching a real bucket.
+func memoryDelayProfile() (middleware.DelayOptions, error) {
+	var delays middleware.DelayOptions
+	switch *memoryDelays {
+	case "gcs":
+		delays = middleware.GCSDelays
+	case "s3":
+		delays = middleware.S3Delays
+	default:
+		return middleware.DelayOptions{}, fmt.Errorf("unknown delay profile %q", *memoryDelays)
+	}
+	// Let experiments vary how finely the key space is partitioned across
+	// throttled prefixes without recompiling (see middleware.S3Delays).
+	if *prefixDepth > 0 {
+		delays.PrefixDepth = *prefixDepth
+	}
+	return delays, nil
 }
 
 func env(k string) (string, error) {
@@ -87,16 +125,20 @@ func initGCS(ctx context.Context) (backend.Backend, error) {
 	return gcs.New(client.Bucket(bucket)), nil
 }
 
-func initS3(ctx context.Context) (backend.Backend, error) {
+func initS3(ctx context.Context) (backend.Backend, *httpMetrics, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("loading AWS config: %v", err)
+		return nil, nil, fmt.Errorf("loading AWS config: %v", err)
 	}
 	bucket, err := env("BUCKET")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return s3.New(awss3.NewFromConfig(cfg), bucket), nil
+	metrics := &httpMetrics{}
+	client := awss3.NewFromConfig(cfg, func(o *awss3.Options) {
+		o.HTTPClient = newInstrumentedHTTPClient(metrics)
+	})
+	return s3.New(client, bucket), metrics, nil
 }
 
 func initDB(b backend.Backend) *glassdb.DB {
@@ -328,33 +370,36 @@ func overlappingMultiRMW(b *benchmarker, db *glassdb.DB, nWriters, nKeysPerWrite
 }
 
 func runReadWrite9010() error {
-	b, err := initBackend()
+	b, metrics, err := initBackend()
 	if err != nil {
 		return err
 	}
 
 	// Initialize all the keys once and for all the tests.
 	log.Printf("Initialize keys")
-	keys, err := initKeys(b, readWrite9010NumKeys)
+	keys, err := initKeys(b, *numKeys)
 	if err != nil {
 		return err
 	}
 	log.Printf("End of keys initialization")
 
-	fSamples, err := os.Create(*samplesOut)
+	fSamples, err := createCSV(*samplesOut, "num-db,db,tx-type,ops,latency\n")
 	if err != nil {
 		return err
 	}
-	_, err = fSamples.WriteString("num-db,db,tx-type,ops,latency\n")
+	fStats, err := createCSV(*statsOut,
+		"num-db,db,num-tx,num-retries,obj-write,obj-read,meta-write,meta-read\n")
 	if err != nil {
 		return err
 	}
-
-	fStats, err := os.Create(*statsOut)
+	fThroughput, err := createCSV(*throughputOut,
+		"num-db,db,tx-type,count,duration-ms,tx-per-sec\n")
 	if err != nil {
 		return err
 	}
-	_, err = fStats.WriteString("num-db,db,num-tx,num-retries,obj-write,obj-read,meta-write,meta-read\n")
+	fClient, err := createCSV(*clientStatsOut,
+		"num-db,wall-ms,num-cpu,cpu-user-ms,cpu-sys-ms,cpu-util-pct,"+
+			"http-requests,http-throttle,http-5xx,http-2xx,new-conns,max-goroutines\n")
 	if err != nil {
 		return err
 	}
@@ -362,22 +407,132 @@ func runReadWrite9010() error {
 	// Deterministic random source. Helps with reproducibility.
 	rnd := mrand.New(mrand.NewSource(42)) // #nosec
 
-	for i := 0; i <= readWrite9010MaxDBs; i += 5 {
+	for i := 0; i <= *maxDBs; i += 5 {
 		numdb := max(1, i)
 		log.Printf("Testing %d dbs", numdb)
-		res, err := readWrite9010AllDBs(rnd, b, keys, numdb)
-		if err != nil {
-			return err
+		out := rw9010Outputs{
+			samples:    fSamples,
+			stats:      fStats,
+			throughput: fThroughput,
+			client:     fClient,
 		}
-		if err := dumpSamples(fSamples, res, numdb); err != nil {
-			return err
-		}
-		if err := dumpStats(fStats, res, numdb); err != nil {
+		if err := runReadWrite9010Step(rnd, b, metrics, keys, numdb, out); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// createCSV creates (truncating) the file at path and writes the header row.
+func createCSV(path, header string) (*os.File, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := f.WriteString(header); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return f, nil
+}
+
+// rw9010Outputs groups the per-step CSV destinations for the rw9010 run.
+type rw9010Outputs struct {
+	samples    io.Writer
+	stats      io.Writer
+	throughput io.Writer
+	client     io.Writer
+}
+
+// runReadWrite9010Step runs one concurrency step and dumps its rows. It
+// snapshots client-side resource usage (CPU, HTTP traffic, connection churn)
+// around the step so each row is attributed to this exact concurrency level.
+func runReadWrite9010Step(
+	rnd *mrand.Rand,
+	b backend.Backend,
+	metrics *httpMetrics,
+	keys [][]byte,
+	numdb int,
+	out rw9010Outputs,
+) error {
+	var httpBefore httpSnapshot
+	if metrics != nil {
+		httpBefore = metrics.snapshot()
+	}
+	userBefore, sysBefore := processCPUTime()
+	sampler := startGoroutineSampler()
+	wallStart := time.Now()
+
+	res, err := readWrite9010AllDBs(rnd, b, keys, numdb)
+	if err != nil {
+		return err
+	}
+
+	wall := time.Since(wallStart)
+	userAfter, sysAfter := processCPUTime()
+	peakGoroutines := sampler.stopAndPeak()
+	var httpDelta httpSnapshot
+	if metrics != nil {
+		httpDelta = metrics.snapshot().sub(httpBefore)
+	}
+
+	if err := dumpSamples(out.samples, res, numdb); err != nil {
+		return err
+	}
+	if err := dumpStats(out.stats, res, numdb); err != nil {
+		return err
+	}
+	if err := dumpThroughput(out.throughput, res, numdb); err != nil {
+		return err
+	}
+	return dumpClientStats(
+		out.client, numdb, wall, userAfter-userBefore, sysAfter-sysBefore,
+		httpDelta, peakGoroutines,
+	)
+}
+
+// dumpClientStats writes one row of per-step client-side resource usage and
+// logs a human-readable summary. CPU utilization is a percentage of all cores
+// (100% means every core was fully busy for the whole step), which is the key
+// signal for whether the throughput plateau is a client CPU bottleneck. The
+// HTTP throttle count distinguishes that from backend (S3) throttling.
+func dumpClientStats(
+	out io.Writer,
+	numdb int,
+	wall, cpuUser, cpuSys time.Duration,
+	http httpSnapshot,
+	peakGoroutines int,
+) error {
+	numCPU := runtime.NumCPU()
+	cpuTotal := cpuUser + cpuSys
+	var utilPct, reqPerSec float64
+	if wall > 0 {
+		utilPct = 100 * cpuTotal.Seconds() / (wall.Seconds() * float64(numCPU))
+		reqPerSec = float64(http.Requests) / wall.Seconds()
+	}
+
+	log.Printf(
+		"clientmetrics num-db=%d cpu-util=%.0f%% (user=%s sys=%s wall=%s cores=%d) "+
+			"http-req=%d (%.0f/s) throttle=%d 5xx=%d new-conns=%d peak-goroutines=%d",
+		numdb, utilPct,
+		cpuUser.Round(time.Millisecond), cpuSys.Round(time.Millisecond),
+		wall.Round(time.Millisecond), numCPU,
+		http.Requests, reqPerSec, http.Throttle, http.ServerErr, http.NewConns,
+		peakGoroutines,
+	)
+
+	_, err := fmt.Fprintf(out, "%d,%.2f,%d,%.2f,%.2f,%.2f,%d,%d,%d,%d,%d,%d\n",
+		numdb,
+		float64(wall)/float64(time.Millisecond),
+		numCPU,
+		float64(cpuUser)/float64(time.Millisecond),
+		float64(cpuSys)/float64(time.Millisecond),
+		utilPct,
+		http.Requests, http.Throttle, http.ServerErr, http.Success, http.NewConns,
+		peakGoroutines,
+	)
+	return err
 }
 
 func dumpSamples(out io.Writer, results []dbResults, numdb int) error {
@@ -427,16 +582,56 @@ func dumpStats(out io.Writer, results []dbResults, numdb int) error {
 	return nil
 }
 
+// dumpThroughput writes the per-DB, per-transaction-type throughput. The
+// transaction count divided by the measured run duration gives the throughput
+// each individual DB sustained; the plotting script aggregates these into the
+// total system throughput.
+func dumpThroughput(out io.Writer, results []dbResults, numdb int) error {
+	for i, res := range results {
+		byType := []struct {
+			name string
+			r    bench.Results
+		}{
+			{"strong-read", res.Bench.Read},
+			{"weak-read", res.Bench.WeakRead},
+			{"write", res.Bench.Write},
+		}
+		for _, t := range byType {
+			count := len(t.r.Samples)
+			durMs := float64(t.r.TotDuration) / float64(time.Millisecond)
+			var tps float64
+			if t.r.TotDuration > 0 {
+				tps = float64(count) / float64(t.r.TotDuration) * float64(time.Second)
+			}
+			_, err := fmt.Fprintf(out, "%d,%d,%s,%d,%.2f,%.4f\n",
+				numdb, i, t.name, count, durMs, tps)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func readWrite9010AllDBs(rnd *mrand.Rand, b backend.Backend, keys [][]byte, numdb int) ([]dbResults, error) {
 	resCh := make(chan dbResults, numdb)
 	eg := errgroup.Group{}
 
-	for range numdb {
+	// Derive one seed per DB up front, from the single shared source, so each
+	// DB (and below, each worker) gets its own *mrand.Rand. math/rand.Rand is
+	// not safe for concurrent use, and sharing one across all DBs/workers
+	// races and panics at high concurrency.
+	seeds := make([]int64, numdb)
+	for i := range seeds {
+		seeds[i] = rnd.Int63()
+	}
+
+	for i := range numdb {
 		eg.Go(func() error {
 			db := initDB(b)
 			defer db.Close(context.Background())
 
-			res, err := readWrite9010(rnd, db, keys)
+			res, err := readWrite9010(mrand.NewSource(seeds[i]), db, keys)
 			if err != nil {
 				return err
 			}
@@ -494,24 +689,33 @@ func makeTxSeries(numW, numStrongR, numWeakR int) []txType {
 	return res
 }
 
-func readWrite9010(rnd *mrand.Rand, db *glassdb.DB, keys [][]byte) (benchResults, error) {
+func readWrite9010(src mrand.Source, db *glassdb.DB, keys [][]byte) (benchResults, error) {
 	eg := errgroup.Group{}
 
 	wbench := bench.Bench{}
-	wbench.SetDuration(readWrite9010Duration)
+	wbench.SetDuration(*duration)
 	srbench := bench.Bench{}
-	srbench.SetDuration(readWrite9010Duration)
+	srbench.SetDuration(*duration)
 	wrbench := bench.Bench{}
-	wrbench.SetDuration(readWrite9010Duration)
+	wrbench.SetDuration(*duration)
 
 	wbench.Start()
 	srbench.Start()
 	wrbench.Start()
 
+	// Each parallel worker gets its own rand seeded from the DB's source, so no
+	// *mrand.Rand is shared across goroutines (see readWrite9010AllDBs).
+	dbRnd := mrand.New(src)
+	wseeds := make([]int64, readWrite9010NumConcurrTx)
+	for i := range wseeds {
+		wseeds[i] = dbRnd.Int63()
+	}
+
 	// Run the sequence of transactions 10 times in parallel.
 	// Each sequence has 10 operations.
-	for range readWrite9010NumConcurrTx {
+	for w := range readWrite9010NumConcurrTx {
 		eg.Go(func() error {
+			rnd := mrand.New(mrand.NewSource(wseeds[w]))
 			// 10 transactions in series.
 			// - 1 writer.
 			// - 6 strong readers.
@@ -667,7 +871,7 @@ func runTest(name string, b backend.Backend, fn func(*benchmarker, *glassdb.DB) 
 }
 
 func runSimple() error {
-	back, err := initBackend()
+	back, _, err := initBackend()
 	if err != nil {
 		return err
 	}
@@ -730,14 +934,66 @@ func runSimple() error {
 	return nil
 }
 
+// runDeadlock reproduces the deadlock-latency scenario: deadlockNumWriters
+// workers contend on the same set of keys (1 to 6) with up to 100% overlap.
+// It dumps the raw per-transaction latency samples so the plotting script can
+// compute percentiles and show the tail behavior under contention.
+func runDeadlock() error {
+	back, _, err := initBackend()
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(*deadlockOut)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.WriteString("num-keys,overlap,overlap-pct,latency-ms\n"); err != nil {
+		return err
+	}
+
+	for k := 1; k <= 6; k++ {
+		for overlap := 1; overlap <= k; overlap++ {
+			ctx := context.Background()
+			db := initDB(back)
+
+			ben := benchmarker{}
+			ben.SetDuration(*duration)
+			err := overlappingMultiRMW(&ben, db, deadlockNumWriters, k, overlap)
+			db.Close(ctx)
+			runtime.GC()
+			if err != nil {
+				return err
+			}
+
+			res := ben.Bench.Results()
+			overlapPct := 100 * overlap / k
+			for _, s := range res.Samples {
+				latMs := float64(s) / float64(time.Millisecond)
+				if _, err := fmt.Fprintf(f, "%d,%d,%d,%.2f\n", k, overlap, overlapPct, latMs); err != nil {
+					return err
+				}
+			}
+			log.Printf("deadlock: keys=%d overlap=%d (%d%%) samples=%d p50=%v p90=%v",
+				k, overlap, overlapPct, len(res.Samples),
+				res.Percentile(0.5), res.Percentile(0.9))
+		}
+	}
+
+	return nil
+}
+
 func do() error {
 	switch *testName {
 	case "simple":
 		return runSimple()
 	case "rw9010":
 		return runReadWrite9010()
+	case "deadlock":
+		return runDeadlock()
 	}
-	return nil
+	return fmt.Errorf("unknown test name %q", *testName)
 }
 
 func main() {

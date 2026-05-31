@@ -668,10 +668,10 @@ func TestSerialValidate(t *testing.T) {
 		// t2 should need to retry.
 		err = g.Wait()
 		assert.ErrorIs(t, err, ErrRetry)
-		// t2 was wounded by t1, so its log is already aborted: ending it now is
-		// a no-op that surfaces the finalized log.
+		// t2 was wounded by t1, so its log is already aborted. Ending it now is
+		// a benign no-op: the abort goal is already met, so End reports success.
 		err = tm2.End(ctx, h2)
-		assert.ErrorIs(t, err, ErrAlreadyFinalized)
+		assert.NoError(t, err)
 
 		// Check end result.
 		flushWrites(t, tm1, h1)
