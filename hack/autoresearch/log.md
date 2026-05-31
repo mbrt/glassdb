@@ -166,3 +166,42 @@ The full gate now passes (`check.sh --full`: `make test` + 120s FuzzConcurrentTx
   short-circuit trivial sizes; worth auditing the background fanout in
   asyncCleanup too (left for later - it is off the measured critical path).
 - Commit: 42e2696
+
+## Analyzed but not attempted (would compromise correctness)
+
+After exp 2-3 the primary is at the safe floor for these workloads; the op
+counts of singleRMW (1 objWrite), multiRMW (10 metaWrite locks + 10 objWrite
+write-backs + 1 log), batchRead/readRepeat (1 metaRead/key validation) are
+minimal for strict-serializable S2PL. The only workload with reducible ops is
+`batchWrite100` (100 metaReads to discover absence + 100 objWrites to create +
+100 objWrites to write back). The two levers there were rejected:
+
+- **Write the value into the create-lock placeholder** (turning the write-back
+  objWrite into a cheap SetTagsIf). Unsafe: `reader.handleLockCreate` uses
+  "non-empty value => committed" (`len(rv.Value) > 0`) to avoid an extra
+  metadata read on every read. A non-empty create placeholder would be returned
+  as a committed value, exposing uncommitted data (serializability violation).
+  Fixing that would add a metadata read to every read, negating the gain.
+- **Drop the create placeholder; create with value at write-back via
+  WriteIfNotExists.** Removes the path reservation that guards against the
+  collection-lock release racing a concurrent creator, and complicates crash
+  recovery. Both make the serializability reasoning harder, which the mission
+  says is not worth it.
+
+Remaining ideas are allocation micro-opts in the concurrency-critical dedup/lock
+path (per-op `*call` and interface-boxing allocations); uncertain payoff and
+real regression risk in correctness-sensitive code, so not pursued in this
+session.
+
+## Session 2 summary
+
+- Experiments run: 3 (after the lost-update fix). Kept: 2, discarded: 0.
+- Baseline -> best primary score: **435.23 -> 420.56 (-3.4%)**, from skipping the
+  redundant create-lock metadata read (exp 2). Exp 3 kept primary flat while
+  cutting secondary axes substantially (allocs -6%, ns -20%+, cpuNs -27%, mutex
+  wait -24%).
+- Correctness: every kept change passed the full gate (make test + 120s
+  FuzzConcurrentTx + 120s FuzzAlgoConcurrentTx) and the test-integrity judge.
+- Stopped because the safe primary-optimization space for the current workloads
+  is exhausted (see "Analyzed but not attempted"); further gains would require
+  protocol changes that weaken strict-serializability reasoning.
