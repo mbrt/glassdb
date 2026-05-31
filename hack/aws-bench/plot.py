@@ -6,14 +6,16 @@
 #     "pandas>=2.0",
 #     "matplotlib>=3.8",
 #     "seaborn>=0.13",
-#     "boto3>=1.34",
 # ]
 # ///
 """Reproduce the GlassDB README performance graphs from rtbench CSV output.
 
-It consumes the four CSV files produced by ``rtbench -test-name=rw9010`` and
+It reads the four CSV files produced by ``rtbench -test-name=rw9010`` and
 ``rtbench -test-name=deadlock`` (``samples.csv``, ``stats.csv``,
-``throughput.csv`` and ``deadlock.csv``) and renders the five README figures:
+``throughput.csv`` and ``deadlock.csv``) from a local directory -- typically
+``hack/aws-bench/out``, where ``deploy.sh results`` downloads them. The large
+``samples.csv`` may be stored compressed as ``samples.csv.xz``; it is read
+transparently. It renders the five README figures:
 
 * ``tx-throughput.png`` -- total transactions/sec per transaction type.
 * ``retries.png``       -- transaction retries per committed transaction.
@@ -46,42 +48,20 @@ import seaborn as sns
 # 10th-90th percentile band, matching the README error bands.
 ERRORBAR = ("pi", 80)
 CONC_LABEL = "Concurrent transactions"
-RESULT_FILES = ("samples.csv", "stats.csv", "throughput.csv", "deadlock.csv")
-
-
-def parse_s3_uri(uri: str) -> tuple[str, str]:
-    """Split an ``s3://bucket/prefix`` URI into ``(bucket, prefix)``."""
-    if not uri.startswith("s3://"):
-        raise ValueError(f"not an s3 URI: {uri}")
-    rest = uri[len("s3://") :]
-    bucket, _, prefix = rest.partition("/")
-    return bucket, prefix.strip("/")
-
-
-def download_from_s3(uri: str, dest: Path) -> None:
-    """Download the known result CSVs from an S3 prefix into ``dest``."""
-    import boto3  # imported lazily so local-only use needs no AWS deps
-
-    bucket, prefix = parse_s3_uri(uri)
-    s3 = boto3.client("s3")
-    dest.mkdir(parents=True, exist_ok=True)
-    for name in RESULT_FILES:
-        key = f"{prefix}/{name}" if prefix else name
-        target = dest / name
-        try:
-            s3.download_file(bucket, key, str(target))
-            print(f"downloaded s3://{bucket}/{key}")
-        except Exception as exc:  # noqa: BLE001 - report and continue
-            print(f"warning: could not download {key}: {exc}", file=sys.stderr)
 
 
 def read_csv(input_dir: Path, name: str) -> pd.DataFrame | None:
-    """Load a result CSV, returning None (with a warning) when it is missing."""
-    path = input_dir / name
-    if not path.exists():
-        print(f"warning: {path} not found, skipping its figures", file=sys.stderr)
-        return None
-    return pd.read_csv(path)
+    """Load a result CSV, returning None (with a warning) when it is missing.
+
+    Accepts either ``<name>`` or a compressed ``<name>.xz`` (e.g. the large
+    ``samples.csv`` that ``deploy.sh results`` compresses); pandas infers the
+    compression from the extension.
+    """
+    for path in (input_dir / name, input_dir / f"{name}.xz"):
+        if path.exists():
+            return pd.read_csv(path)
+    print(f"warning: {input_dir / name}[.xz] not found, skipping", file=sys.stderr)
+    return None
 
 
 def _save(fig: plt.Figure, out_dir: Path, name: str, extra_dirs: list[Path]) -> None:
@@ -214,23 +194,20 @@ def plot_deadlock(df: pd.DataFrame, out_dir: Path, extra: list[Path]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    default_dir = Path(__file__).resolve().parent / "out"
     parser.add_argument(
         "-i",
         "--input",
         type=Path,
-        default=Path("."),
-        help="directory containing the result CSVs (default: current dir)",
-    )
-    parser.add_argument(
-        "--s3",
-        help="s3://bucket/results/<ts> prefix to download the CSVs from first",
+        default=default_dir,
+        help="directory containing the result CSVs (default: ./out)",
     )
     parser.add_argument(
         "-o",
         "--out",
         type=Path,
-        default=Path(__file__).resolve().parent / "out",
-        help="output directory for the PNGs",
+        default=default_dir,
+        help="output directory for the PNGs (default: ./out)",
     )
     parser.add_argument(
         "--concurrency-per-db",
@@ -244,9 +221,6 @@ def main() -> int:
         help="also write the PNGs into docs/img/",
     )
     args = parser.parse_args()
-
-    if args.s3:
-        download_from_s3(args.s3, args.input)
 
     sns.set_theme(style="whitegrid", context="talk")
 

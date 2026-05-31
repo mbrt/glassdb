@@ -48,7 +48,8 @@ flowchart LR
   ec2 -->|"4. run vs S3"| bucket
   ec2 -->|"5. upload CSVs"| bucket
   ec2 -->|"6. self-stop"| ec2
-  dev -->|"7. plot --s3"| bucket
+  bucket -->|"7. results -> out/"| dev
+  dev -->|"8. plot out/"| png[PNGs]
 ```
 
 ## Prerequisites
@@ -64,20 +65,45 @@ flowchart LR
 export AWS_REGION=us-east-1            # pick a region close to you
 ./hack/aws-bench/deploy.sh deploy
 
-# 2. Wait ~15-20 min. The instance stops itself when finished; results land in
-#    s3://<bucket>/results/<timestamp>/. List them with:
+# 2. Watch the run live (optional). Streams the bootstrap + rtbench log over
+#    SSM until you Ctrl-C; -F waits for the file if the box is still booting.
+./hack/aws-bench/deploy.sh logs
+
+# 4. Wait ~15-20 min. The instance stops itself when finished. Download the
+#    latest run's CSVs into hack/aws-bench/out/ with (the large samples.csv is
+#    compressed to samples.csv.xz on the way in, if xz is installed):
 ./hack/aws-bench/deploy.sh results
 
-# 3. Render the five PNGs from the latest results.
-uv run hack/aws-bench/plot.py \
-  --s3 s3://<bucket>/results/<timestamp> \
-  --out hack/aws-bench/out
+# 5. Render the five PNGs from the downloaded CSVs (reads/writes out/ by default).
+uv run hack/aws-bench/plot.py
 
 # To overwrite the committed figures in docs/img as well, add --write-docs.
 
-# 4. Tear everything down (empties the bucket, then deletes the stack).
+# 6. Tear everything down (empties the bucket, then deletes the stack).
 ./hack/aws-bench/deploy.sh teardown
 ```
+
+### Streaming the logs
+
+The bootstrap redirects everything (the binary-poll loop and all `rtbench`
+output) to `/var/log/rtbench-bootstrap.log`, which grows live. Since the
+instance has no public IP, stream it over SSM:
+
+```bash
+# Convenience wrapper (resolves the instance id from the stack):
+./hack/aws-bench/deploy.sh logs
+
+# ...which is equivalent to:
+aws ssm start-session --target <instance-id> \
+  --document-name AWS-StartInteractiveCommand \
+  --parameters command="sudo tail -n +1 -F /var/log/rtbench-bootstrap.log"
+```
+
+This requires the [Session Manager
+plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
+locally. For a full interactive shell instead, use the `SsmSessionCommand` from
+the stack outputs. The same log is also uploaded to
+`s3://<bucket>/results/<timestamp>/bootstrap.log` at the end of the run.
 
 ### Tuning
 
@@ -96,10 +122,11 @@ full list):
 For a cheap smoke test, scale everything down, e.g.
 `MAX_DBS=5 NUM_KEYS=500 RUN_DURATION=10s ./hack/aws-bench/deploy.sh deploy`.
 
-## Plotting from local CSVs
+## Plotting from a different directory
 
-If you already have the CSVs locally (for example from a `-backend=memory` or
-`-backend=gcs` run), skip `--s3` and point at the directory:
+`plot.py` always reads local CSVs and defaults to `hack/aws-bench/out/`. If your
+CSVs are elsewhere (for example from a local `-backend=memory` or `-backend=gcs`
+run), point at the directory:
 
 ```bash
 uv run hack/aws-bench/plot.py --input ./results-dir --out ./out

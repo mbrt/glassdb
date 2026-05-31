@@ -243,6 +243,16 @@ func (t Algo) End(ctx context.Context, tx *Handle) error {
 	}
 	// Release all the locks and abort.
 	if err := t.mon.AbortTx(ctx, tx.id); err != nil {
+		if errors.Is(err, ErrAlreadyFinalized) {
+			// The log was already finalized (typically aborted by a
+			// higher-priority transaction under wound-wait, or reclaimed as
+			// expired). Aborting is exactly what End wants, so this is a benign
+			// no-op: clean up any locks we still hold and report success rather
+			// than surfacing it as a transaction error.
+			tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit End: already finalized")
+			t.asyncCleanup(ctx, tx)
+			return nil
+		}
 		// Failing because of a timeout is not a big problem, as we're going to
 		// follow up with an async cleanup.
 		tx.log.LogAttrs(ctx, slog.LevelError, "Commit End", errAttr(err))

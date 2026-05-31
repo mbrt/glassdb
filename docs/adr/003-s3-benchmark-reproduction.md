@@ -47,9 +47,11 @@ instance bootstrap bridges the "instance launched before binary uploaded"
 ordering.
 
 **3. A single-file `uv` plotting script** (`hack/aws-bench/plot.py`) using
-pandas + seaborn. It reads the four CSVs (optionally downloading them from S3)
-and renders the five figures with a median line and a 10th-90th percentile band,
-matching the README.
+pandas + seaborn. It reads the four CSVs from a local directory (populated by
+`deploy.sh results`, which downloads the latest run from S3 and compresses the
+large `samples.csv` to `samples.csv.xz`; the script reads either form
+transparently) and renders the five figures with a median line and a
+10th-90th percentile band, matching the README.
 
 Two interpretation choices are baked in and documented in the script:
 
@@ -66,8 +68,8 @@ Two interpretation choices are baked in and documented in the script:
 ## Consequences
 
 - The README graphs can be regenerated end-to-end with `deploy.sh deploy` ->
-  wait -> `plot.py --s3 ...`, on any AWS account, without pre-existing
-  networking.
+  wait -> `deploy.sh results` -> `plot.py`, on any AWS account, without
+  pre-existing networking.
 - The benchmark itself stays backend-agnostic; only output and CLI surface grew.
 - Real costs apply while the stack exists: S3 storage/requests, the EC2 run, and
   four hourly-billed interface endpoints. `deploy.sh teardown` removes them; the
