@@ -265,30 +265,35 @@ work and restart after a conflict.
 
 ## Deadlocks
 
-Glass DB is currently using a naive approach when it comes to deadlocks. The
-only detection mechanism is long timeouts. When a transaction cannot make
-progress for several seconds, it releases all the locks and retries by taking
-them one by one in a defined order. This is very slow, but ensures that no
-further deadlocks can occur.
+Glass DB prevents deadlocks with the **wound-wait** rule. Every transaction has
+a priority derived from its ID (older transactions have higher priority). When a
+transaction needs a lock held by another:
 
-You can see in the graph below how slow transactions can get when these
-situations occur:
+* if it is **older**, it *wounds* (aborts) the younger holder and takes the
+  lock;
+* if it is **younger**, it *waits* for the older one to finish.
+
+Because an older transaction never waits on a younger one, the wait-for graph
+can never form a cycle, so deadlocks cannot occur. A wounded transaction simply
+restarts, keeping its original priority so it is not starved. Conflicts are
+therefore resolved in the time it takes to do a few storage operations, instead
+of stalling for several seconds.
+
+A timeout-based fallback to sorted, serial locking is still in place as a safety
+net for sustained contention and for the rare case of equal-priority
+transactions. See
+[ADR-002](docs/adr/002-wound-wait-locking.md) for details.
+
+The graph below shows the latency the *previous* timeout-only approach incurred
+under heavy contention — 5 parallel workers competing for the same keys (between
+1 and 6), with up to 100% overlap — where deadlocks led to delays of tens of
+seconds:
 
 ![](docs/img/deadlock-latency.png)
 
-In this example, 5 parallel workers keep competing for the same keys (between 1
-and 6), with varying degrees of overlap (up to 100%).
-
-As you can see, it's very easy for transactions to deadlock in this situation,
-resulting in delays of tens of seconds in the worst case.
-
-This is mostly due to a few factors:
-
-* Glass DB is not optimized for deadlocks, nor makes sure deadlocked
-  transactions can always make progress.
-* GCS throttles writes when they happen to the same object multiple times per
-  second (some bursting is allowed, but in this case we are consistently trying
-  to overwrite the same object).
+Note that, even with wound-wait, repeatedly overwriting the same object can be
+throttled by the backend (e.g. GCS limits writes to the same object to a few per
+second), so heavy single-key contention still has a throughput ceiling.
 
 ## License
 

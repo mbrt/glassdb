@@ -252,6 +252,10 @@ func (v *Locker) doLockOp(ctx context.Context, key string, req storage.LockReque
 	if err != nil {
 		return lockOpResult{}, fmt.Errorf("computing unlock update: %w", err)
 	}
+	if len(ops.Wound) > 0 {
+		// Lower-priority holders are in the way. Abort them and retry.
+		return lockOpResult{WoundTx: ops.Wound}, nil
+	}
 	if len(ops.WaitFor) > 0 {
 		return lockOpResult{WaitForTx: ops.WaitFor}, nil
 	}
@@ -365,6 +369,13 @@ func (l lockerWorker) Work(ctx context.Context, key string, cntr concurr.DedupCo
 			}
 			return err
 		}
+		if len(lockRes.WoundTx) > 0 {
+			if err := l.woundTxs(ctx, lockRes.WoundTx); err != nil {
+				return err
+			}
+			// Retry now that the lower-priority holders are aborted.
+			continue
+		}
 		if len(lockRes.WaitForTx) > 0 {
 			if err := l.waitForTx(ctx, key, lockRes.WaitForTx, wctx, cntr); err != nil {
 				return err
@@ -379,6 +390,17 @@ func (l lockerWorker) Work(ctx context.Context, key string, cntr concurr.DedupCo
 
 		return nil
 	}
+}
+
+// woundTxs aborts the given lower-priority holders so the requester can take
+// over their locks under the wound-wait rule.
+func (l lockerWorker) woundTxs(ctx context.Context, txs []data.TxID) error {
+	for _, tx := range txs {
+		if err := l.locker.tmon.WoundTx(ctx, tx); err != nil {
+			return fmt.Errorf("wounding tx %v: %w", tx, err)
+		}
+	}
+	return nil
 }
 
 func (l lockerWorker) waitForTx(ctx context.Context, key string, txs []data.TxID, wctx *waitCtx, cntr concurr.DedupContr) error {
@@ -466,6 +488,7 @@ type lockOpResult struct {
 	LockedFor   []data.TxID
 	UnlockedFor []data.TxID
 	WaitForTx   []data.TxID
+	WoundTx     []data.TxID
 }
 
 type waitCtx struct {

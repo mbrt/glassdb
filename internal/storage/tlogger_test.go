@@ -54,7 +54,7 @@ func TestGetSet(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tl, _ := testTLoggerContext(t)
 		ctx := context.Background()
-		tx := data.TxID([]byte("tx1"))
+		tx := data.TIDWithPriority(time.Unix(1, 0), []byte("tx1"))
 
 		// Unknown transactions are not found.
 		_, err := tl.Get(ctx, tx)
@@ -122,7 +122,7 @@ func TestPendingUpdate(t *testing.T) {
 		tl1, tctx := testTLoggerContext(t)
 		tl2, _ := newTLoggerFromBackend(t, tctx.backend)
 		ctx := context.Background()
-		tx := data.TxID([]byte("tx1"))
+		tx := data.TIDWithPriority(time.Unix(1, 0), []byte("tx1"))
 
 		beforeSetTs := time.Now().Truncate(time.Second)
 

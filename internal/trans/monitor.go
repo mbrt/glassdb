@@ -167,6 +167,51 @@ func (m *Monitor) AbortTx(ctx context.Context, tid data.TxID) error {
 	return err
 }
 
+// WoundTx forces the given transaction into the aborted state so that a
+// higher-priority transaction can take over its locks under the wound-wait
+// rule. It is idempotent and safe on transactions that already finished: a
+// committed transaction is left untouched (its locks are released through the
+// normal flow), and an already-aborted one is a no-op.
+//
+// The abort is made durable via a conditional write on the transaction log, so
+// it is observed both by the local victim (its commit will fail) and by other
+// clients holding the same lock.
+func (m *Monitor) WoundTx(ctx context.Context, tid data.TxID) error {
+	cs, err := m.tl.CommitStatus(ctx, tid)
+	if err != nil {
+		return fmt.Errorf("reading status of wound target %v: %w", tid, err)
+	}
+	if cs.Status.IsFinal() {
+		// Already committed or aborted: nothing left to wound.
+		m.markLocalAborted(tid, cs.Status)
+		return nil
+	}
+
+	// Force the transaction to aborted, CAS-ing over its current log version
+	// (or creating an aborted log if it has none yet).
+	status, err := m.tryAbortRemoteTx(ctx, tid, cs.Version)
+	if err != nil {
+		return fmt.Errorf("wounding tx %v: %w", tid, err)
+	}
+	m.markLocalAborted(tid, status)
+	return nil
+}
+
+// markLocalAborted reflects a durable abort in the in-memory state when the
+// wounded transaction is local, so the victim and any waiters unwind promptly.
+func (m *Monitor) markLocalAborted(tid data.TxID, status storage.TxCommitStatus) {
+	if status != storage.TxCommitStatusAborted {
+		return
+	}
+	m.stopTxRefresh(tid)
+
+	sh := m.shardFor(tid)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	delete(sh.localTx, string(tid))
+	m.notifyWaiters(sh, tid, WaitTxResult{Status: storage.TxCommitStatusAborted})
+}
+
 // TxStatus returns the current commit status of the given transaction,
 // checking locally first and then fetching from remote storage if needed.
 func (m *Monitor) TxStatus(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {

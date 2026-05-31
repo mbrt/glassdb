@@ -13,7 +13,6 @@ import (
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/internal/cache"
 	"github.com/mbrt/glassdb/internal/concurr"
-	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/errors"
 	"github.com/mbrt/glassdb/internal/storage"
 )
@@ -21,7 +20,7 @@ import (
 func TestGC(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		gc, tctx := newTestGC(t)
-		txid := data.TxID([]byte("tx1"))
+		txid := mkTID(1, "tx1")
 
 		_, err := gc.tl.Set(tctx.ctx, storage.TxLog{
 			ID:        txid,

@@ -587,8 +587,13 @@ func TestSerialValidate(t *testing.T) {
 			{Path: keys[3], Val: []byte("3")},
 		})
 
+		// Use deterministic priorities so the wound-wait rule has a clear
+		// winner: t1 is older (higher priority) than t2.
+		ctx1 := CtxWithTxID(ctx, mkTID(1, "t1"))
+		ctx2 := CtxWithTxID(ctx, mkTID(2, "t2"))
+
 		// Commit k0, k1 from tm1.
-		h1 := tm1.Begin(ctx, Data{
+		h1 := tm1.Begin(ctx1, Data{
 			Reads: r01,
 			Writes: []WriteAccess{
 				{Path: keys[0], Val: []byte("1")},
@@ -599,7 +604,7 @@ func TestSerialValidate(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRetry)
 
 		// Commit k2, k3 from tm2.
-		h2 := tm2.Begin(ctx, Data{
+		h2 := tm2.Begin(ctx2, Data{
 			Reads: r23,
 			Writes: []WriteAccess{
 				{Path: keys[2], Val: []byte("2")},
@@ -632,9 +637,9 @@ func TestSerialValidate(t *testing.T) {
 		// Commit t2 in parallel.
 		g := errgroup.Group{}
 		g.Go(func() error {
-			// Start the commit only after the timeout for serial locking expired.
-			// This makes sure t1 will win over t2 in the commit race, making the
-			// test deterministic.
+			// Let t1 (the older, higher-priority transaction) commit first. It
+			// wounds t2 on the conflicting key, so by the time t2 validates it
+			// observes t1's committed values and retries.
 			time.Sleep(10 * time.Second)
 
 			tm2.Reset(h2, Data{
@@ -663,9 +668,10 @@ func TestSerialValidate(t *testing.T) {
 		// t2 should need to retry.
 		err = g.Wait()
 		assert.ErrorIs(t, err, ErrRetry)
-		// Let's abort it now.
+		// t2 was wounded by t1, so its log is already aborted: ending it now is
+		// a no-op that surfaces the finalized log.
 		err = tm2.End(ctx, h2)
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, ErrAlreadyFinalized)
 
 		// Check end result.
 		flushWrites(t, tm1, h1)

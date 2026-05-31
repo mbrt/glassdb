@@ -286,7 +286,9 @@ func fuzzAlgoReadOnly(ctx context.Context, env fuzzAlgoEnv, keys []string) error
 
 	h := env.algo.Begin(iterCtx, Data{Reads: reads})
 	err := env.algo.Commit(iterCtx, h)
-	if errors.Is(err, ErrRetry) {
+	if errors.Is(err, ErrRetry) || errors.Is(err, ErrWounded) {
+		// A read-only attempt that conflicts or gets wounded contributes no
+		// increment; just release it.
 		return env.algo.End(iterCtx, h)
 	}
 	if err != nil {
@@ -320,7 +322,8 @@ func fuzzAlgoTx(
 			}
 			return env.algo.unlockAll(ctx, h)
 		}
-		if !errors.Is(err, ErrRetry) {
+		wounded := errors.Is(err, ErrWounded)
+		if !wounded && !errors.Is(err, ErrRetry) {
 			_ = env.algo.End(ctx, h)
 			return err
 		}
@@ -331,6 +334,13 @@ func fuzzAlgoTx(
 			return err
 		}
 		d = buildData(reads, vals)
+		if wounded {
+			// Our log is aborted; restart with a fresh ID that preserves our
+			// priority, after releasing the old attempt's locks.
+			_ = env.algo.End(ctx, h)
+			h = env.algo.Rebegin(ctx, h, d)
+			continue
+		}
 		env.algo.Reset(h, d)
 	}
 }

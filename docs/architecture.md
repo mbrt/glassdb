@@ -294,6 +294,12 @@ on the transaction ID:
 <db-prefix>/_t/<base64-encoded-tx-id>
 ```
 
+The transaction ID is `[8 bytes random prefix][8 bytes big-endian UnixNano
+timestamp]`. The timestamp suffix encodes the wound-wait priority (earlier =
+older), while the random prefix leads so that log keys keep a high-entropy
+prefix and spread across object-store partitions instead of clustering
+sequential commits into one hot partition.
+
 The log is serialized as a Protocol Buffer and contains:
 
 - **Status**: pending, committed, or aborted.
@@ -314,9 +320,11 @@ The transaction log serves two critical purposes:
 
 The validate-and-commit sequence:
 
-1. **Parallel lock acquisition.** Lock all read and written keys in parallel,
-   with a 5-second deadlock timeout. If the timeout fires, fall back to serial
-   locking.
+1. **Parallel lock acquisition.** Lock all read and written keys in parallel.
+   Conflicts are resolved by the wound-wait rule (see [Deadlock
+   Handling](#deadlock-handling)): an older transaction aborts younger holders,
+   a younger one waits. A 5-second timeout falls back to serial locking only if
+   contention prevents progress.
 
 2. **Version verification.** For each read key, check that the version hasn't
    changed since the transaction read it. If it has, the transaction retries
@@ -369,18 +377,31 @@ maximum number of retries to one per conflict.
 
 ### Deadlock Handling
 
-GlassDB uses timeout-based deadlock detection:
+GlassDB prevents deadlocks proactively with the **wound-wait** rule. Each
+transaction has a priority derived from its ID (an earlier timestamp means an
+older, higher-priority transaction). When a transaction requests a lock that
+conflicts with current holders:
 
-1. **Parallel validation** attempts to lock all keys concurrently with a
-   5-second timeout (`maxDeadlockTimeout`).
-2. If the timeout expires (suspected deadlock), the transaction falls back to
-   **serial validation**: locks are acquired one at a time in sorted path order.
-   Total ordering prevents cycles in the wait-for graph, guaranteeing no
-   further deadlocks.
+- If the requester is **older** than a holder, it **wounds** it: the holder's
+  log is durably aborted and the requester takes the lock.
+- If the requester is **younger**, it **waits** for the holder to finish.
 
-This is a deliberate simplicity tradeoff: the naive approach is slow when
-deadlocks do occur (tens of seconds in the worst case), but deadlocks should be
-rare in the target workloads.
+Since an older transaction never waits for a younger one, the wait-for graph
+stays acyclic and no cycle can form. A wounded transaction observes `ErrWounded`
+and restarts with a renewed ID that preserves its original priority, so it is
+not starved.
+
+**Serial locking is kept as a safety net.** Parallel validation still arms a
+5-second timeout (`maxDeadlockTimeout`); if it fires — meaning sustained
+contention, or two equal-priority transactions that wound-wait does not order —
+the transaction falls back to **serial validation**, acquiring locks one at a
+time in sorted path order. Total ordering cannot deadlock, guaranteeing
+progress.
+
+Priority depends only on the ID's timestamp, never on its random prefix, because
+`RenewTID` keeps the timestamp but changes the prefix on each restart; ordering
+on the prefix would let equal-timestamp transactions flip order every restart
+and livelock. See [ADR-002](adr/002-wound-wait-locking.md).
 
 ### Crash Recovery
 

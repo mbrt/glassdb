@@ -5,11 +5,25 @@ package data
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"time"
+)
+
+const (
+	txIDLen   = 16
+	txIDTSOff = 8 // [0:8] random prefix, [8:16] big-endian UnixNano timestamp.
 )
 
 // TxID represents a transaction id.
+//
+// The layout is [8 bytes random][8 bytes big-endian UnixNano timestamp]. The
+// random bytes come first so that transaction-log keys (_t/<tx-id>) keep a
+// high-entropy prefix, spreading writes across object-storage partitions
+// instead of clustering sequential commits into a single hot partition. The
+// timestamp suffix encodes the transaction priority used by the wound-wait
+// rule: an earlier timestamp means an older, higher-priority transaction.
 type TxID []byte
 
 func (t TxID) String() string {
@@ -21,13 +35,60 @@ func (t TxID) Equal(other TxID) bool {
 	return bytes.Equal(t, other)
 }
 
-// NewTId generates a new random 128-bit transaction ID.
+// Older reports whether t has strictly higher priority than other, i.e. it
+// carries an earlier timestamp.
+//
+// Priority depends only on the timestamp, never on the random prefix. This is
+// essential for the wound-wait rule: RenewTID preserves the timestamp but mints
+// a fresh prefix on every restart, so a prefix-based tiebreak would let two
+// equal-timestamp transactions flip their relative order on each wound and
+// livelock by wounding each other forever. Transactions sharing a timestamp are
+// therefore never ordered against each other; that rare tie is left to the
+// serial-locking deadlock safety net.
+func (t TxID) Older(other TxID) bool {
+	return t.priority() < other.priority()
+}
+
+func (t TxID) priority() uint64 {
+	return binary.BigEndian.Uint64(t[txIDTSOff:])
+}
+
+// NewTId generates a new transaction ID using the current time as its priority.
 func NewTId() TxID {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
+	return newTID(time.Now())
+}
+
+// RenewTID returns a transaction ID that preserves the priority (timestamp) of
+// old but uses a fresh random prefix. A wounded transaction reuses its priority
+// on restart to avoid starvation, while the new prefix gives it a distinct log
+// object that lands in a different storage partition.
+func RenewTID(old TxID) TxID {
+	res := make([]byte, txIDLen)
+	randPrefix(res)
+	copy(res[txIDTSOff:], old[txIDTSOff:])
+	return res
+}
+
+// TIDWithPriority builds a transaction ID from an explicit timestamp and random
+// prefix. It is meant for tests that need deterministic priorities.
+func TIDWithPriority(ts time.Time, prefix []byte) TxID {
+	res := make([]byte, txIDLen)
+	copy(res[:txIDTSOff], prefix)
+	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
+	return res
+}
+
+func newTID(ts time.Time) TxID {
+	res := make([]byte, txIDLen)
+	randPrefix(res)
+	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
+	return res
+}
+
+func randPrefix(b []byte) {
+	if _, err := rand.Read(b[:txIDTSOff]); err != nil {
 		panic(fmt.Sprintf("Cannot read from random device: %v", err))
 	}
-	return b
 }
 
 // NewTxIDSet creates a TxIDSet containing the given transaction IDs, deduplicating any repeats.
