@@ -14,7 +14,7 @@
 # Configuration via environment variables (all optional):
 #   STACK_NAME         CloudFormation stack name      (default: glassdb-bench)
 #   AWS_REGION         AWS region                     (default: from aws config)
-#   INSTANCE_TYPE      EC2 instance type              (default: c7i.2xlarge)
+#   INSTANCE_TYPE      EC2 instance type              (default: c7i.8xlarge)
 #   MAX_DBS            rw9010 max concurrent DBs       (default: 50)
 #   NUM_KEYS           rw9010 number of keys           (default: 50000)
 #   RUN_DURATION       rw9010 per-step duration        (default: 60s)
@@ -26,7 +26,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$DIR/../.." && pwd)"
 
 STACK_NAME="${STACK_NAME:-glassdb-bench}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-c7i.2xlarge}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-c7i.8xlarge}"
 MAX_DBS="${MAX_DBS:-50}"
 NUM_KEYS="${NUM_KEYS:-50000}"
 RUN_DURATION="${RUN_DURATION:-60s}"

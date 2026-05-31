@@ -10,8 +10,14 @@ Description: >-
 Parameters:
   InstanceType:
     Type: String
-    Default: c7i.2xlarge
-    Description: EC2 instance type (must be x86_64 to match the amd64 binary).
+    Default: c7i.8xlarge
+    Description: >-
+      EC2 instance type (must be x86_64 to match the amd64 binary). The
+      throughput plateau is the write-commit path (lock stamping + multi
+      round-trip commits), not client CPU: a 48-vCPU c7i.12xlarge peaked at only
+      ~13% CPU over the full 1..50 DB sweep. c7i.8xlarge (32 vCPUs) keeps CPU
+      around ~20% with comfortable headroom; c7i.2xlarge (8 vCPUs) is enough for
+      a cheap run but becomes CPU-bound near 200 concurrent transactions.
   VpcCidr:
     Type: String
     Default: 10.0.0.0/16
@@ -268,7 +274,8 @@ Resources:
             -max-dbs=${MaxDBs} -num-keys=${NumKeys} -duration=${RunDuration} \
             -samples-out=out/samples.csv \
             -stats-out=out/stats.csv \
-            -throughput-out=out/throughput.csv
+            -throughput-out=out/throughput.csv \
+            -client-stats-out=out/client-stats.csv
 
           ./rtbench -backend=s3 -test-name=deadlock \
             -duration=${DeadlockDuration} \

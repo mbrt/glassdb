@@ -2,762 +2,592 @@
 + AWS_REGION=eu-central-1
 + export AWS_DEFAULT_REGION=eu-central-1
 + AWS_DEFAULT_REGION=eu-central-1
-+ export BUCKET=glassdb-bench-benchbucket-sroa7w6f2ywb
-+ BUCKET=glassdb-bench-benchbucket-sroa7w6f2ywb
++ export BUCKET=glassdb-bench-benchbucket-gogc45ifcnsf
++ BUCKET=glassdb-bench-benchbucket-gogc45ifcnsf
 + BIN_KEY=bin/rtbench
 + cd /root
 + i=0
 + '[' 0 -lt 120 ']'
-+ aws s3 cp s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench ./rtbench
++ aws s3 cp s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench ./rtbench
 fatal error: An error occurred (404) when calling the HeadObject operation: Key "bin/rtbench" does not exist
-+ echo 'waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 0)'
-waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 0)
++ echo 'waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 0)'
+waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 0)
 + i=1
 + sleep 15
 + '[' 1 -lt 120 ']'
-+ aws s3 cp s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench ./rtbench
++ aws s3 cp s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench ./rtbench
 fatal error: An error occurred (404) when calling the HeadObject operation: Key "bin/rtbench" does not exist
-+ echo 'waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 1)'
-waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 1)
++ echo 'waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 1)'
+waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 1)
 + i=2
 + sleep 15
 + '[' 2 -lt 120 ']'
-+ aws s3 cp s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench ./rtbench
++ aws s3 cp s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench ./rtbench
 fatal error: An error occurred (404) when calling the HeadObject operation: Key "bin/rtbench" does not exist
-+ echo 'waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 2)'
-waiting for s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench (attempt 2)
++ echo 'waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 2)'
+waiting for s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench (attempt 2)
 + i=3
 + sleep 15
 + '[' 3 -lt 120 ']'
-+ aws s3 cp s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench ./rtbench
-Completed 256.0 KiB/56.0 MiB (2.1 MiB/s) with 1 file(s) remainingCompleted 512.0 KiB/56.0 MiB (4.3 MiB/s) with 1 file(s) remainingCompleted 768.0 KiB/56.0 MiB (6.4 MiB/s) with 1 file(s) remainingCompleted 1.0 MiB/56.0 MiB (8.4 MiB/s) with 1 file(s) remaining  Completed 1.2 MiB/56.0 MiB (10.5 MiB/s) with 1 file(s) remaining Completed 1.5 MiB/56.0 MiB (12.6 MiB/s) with 1 file(s) remaining Completed 1.8 MiB/56.0 MiB (14.7 MiB/s) with 1 file(s) remaining Completed 2.0 MiB/56.0 MiB (16.7 MiB/s) with 1 file(s) remaining Completed 2.2 MiB/56.0 MiB (18.6 MiB/s) with 1 file(s) remaining Completed 2.5 MiB/56.0 MiB (20.5 MiB/s) with 1 file(s) remaining Completed 2.8 MiB/56.0 MiB (22.5 MiB/s) with 1 file(s) remaining Completed 3.0 MiB/56.0 MiB (24.4 MiB/s) with 1 file(s) remaining Completed 3.2 MiB/56.0 MiB (26.4 MiB/s) with 1 file(s) remaining Completed 3.5 MiB/56.0 MiB (28.3 MiB/s) with 1 file(s) remaining Completed 3.8 MiB/56.0 MiB (30.2 MiB/s) with 1 file(s) remaining Completed 4.0 MiB/56.0 MiB (32.1 MiB/s) with 1 file(s) remaining Completed 4.2 MiB/56.0 MiB (34.0 MiB/s) with 1 file(s) remaining Completed 4.5 MiB/56.0 MiB (35.9 MiB/s) with 1 file(s) remaining Completed 4.8 MiB/56.0 MiB (37.8 MiB/s) with 1 file(s) remaining Completed 5.0 MiB/56.0 MiB (39.6 MiB/s) with 1 file(s) remaining Completed 5.2 MiB/56.0 MiB (41.5 MiB/s) with 1 file(s) remaining Completed 5.5 MiB/56.0 MiB (43.1 MiB/s) with 1 file(s) remaining Completed 5.8 MiB/56.0 MiB (44.9 MiB/s) with 1 file(s) remaining Completed 6.0 MiB/56.0 MiB (46.7 MiB/s) with 1 file(s) remaining Completed 6.2 MiB/56.0 MiB (48.3 MiB/s) with 1 file(s) remaining Completed 6.5 MiB/56.0 MiB (50.2 MiB/s) with 1 file(s) remaining Completed 6.8 MiB/56.0 MiB (51.5 MiB/s) with 1 file(s) remaining Completed 7.0 MiB/56.0 MiB (53.1 MiB/s) with 1 file(s) remaining Completed 7.2 MiB/56.0 MiB (54.8 MiB/s) with 1 file(s) remaining Completed 7.5 MiB/56.0 MiB (56.5 MiB/s) with 1 file(s) remaining Completed 7.8 MiB/56.0 MiB (58.1 MiB/s) with 1 file(s) remaining Completed 8.0 MiB/56.0 MiB (59.8 MiB/s) with 1 file(s) remaining Completed 8.2 MiB/56.0 MiB (61.5 MiB/s) with 1 file(s) remaining Completed 8.5 MiB/56.0 MiB (63.0 MiB/s) with 1 file(s) remaining Completed 8.8 MiB/56.0 MiB (64.7 MiB/s) with 1 file(s) remaining Completed 9.0 MiB/56.0 MiB (66.4 MiB/s) with 1 file(s) remaining Completed 9.2 MiB/56.0 MiB (67.6 MiB/s) with 1 file(s) remaining Completed 9.5 MiB/56.0 MiB (69.3 MiB/s) with 1 file(s) remaining Completed 9.8 MiB/56.0 MiB (70.7 MiB/s) with 1 file(s) remaining Completed 10.0 MiB/56.0 MiB (72.3 MiB/s) with 1 file(s) remainingCompleted 10.2 MiB/56.0 MiB (74.0 MiB/s) with 1 file(s) remainingCompleted 10.5 MiB/56.0 MiB (75.5 MiB/s) with 1 file(s) remainingCompleted 10.8 MiB/56.0 MiB (76.7 MiB/s) with 1 file(s) remainingCompleted 11.0 MiB/56.0 MiB (78.4 MiB/s) with 1 file(s) remainingCompleted 11.2 MiB/56.0 MiB (79.8 MiB/s) with 1 file(s) remainingCompleted 11.5 MiB/56.0 MiB (81.3 MiB/s) with 1 file(s) remainingCompleted 11.8 MiB/56.0 MiB (82.9 MiB/s) with 1 file(s) remainingCompleted 12.0 MiB/56.0 MiB (84.6 MiB/s) with 1 file(s) remainingCompleted 12.2 MiB/56.0 MiB (85.8 MiB/s) with 1 file(s) remainingCompleted 12.5 MiB/56.0 MiB (87.3 MiB/s) with 1 file(s) remainingCompleted 12.8 MiB/56.0 MiB (88.9 MiB/s) with 1 file(s) remainingCompleted 13.0 MiB/56.0 MiB (90.4 MiB/s) with 1 file(s) remainingCompleted 13.2 MiB/56.0 MiB (91.9 MiB/s) with 1 file(s) remainingCompleted 13.5 MiB/56.0 MiB (93.0 MiB/s) with 1 file(s) remainingCompleted 13.8 MiB/56.0 MiB (94.6 MiB/s) with 1 file(s) remainingCompleted 14.0 MiB/56.0 MiB (96.0 MiB/s) with 1 file(s) remainingCompleted 14.2 MiB/56.0 MiB (97.4 MiB/s) with 1 file(s) remainingCompleted 14.5 MiB/56.0 MiB (98.9 MiB/s) with 1 file(s) remainingCompleted 14.8 MiB/56.0 MiB (100.1 MiB/s) with 1 file(s) remainingCompleted 15.0 MiB/56.0 MiB (101.5 MiB/s) with 1 file(s) remainingCompleted 15.2 MiB/56.0 MiB (103.1 MiB/s) with 1 file(s) remainingCompleted 15.5 MiB/56.0 MiB (104.3 MiB/s) with 1 file(s) remainingCompleted 15.8 MiB/56.0 MiB (105.8 MiB/s) with 1 file(s) remainingCompleted 16.0 MiB/56.0 MiB (107.0 MiB/s) with 1 file(s) remainingCompleted 16.2 MiB/56.0 MiB (108.3 MiB/s) with 1 file(s) remainingCompleted 16.5 MiB/56.0 MiB (109.7 MiB/s) with 1 file(s) remainingCompleted 16.8 MiB/56.0 MiB (111.1 MiB/s) with 1 file(s) remainingCompleted 17.0 MiB/56.0 MiB (112.6 MiB/s) with 1 file(s) remainingCompleted 17.2 MiB/56.0 MiB (113.6 MiB/s) with 1 file(s) remainingCompleted 17.5 MiB/56.0 MiB (115.2 MiB/s) with 1 file(s) remainingCompleted 17.8 MiB/56.0 MiB (116.2 MiB/s) with 1 file(s) remainingCompleted 18.0 MiB/56.0 MiB (117.7 MiB/s) with 1 file(s) remainingCompleted 18.2 MiB/56.0 MiB (118.8 MiB/s) with 1 file(s) remainingCompleted 18.5 MiB/56.0 MiB (120.2 MiB/s) with 1 file(s) remainingCompleted 18.8 MiB/56.0 MiB (121.4 MiB/s) with 1 file(s) remainingCompleted 19.0 MiB/56.0 MiB (122.8 MiB/s) with 1 file(s) remainingCompleted 19.2 MiB/56.0 MiB (124.3 MiB/s) with 1 file(s) remainingCompleted 19.5 MiB/56.0 MiB (125.3 MiB/s) with 1 file(s) remainingCompleted 19.7 MiB/56.0 MiB (126.5 MiB/s) with 1 file(s) remainingCompleted 20.0 MiB/56.0 MiB (127.7 MiB/s) with 1 file(s) remainingCompleted 20.2 MiB/56.0 MiB (129.0 MiB/s) with 1 file(s) remainingCompleted 20.5 MiB/56.0 MiB (130.3 MiB/s) with 1 file(s) remainingCompleted 20.7 MiB/56.0 MiB (131.5 MiB/s) with 1 file(s) remainingCompleted 21.0 MiB/56.0 MiB (132.6 MiB/s) with 1 file(s) remainingCompleted 21.2 MiB/56.0 MiB (133.9 MiB/s) with 1 file(s) remainingCompleted 21.5 MiB/56.0 MiB (135.1 MiB/s) with 1 file(s) remainingCompleted 21.7 MiB/56.0 MiB (136.5 MiB/s) with 1 file(s) remainingCompleted 22.0 MiB/56.0 MiB (136.4 MiB/s) with 1 file(s) remainingCompleted 22.2 MiB/56.0 MiB (137.7 MiB/s) with 1 file(s) remainingCompleted 22.5 MiB/56.0 MiB (138.7 MiB/s) with 1 file(s) remainingCompleted 22.7 MiB/56.0 MiB (139.8 MiB/s) with 1 file(s) remainingCompleted 23.0 MiB/56.0 MiB (141.2 MiB/s) with 1 file(s) remainingCompleted 23.2 MiB/56.0 MiB (142.1 MiB/s) with 1 file(s) remainingCompleted 23.5 MiB/56.0 MiB (142.4 MiB/s) with 1 file(s) remainingCompleted 23.7 MiB/56.0 MiB (143.5 MiB/s) with 1 file(s) remainingCompleted 24.0 MiB/56.0 MiB (144.6 MiB/s) with 1 file(s) remainingCompleted 24.2 MiB/56.0 MiB (145.7 MiB/s) with 1 file(s) remainingCompleted 24.5 MiB/56.0 MiB (146.6 MiB/s) with 1 file(s) remainingCompleted 24.7 MiB/56.0 MiB (147.3 MiB/s) with 1 file(s) remainingCompleted 25.0 MiB/56.0 MiB (148.3 MiB/s) with 1 file(s) remainingCompleted 25.2 MiB/56.0 MiB (149.5 MiB/s) with 1 file(s) remainingCompleted 25.5 MiB/56.0 MiB (150.7 MiB/s) with 1 file(s) remainingCompleted 25.7 MiB/56.0 MiB (151.9 MiB/s) with 1 file(s) remainingCompleted 26.0 MiB/56.0 MiB (153.0 MiB/s) with 1 file(s) remainingCompleted 26.2 MiB/56.0 MiB (153.7 MiB/s) with 1 file(s) remainingCompleted 26.5 MiB/56.0 MiB (154.8 MiB/s) with 1 file(s) remainingCompleted 26.7 MiB/56.0 MiB (155.9 MiB/s) with 1 file(s) remainingCompleted 27.0 MiB/56.0 MiB (156.7 MiB/s) with 1 file(s) remainingCompleted 27.2 MiB/56.0 MiB (157.7 MiB/s) with 1 file(s) remainingCompleted 27.5 MiB/56.0 MiB (158.6 MiB/s) with 1 file(s) remainingCompleted 27.7 MiB/56.0 MiB (159.7 MiB/s) with 1 file(s) remainingCompleted 28.0 MiB/56.0 MiB (160.7 MiB/s) with 1 file(s) remainingCompleted 28.2 MiB/56.0 MiB (162.0 MiB/s) with 1 file(s) remainingCompleted 28.5 MiB/56.0 MiB (163.2 MiB/s) with 1 file(s) remainingCompleted 28.7 MiB/56.0 MiB (163.9 MiB/s) with 1 file(s) remainingCompleted 29.0 MiB/56.0 MiB (165.1 MiB/s) with 1 file(s) remainingCompleted 29.2 MiB/56.0 MiB (165.9 MiB/s) with 1 file(s) remainingCompleted 29.5 MiB/56.0 MiB (166.8 MiB/s) with 1 file(s) remainingCompleted 29.7 MiB/56.0 MiB (167.8 MiB/s) with 1 file(s) remainingCompleted 30.0 MiB/56.0 MiB (169.1 MiB/s) with 1 file(s) remainingCompleted 30.2 MiB/56.0 MiB (170.0 MiB/s) with 1 file(s) remainingCompleted 30.5 MiB/56.0 MiB (170.9 MiB/s) with 1 file(s) remainingCompleted 30.7 MiB/56.0 MiB (171.6 MiB/s) with 1 file(s) remainingCompleted 31.0 MiB/56.0 MiB (172.6 MiB/s) with 1 file(s) remainingCompleted 31.2 MiB/56.0 MiB (173.8 MiB/s) with 1 file(s) remainingCompleted 31.5 MiB/56.0 MiB (174.6 MiB/s) with 1 file(s) remainingCompleted 31.7 MiB/56.0 MiB (175.4 MiB/s) with 1 file(s) remainingCompleted 32.0 MiB/56.0 MiB (176.1 MiB/s) with 1 file(s) remainingCompleted 32.2 MiB/56.0 MiB (177.2 MiB/s) with 1 file(s) remainingCompleted 32.5 MiB/56.0 MiB (178.3 MiB/s) with 1 file(s) remainingCompleted 32.7 MiB/56.0 MiB (179.3 MiB/s) with 1 file(s) remainingCompleted 33.0 MiB/56.0 MiB (180.1 MiB/s) with 1 file(s) remainingCompleted 33.2 MiB/56.0 MiB (180.9 MiB/s) with 1 file(s) remainingCompleted 33.5 MiB/56.0 MiB (182.1 MiB/s) with 1 file(s) remainingCompleted 33.7 MiB/56.0 MiB (182.7 MiB/s) with 1 file(s) remainingCompleted 34.0 MiB/56.0 MiB (183.7 MiB/s) with 1 file(s) remainingCompleted 34.2 MiB/56.0 MiB (184.9 MiB/s) with 1 file(s) remainingCompleted 34.5 MiB/56.0 MiB (185.6 MiB/s) with 1 file(s) remainingCompleted 34.7 MiB/56.0 MiB (186.9 MiB/s) with 1 file(s) remainingCompleted 35.0 MiB/56.0 MiB (187.6 MiB/s) with 1 file(s) remainingCompleted 35.2 MiB/56.0 MiB (188.5 MiB/s) with 1 file(s) remainingCompleted 35.5 MiB/56.0 MiB (189.1 MiB/s) with 1 file(s) remainingCompleted 35.7 MiB/56.0 MiB (190.1 MiB/s) with 1 file(s) remainingCompleted 36.0 MiB/56.0 MiB (191.1 MiB/s) with 1 file(s) remainingCompleted 36.2 MiB/56.0 MiB (192.1 MiB/s) with 1 file(s) remainingCompleted 36.5 MiB/56.0 MiB (193.2 MiB/s) with 1 file(s) remainingCompleted 36.7 MiB/56.0 MiB (193.5 MiB/s) with 1 file(s) remainingCompleted 37.0 MiB/56.0 MiB (194.4 MiB/s) with 1 file(s) remainingCompleted 37.2 MiB/56.0 MiB (195.4 MiB/s) with 1 file(s) remainingCompleted 37.5 MiB/56.0 MiB (196.2 MiB/s) with 1 file(s) remainingCompleted 37.7 MiB/56.0 MiB (197.3 MiB/s) with 1 file(s) remainingCompleted 38.0 MiB/56.0 MiB (198.4 MiB/s) with 1 file(s) remainingCompleted 38.2 MiB/56.0 MiB (198.7 MiB/s) with 1 file(s) remainingCompleted 38.5 MiB/56.0 MiB (199.6 MiB/s) with 1 file(s) remainingCompleted 38.7 MiB/56.0 MiB (200.3 MiB/s) with 1 file(s) remainingCompleted 39.0 MiB/56.0 MiB (201.5 MiB/s) with 1 file(s) remainingCompleted 39.2 MiB/56.0 MiB (202.5 MiB/s) with 1 file(s) remainingCompleted 39.5 MiB/56.0 MiB (203.1 MiB/s) with 1 file(s) remainingCompleted 39.7 MiB/56.0 MiB (203.7 MiB/s) with 1 file(s) remainingCompleted 40.0 MiB/56.0 MiB (204.8 MiB/s) with 1 file(s) remainingCompleted 40.2 MiB/56.0 MiB (206.0 MiB/s) with 1 file(s) remainingCompleted 40.5 MiB/56.0 MiB (206.9 MiB/s) with 1 file(s) remainingCompleted 40.7 MiB/56.0 MiB (207.5 MiB/s) with 1 file(s) remainingCompleted 41.0 MiB/56.0 MiB (208.2 MiB/s) with 1 file(s) remainingCompleted 41.2 MiB/56.0 MiB (209.3 MiB/s) with 1 file(s) remainingCompleted 41.5 MiB/56.0 MiB (210.5 MiB/s) with 1 file(s) remainingCompleted 41.7 MiB/56.0 MiB (211.3 MiB/s) with 1 file(s) remainingCompleted 42.0 MiB/56.0 MiB (211.9 MiB/s) with 1 file(s) remainingCompleted 42.2 MiB/56.0 MiB (212.7 MiB/s) with 1 file(s) remainingCompleted 42.5 MiB/56.0 MiB (213.5 MiB/s) with 1 file(s) remainingCompleted 42.7 MiB/56.0 MiB (214.1 MiB/s) with 1 file(s) remainingCompleted 43.0 MiB/56.0 MiB (215.1 MiB/s) with 1 file(s) remainingCompleted 43.2 MiB/56.0 MiB (215.7 MiB/s) with 1 file(s) remainingCompleted 43.5 MiB/56.0 MiB (216.7 MiB/s) with 1 file(s) remainingCompleted 43.7 MiB/56.0 MiB (217.5 MiB/s) with 1 file(s) remainingCompleted 44.0 MiB/56.0 MiB (218.0 MiB/s) with 1 file(s) remainingCompleted 44.2 MiB/56.0 MiB (218.8 MiB/s) with 1 file(s) remainingCompleted 44.5 MiB/56.0 MiB (219.9 MiB/s) with 1 file(s) remainingCompleted 44.7 MiB/56.0 MiB (220.5 MiB/s) with 1 file(s) remainingCompleted 45.0 MiB/56.0 MiB (221.4 MiB/s) with 1 file(s) remainingCompleted 45.2 MiB/56.0 MiB (222.2 MiB/s) with 1 file(s) remainingCompleted 45.5 MiB/56.0 MiB (222.7 MiB/s) with 1 file(s) remainingCompleted 45.7 MiB/56.0 MiB (223.6 MiB/s) with 1 file(s) remainingCompleted 46.0 MiB/56.0 MiB (224.3 MiB/s) with 1 file(s) remainingCompleted 46.2 MiB/56.0 MiB (225.4 MiB/s) with 1 file(s) remainingCompleted 46.5 MiB/56.0 MiB (226.3 MiB/s) with 1 file(s) remainingCompleted 46.7 MiB/56.0 MiB (226.9 MiB/s) with 1 file(s) remainingCompleted 47.0 MiB/56.0 MiB (227.6 MiB/s) with 1 file(s) remainingCompleted 47.2 MiB/56.0 MiB (228.6 MiB/s) with 1 file(s) remainingCompleted 47.5 MiB/56.0 MiB (229.3 MiB/s) with 1 file(s) remainingCompleted 47.7 MiB/56.0 MiB (230.2 MiB/s) with 1 file(s) remainingCompleted 48.0 MiB/56.0 MiB (231.1 MiB/s) with 1 file(s) remainingCompleted 48.2 MiB/56.0 MiB (231.7 MiB/s) with 1 file(s) remainingCompleted 48.5 MiB/56.0 MiB (232.5 MiB/s) with 1 file(s) remainingCompleted 48.7 MiB/56.0 MiB (233.2 MiB/s) with 1 file(s) remainingCompleted 49.0 MiB/56.0 MiB (234.2 MiB/s) with 1 file(s) remainingCompleted 49.2 MiB/56.0 MiB (234.9 MiB/s) with 1 file(s) remainingCompleted 49.5 MiB/56.0 MiB (235.5 MiB/s) with 1 file(s) remainingCompleted 49.7 MiB/56.0 MiB (236.3 MiB/s) with 1 file(s) remainingCompleted 50.0 MiB/56.0 MiB (237.2 MiB/s) with 1 file(s) remainingCompleted 50.2 MiB/56.0 MiB (237.8 MiB/s) with 1 file(s) remainingCompleted 50.5 MiB/56.0 MiB (238.6 MiB/s) with 1 file(s) remainingCompleted 50.7 MiB/56.0 MiB (239.3 MiB/s) with 1 file(s) remainingCompleted 51.0 MiB/56.0 MiB (240.0 MiB/s) with 1 file(s) remainingCompleted 51.2 MiB/56.0 MiB (240.9 MiB/s) with 1 file(s) remainingCompleted 51.5 MiB/56.0 MiB (241.6 MiB/s) with 1 file(s) remainingCompleted 51.7 MiB/56.0 MiB (242.4 MiB/s) with 1 file(s) remainingCompleted 52.0 MiB/56.0 MiB (243.2 MiB/s) with 1 file(s) remainingCompleted 52.2 MiB/56.0 MiB (244.0 MiB/s) with 1 file(s) remainingCompleted 52.5 MiB/56.0 MiB (244.9 MiB/s) with 1 file(s) remainingCompleted 52.7 MiB/56.0 MiB (245.6 MiB/s) with 1 file(s) remainingCompleted 53.0 MiB/56.0 MiB (246.5 MiB/s) with 1 file(s) remainingCompleted 53.2 MiB/56.0 MiB (247.3 MiB/s) with 1 file(s) remainingCompleted 53.5 MiB/56.0 MiB (247.7 MiB/s) with 1 file(s) remainingCompleted 53.7 MiB/56.0 MiB (248.5 MiB/s) with 1 file(s) remainingCompleted 54.0 MiB/56.0 MiB (249.3 MiB/s) with 1 file(s) remainingCompleted 54.2 MiB/56.0 MiB (250.1 MiB/s) with 1 file(s) remainingCompleted 54.5 MiB/56.0 MiB (250.9 MiB/s) with 1 file(s) remainingCompleted 54.7 MiB/56.0 MiB (251.6 MiB/s) with 1 file(s) remainingCompleted 55.0 MiB/56.0 MiB (252.4 MiB/s) with 1 file(s) remainingCompleted 55.2 MiB/56.0 MiB (253.1 MiB/s) with 1 file(s) remainingCompleted 55.5 MiB/56.0 MiB (253.9 MiB/s) with 1 file(s) remainingCompleted 55.7 MiB/56.0 MiB (254.6 MiB/s) with 1 file(s) remainingCompleted 56.0 MiB/56.0 MiB (255.4 MiB/s) with 1 file(s) remainingdownload: s3://glassdb-bench-benchbucket-sroa7w6f2ywb/bin/rtbench to ./rtbench
++ aws s3 cp s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench ./rtbench
+Completed 32.2 KiB/56.0 MiB (282.5 KiB/s) with 1 file(s) remainingCompleted 288.2 KiB/56.0 MiB (2.1 MiB/s) with 1 file(s) remaining Completed 544.2 KiB/56.0 MiB (4.0 MiB/s) with 1 file(s) remaining Completed 800.2 KiB/56.0 MiB (5.7 MiB/s) with 1 file(s) remaining Completed 1.0 MiB/56.0 MiB (7.5 MiB/s) with 1 file(s) remaining   Completed 1.3 MiB/56.0 MiB (9.3 MiB/s) with 1 file(s) remaining   Completed 1.5 MiB/56.0 MiB (11.1 MiB/s) with 1 file(s) remaining  Completed 1.8 MiB/56.0 MiB (12.8 MiB/s) with 1 file(s) remaining  Completed 2.0 MiB/56.0 MiB (14.6 MiB/s) with 1 file(s) remaining  Completed 2.3 MiB/56.0 MiB (16.4 MiB/s) with 1 file(s) remaining  Completed 2.5 MiB/56.0 MiB (18.0 MiB/s) with 1 file(s) remaining  Completed 2.8 MiB/56.0 MiB (19.7 MiB/s) with 1 file(s) remaining  Completed 3.0 MiB/56.0 MiB (21.4 MiB/s) with 1 file(s) remaining  Completed 3.3 MiB/56.0 MiB (23.0 MiB/s) with 1 file(s) remaining  Completed 3.5 MiB/56.0 MiB (24.8 MiB/s) with 1 file(s) remaining  Completed 3.8 MiB/56.0 MiB (26.4 MiB/s) with 1 file(s) remaining  Completed 4.0 MiB/56.0 MiB (28.1 MiB/s) with 1 file(s) remaining  Completed 4.3 MiB/56.0 MiB (29.7 MiB/s) with 1 file(s) remaining  Completed 4.5 MiB/56.0 MiB (31.3 MiB/s) with 1 file(s) remaining  Completed 4.8 MiB/56.0 MiB (32.9 MiB/s) with 1 file(s) remaining  Completed 5.0 MiB/56.0 MiB (34.6 MiB/s) with 1 file(s) remaining  Completed 5.3 MiB/56.0 MiB (35.8 MiB/s) with 1 file(s) remaining  Completed 5.5 MiB/56.0 MiB (37.4 MiB/s) with 1 file(s) remaining  Completed 5.8 MiB/56.0 MiB (39.0 MiB/s) with 1 file(s) remaining  Completed 6.0 MiB/56.0 MiB (40.6 MiB/s) with 1 file(s) remaining  Completed 6.3 MiB/56.0 MiB (42.2 MiB/s) with 1 file(s) remaining  Completed 6.5 MiB/56.0 MiB (43.7 MiB/s) with 1 file(s) remaining  Completed 6.8 MiB/56.0 MiB (45.2 MiB/s) with 1 file(s) remaining  Completed 7.0 MiB/56.0 MiB (46.8 MiB/s) with 1 file(s) remaining  Completed 7.3 MiB/56.0 MiB (48.3 MiB/s) with 1 file(s) remaining  Completed 7.5 MiB/56.0 MiB (49.8 MiB/s) with 1 file(s) remaining  Completed 7.8 MiB/56.0 MiB (51.3 MiB/s) with 1 file(s) remaining  Completed 8.0 MiB/56.0 MiB (52.9 MiB/s) with 1 file(s) remaining  Completed 8.3 MiB/56.0 MiB (54.3 MiB/s) with 1 file(s) remaining  Completed 8.5 MiB/56.0 MiB (55.9 MiB/s) with 1 file(s) remaining  Completed 8.8 MiB/56.0 MiB (57.2 MiB/s) with 1 file(s) remaining  Completed 9.0 MiB/56.0 MiB (58.8 MiB/s) with 1 file(s) remaining  Completed 9.3 MiB/56.0 MiB (60.2 MiB/s) with 1 file(s) remaining  Completed 9.5 MiB/56.0 MiB (61.7 MiB/s) with 1 file(s) remaining  Completed 9.8 MiB/56.0 MiB (63.0 MiB/s) with 1 file(s) remaining  Completed 10.0 MiB/56.0 MiB (64.1 MiB/s) with 1 file(s) remaining Completed 10.3 MiB/56.0 MiB (65.5 MiB/s) with 1 file(s) remaining Completed 10.5 MiB/56.0 MiB (67.0 MiB/s) with 1 file(s) remaining Completed 10.8 MiB/56.0 MiB (68.4 MiB/s) with 1 file(s) remaining Completed 11.0 MiB/56.0 MiB (69.6 MiB/s) with 1 file(s) remaining Completed 11.3 MiB/56.0 MiB (71.1 MiB/s) with 1 file(s) remaining Completed 11.5 MiB/56.0 MiB (72.3 MiB/s) with 1 file(s) remaining Completed 11.8 MiB/56.0 MiB (73.9 MiB/s) with 1 file(s) remaining Completed 12.0 MiB/56.0 MiB (75.1 MiB/s) with 1 file(s) remaining Completed 12.3 MiB/56.0 MiB (76.5 MiB/s) with 1 file(s) remaining Completed 12.5 MiB/56.0 MiB (77.7 MiB/s) with 1 file(s) remaining Completed 12.8 MiB/56.0 MiB (79.1 MiB/s) with 1 file(s) remaining Completed 13.0 MiB/56.0 MiB (80.4 MiB/s) with 1 file(s) remaining Completed 13.3 MiB/56.0 MiB (81.6 MiB/s) with 1 file(s) remaining Completed 13.5 MiB/56.0 MiB (82.8 MiB/s) with 1 file(s) remaining Completed 13.8 MiB/56.0 MiB (84.3 MiB/s) with 1 file(s) remaining Completed 14.0 MiB/56.0 MiB (85.8 MiB/s) with 1 file(s) remaining Completed 14.3 MiB/56.0 MiB (87.0 MiB/s) with 1 file(s) remaining Completed 14.5 MiB/56.0 MiB (88.3 MiB/s) with 1 file(s) remaining Completed 14.8 MiB/56.0 MiB (89.4 MiB/s) with 1 file(s) remaining Completed 15.0 MiB/56.0 MiB (90.6 MiB/s) with 1 file(s) remaining Completed 15.3 MiB/56.0 MiB (92.0 MiB/s) with 1 file(s) remaining Completed 15.5 MiB/56.0 MiB (93.4 MiB/s) with 1 file(s) remaining Completed 15.8 MiB/56.0 MiB (94.5 MiB/s) with 1 file(s) remaining Completed 16.0 MiB/56.0 MiB (95.7 MiB/s) with 1 file(s) remaining Completed 16.3 MiB/56.0 MiB (96.7 MiB/s) with 1 file(s) remaining Completed 16.5 MiB/56.0 MiB (98.1 MiB/s) with 1 file(s) remaining Completed 16.8 MiB/56.0 MiB (99.4 MiB/s) with 1 file(s) remaining Completed 17.0 MiB/56.0 MiB (100.8 MiB/s) with 1 file(s) remainingCompleted 17.3 MiB/56.0 MiB (101.4 MiB/s) with 1 file(s) remainingCompleted 17.5 MiB/56.0 MiB (102.3 MiB/s) with 1 file(s) remainingCompleted 17.8 MiB/56.0 MiB (103.7 MiB/s) with 1 file(s) remainingCompleted 18.0 MiB/56.0 MiB (105.1 MiB/s) with 1 file(s) remainingCompleted 18.3 MiB/56.0 MiB (106.1 MiB/s) with 1 file(s) remainingCompleted 18.5 MiB/56.0 MiB (107.5 MiB/s) with 1 file(s) remainingCompleted 18.8 MiB/56.0 MiB (108.5 MiB/s) with 1 file(s) remainingCompleted 19.0 MiB/56.0 MiB (109.4 MiB/s) with 1 file(s) remainingCompleted 19.3 MiB/56.0 MiB (110.5 MiB/s) with 1 file(s) remainingCompleted 19.5 MiB/56.0 MiB (111.7 MiB/s) with 1 file(s) remainingCompleted 19.8 MiB/56.0 MiB (112.7 MiB/s) with 1 file(s) remainingCompleted 20.0 MiB/56.0 MiB (114.0 MiB/s) with 1 file(s) remainingCompleted 20.3 MiB/56.0 MiB (115.2 MiB/s) with 1 file(s) remainingCompleted 20.5 MiB/56.0 MiB (116.1 MiB/s) with 1 file(s) remainingCompleted 20.8 MiB/56.0 MiB (117.2 MiB/s) with 1 file(s) remainingCompleted 21.0 MiB/56.0 MiB (118.2 MiB/s) with 1 file(s) remainingCompleted 21.3 MiB/56.0 MiB (119.5 MiB/s) with 1 file(s) remainingCompleted 21.5 MiB/56.0 MiB (120.5 MiB/s) with 1 file(s) remainingCompleted 21.8 MiB/56.0 MiB (121.6 MiB/s) with 1 file(s) remainingCompleted 22.0 MiB/56.0 MiB (122.6 MiB/s) with 1 file(s) remainingCompleted 22.3 MiB/56.0 MiB (123.7 MiB/s) with 1 file(s) remainingCompleted 22.5 MiB/56.0 MiB (124.8 MiB/s) with 1 file(s) remainingCompleted 22.8 MiB/56.0 MiB (126.0 MiB/s) with 1 file(s) remainingCompleted 23.0 MiB/56.0 MiB (126.9 MiB/s) with 1 file(s) remainingCompleted 23.3 MiB/56.0 MiB (128.2 MiB/s) with 1 file(s) remainingCompleted 23.5 MiB/56.0 MiB (129.0 MiB/s) with 1 file(s) remainingCompleted 23.8 MiB/56.0 MiB (130.1 MiB/s) with 1 file(s) remainingCompleted 24.0 MiB/56.0 MiB (131.4 MiB/s) with 1 file(s) remainingCompleted 24.3 MiB/56.0 MiB (132.4 MiB/s) with 1 file(s) remainingCompleted 24.5 MiB/56.0 MiB (133.3 MiB/s) with 1 file(s) remainingCompleted 24.8 MiB/56.0 MiB (134.2 MiB/s) with 1 file(s) remainingCompleted 25.0 MiB/56.0 MiB (135.3 MiB/s) with 1 file(s) remainingCompleted 25.3 MiB/56.0 MiB (136.3 MiB/s) with 1 file(s) remainingCompleted 25.5 MiB/56.0 MiB (137.0 MiB/s) with 1 file(s) remainingCompleted 25.8 MiB/56.0 MiB (138.2 MiB/s) with 1 file(s) remainingCompleted 26.0 MiB/56.0 MiB (139.3 MiB/s) with 1 file(s) remainingCompleted 26.3 MiB/56.0 MiB (140.6 MiB/s) with 1 file(s) remainingCompleted 26.5 MiB/56.0 MiB (141.5 MiB/s) with 1 file(s) remainingCompleted 26.8 MiB/56.0 MiB (142.6 MiB/s) with 1 file(s) remainingCompleted 27.0 MiB/56.0 MiB (143.3 MiB/s) with 1 file(s) remainingCompleted 27.3 MiB/56.0 MiB (144.2 MiB/s) with 1 file(s) remainingCompleted 27.5 MiB/56.0 MiB (144.9 MiB/s) with 1 file(s) remainingCompleted 27.8 MiB/56.0 MiB (146.0 MiB/s) with 1 file(s) remainingCompleted 28.0 MiB/56.0 MiB (147.2 MiB/s) with 1 file(s) remainingCompleted 28.3 MiB/56.0 MiB (148.4 MiB/s) with 1 file(s) remainingCompleted 28.5 MiB/56.0 MiB (149.2 MiB/s) with 1 file(s) remainingCompleted 28.8 MiB/56.0 MiB (150.2 MiB/s) with 1 file(s) remainingCompleted 29.0 MiB/56.0 MiB (151.2 MiB/s) with 1 file(s) remainingCompleted 29.3 MiB/56.0 MiB (151.8 MiB/s) with 1 file(s) remainingCompleted 29.5 MiB/56.0 MiB (152.6 MiB/s) with 1 file(s) remainingCompleted 29.8 MiB/56.0 MiB (153.7 MiB/s) with 1 file(s) remainingCompleted 30.0 MiB/56.0 MiB (154.8 MiB/s) with 1 file(s) remainingCompleted 30.3 MiB/56.0 MiB (156.0 MiB/s) with 1 file(s) remainingCompleted 30.5 MiB/56.0 MiB (157.0 MiB/s) with 1 file(s) remainingCompleted 30.8 MiB/56.0 MiB (157.9 MiB/s) with 1 file(s) remainingCompleted 31.0 MiB/56.0 MiB (158.6 MiB/s) with 1 file(s) remainingCompleted 31.3 MiB/56.0 MiB (159.3 MiB/s) with 1 file(s) remainingCompleted 31.5 MiB/56.0 MiB (160.1 MiB/s) with 1 file(s) remainingCompleted 31.8 MiB/56.0 MiB (161.2 MiB/s) with 1 file(s) remainingCompleted 32.0 MiB/56.0 MiB (162.2 MiB/s) with 1 file(s) remainingCompleted 32.3 MiB/56.0 MiB (163.1 MiB/s) with 1 file(s) remainingCompleted 32.5 MiB/56.0 MiB (164.2 MiB/s) with 1 file(s) remainingCompleted 32.8 MiB/56.0 MiB (165.1 MiB/s) with 1 file(s) remainingCompleted 33.0 MiB/56.0 MiB (166.2 MiB/s) with 1 file(s) remainingCompleted 33.3 MiB/56.0 MiB (167.3 MiB/s) with 1 file(s) remainingCompleted 33.5 MiB/56.0 MiB (167.6 MiB/s) with 1 file(s) remainingCompleted 33.8 MiB/56.0 MiB (168.7 MiB/s) with 1 file(s) remainingCompleted 34.0 MiB/56.0 MiB (169.8 MiB/s) with 1 file(s) remainingCompleted 34.3 MiB/56.0 MiB (170.7 MiB/s) with 1 file(s) remainingCompleted 34.5 MiB/56.0 MiB (171.5 MiB/s) with 1 file(s) remainingCompleted 34.8 MiB/56.0 MiB (172.5 MiB/s) with 1 file(s) remainingCompleted 35.0 MiB/56.0 MiB (173.3 MiB/s) with 1 file(s) remainingCompleted 35.3 MiB/56.0 MiB (174.2 MiB/s) with 1 file(s) remainingCompleted 35.5 MiB/56.0 MiB (175.3 MiB/s) with 1 file(s) remainingCompleted 35.8 MiB/56.0 MiB (176.2 MiB/s) with 1 file(s) remainingCompleted 36.0 MiB/56.0 MiB (176.8 MiB/s) with 1 file(s) remainingCompleted 36.3 MiB/56.0 MiB (177.9 MiB/s) with 1 file(s) remainingCompleted 36.5 MiB/56.0 MiB (178.5 MiB/s) with 1 file(s) remainingCompleted 36.8 MiB/56.0 MiB (179.6 MiB/s) with 1 file(s) remainingCompleted 37.0 MiB/56.0 MiB (180.1 MiB/s) with 1 file(s) remainingCompleted 37.3 MiB/56.0 MiB (181.2 MiB/s) with 1 file(s) remainingCompleted 37.5 MiB/56.0 MiB (181.9 MiB/s) with 1 file(s) remainingCompleted 37.8 MiB/56.0 MiB (182.6 MiB/s) with 1 file(s) remainingCompleted 38.0 MiB/56.0 MiB (183.3 MiB/s) with 1 file(s) remainingCompleted 38.3 MiB/56.0 MiB (184.3 MiB/s) with 1 file(s) remainingCompleted 38.5 MiB/56.0 MiB (184.9 MiB/s) with 1 file(s) remainingCompleted 38.8 MiB/56.0 MiB (186.0 MiB/s) with 1 file(s) remainingCompleted 39.0 MiB/56.0 MiB (186.6 MiB/s) with 1 file(s) remainingCompleted 39.3 MiB/56.0 MiB (187.7 MiB/s) with 1 file(s) remainingCompleted 39.5 MiB/56.0 MiB (188.3 MiB/s) with 1 file(s) remainingCompleted 39.8 MiB/56.0 MiB (188.9 MiB/s) with 1 file(s) remainingCompleted 40.0 MiB/56.0 MiB (189.6 MiB/s) with 1 file(s) remainingCompleted 40.3 MiB/56.0 MiB (190.7 MiB/s) with 1 file(s) remainingCompleted 40.5 MiB/56.0 MiB (191.8 MiB/s) with 1 file(s) remainingCompleted 40.8 MiB/56.0 MiB (192.3 MiB/s) with 1 file(s) remainingCompleted 41.0 MiB/56.0 MiB (193.0 MiB/s) with 1 file(s) remainingCompleted 41.3 MiB/56.0 MiB (194.0 MiB/s) with 1 file(s) remainingCompleted 41.5 MiB/56.0 MiB (194.7 MiB/s) with 1 file(s) remainingCompleted 41.8 MiB/56.0 MiB (195.7 MiB/s) with 1 file(s) remainingCompleted 42.0 MiB/56.0 MiB (196.5 MiB/s) with 1 file(s) remainingCompleted 42.3 MiB/56.0 MiB (196.8 MiB/s) with 1 file(s) remainingCompleted 42.5 MiB/56.0 MiB (197.8 MiB/s) with 1 file(s) remainingCompleted 42.8 MiB/56.0 MiB (198.4 MiB/s) with 1 file(s) remainingCompleted 43.0 MiB/56.0 MiB (199.1 MiB/s) with 1 file(s) remainingCompleted 43.3 MiB/56.0 MiB (200.2 MiB/s) with 1 file(s) remainingCompleted 43.5 MiB/56.0 MiB (200.5 MiB/s) with 1 file(s) remainingCompleted 43.8 MiB/56.0 MiB (201.5 MiB/s) with 1 file(s) remainingCompleted 44.0 MiB/56.0 MiB (202.2 MiB/s) with 1 file(s) remainingCompleted 44.3 MiB/56.0 MiB (202.8 MiB/s) with 1 file(s) remainingCompleted 44.5 MiB/56.0 MiB (203.5 MiB/s) with 1 file(s) remainingCompleted 44.8 MiB/56.0 MiB (204.2 MiB/s) with 1 file(s) remainingCompleted 45.0 MiB/56.0 MiB (205.2 MiB/s) with 1 file(s) remainingCompleted 45.3 MiB/56.0 MiB (205.9 MiB/s) with 1 file(s) remainingCompleted 45.5 MiB/56.0 MiB (206.9 MiB/s) with 1 file(s) remainingCompleted 45.8 MiB/56.0 MiB (207.3 MiB/s) with 1 file(s) remainingCompleted 46.0 MiB/56.0 MiB (208.1 MiB/s) with 1 file(s) remainingCompleted 46.3 MiB/56.0 MiB (208.9 MiB/s) with 1 file(s) remainingCompleted 46.5 MiB/56.0 MiB (209.7 MiB/s) with 1 file(s) remainingCompleted 46.8 MiB/56.0 MiB (210.7 MiB/s) with 1 file(s) remainingCompleted 47.0 MiB/56.0 MiB (211.2 MiB/s) with 1 file(s) remainingCompleted 47.3 MiB/56.0 MiB (212.1 MiB/s) with 1 file(s) remainingCompleted 47.5 MiB/56.0 MiB (212.8 MiB/s) with 1 file(s) remainingCompleted 47.8 MiB/56.0 MiB (213.5 MiB/s) with 1 file(s) remainingCompleted 48.0 MiB/56.0 MiB (214.2 MiB/s) with 1 file(s) remainingCompleted 48.3 MiB/56.0 MiB (215.0 MiB/s) with 1 file(s) remainingCompleted 48.5 MiB/56.0 MiB (215.6 MiB/s) with 1 file(s) remainingCompleted 48.8 MiB/56.0 MiB (216.3 MiB/s) with 1 file(s) remainingCompleted 49.0 MiB/56.0 MiB (217.0 MiB/s) with 1 file(s) remainingCompleted 49.3 MiB/56.0 MiB (217.7 MiB/s) with 1 file(s) remainingCompleted 49.5 MiB/56.0 MiB (218.2 MiB/s) with 1 file(s) remainingCompleted 49.8 MiB/56.0 MiB (218.8 MiB/s) with 1 file(s) remainingCompleted 50.0 MiB/56.0 MiB (219.6 MiB/s) with 1 file(s) remainingCompleted 50.3 MiB/56.0 MiB (220.4 MiB/s) with 1 file(s) remainingCompleted 50.5 MiB/56.0 MiB (220.9 MiB/s) with 1 file(s) remainingCompleted 50.8 MiB/56.0 MiB (221.7 MiB/s) with 1 file(s) remainingCompleted 51.0 MiB/56.0 MiB (222.7 MiB/s) with 1 file(s) remainingCompleted 51.3 MiB/56.0 MiB (222.9 MiB/s) with 1 file(s) remainingCompleted 51.5 MiB/56.0 MiB (223.5 MiB/s) with 1 file(s) remainingCompleted 51.8 MiB/56.0 MiB (224.0 MiB/s) with 1 file(s) remainingCompleted 52.0 MiB/56.0 MiB (225.0 MiB/s) with 1 file(s) remainingCompleted 52.3 MiB/56.0 MiB (225.6 MiB/s) with 1 file(s) remainingCompleted 52.5 MiB/56.0 MiB (226.2 MiB/s) with 1 file(s) remainingCompleted 52.8 MiB/56.0 MiB (226.8 MiB/s) with 1 file(s) remainingCompleted 53.0 MiB/56.0 MiB (227.7 MiB/s) with 1 file(s) remainingCompleted 53.3 MiB/56.0 MiB (228.4 MiB/s) with 1 file(s) remainingCompleted 53.5 MiB/56.0 MiB (229.0 MiB/s) with 1 file(s) remainingCompleted 53.8 MiB/56.0 MiB (229.7 MiB/s) with 1 file(s) remainingCompleted 54.0 MiB/56.0 MiB (230.3 MiB/s) with 1 file(s) remainingCompleted 54.3 MiB/56.0 MiB (231.0 MiB/s) with 1 file(s) remainingCompleted 54.5 MiB/56.0 MiB (231.7 MiB/s) with 1 file(s) remainingCompleted 54.8 MiB/56.0 MiB (232.5 MiB/s) with 1 file(s) remainingCompleted 55.0 MiB/56.0 MiB (233.2 MiB/s) with 1 file(s) remainingCompleted 55.3 MiB/56.0 MiB (234.0 MiB/s) with 1 file(s) remainingCompleted 55.5 MiB/56.0 MiB (234.6 MiB/s) with 1 file(s) remainingCompleted 55.8 MiB/56.0 MiB (235.5 MiB/s) with 1 file(s) remainingCompleted 56.0 MiB/56.0 MiB (236.1 MiB/s) with 1 file(s) remainingdownload: s3://glassdb-bench-benchbucket-gogc45ifcnsf/bin/rtbench to ./rtbench
 + break
 + chmod +x ./rtbench
 ++ date +%Y%m%dT%H%M%S
-+ TS=20260531T114201
-+ OUT=results/20260531T114201
++ TS=20260531T153752
++ OUT=results/20260531T153752
 + mkdir -p out
-+ ./rtbench -backend=s3 -test-name=rw9010 -max-dbs=50 -num-keys=50000 -duration=60s -samples-out=out/samples.csv -stats-out=out/stats.csv -throughput-out=out/throughput.csv
-2026/05/31 11:42:01 Initialize keys
-2026/05/31 11:42:01 keys 0 - 100
-2026/05/31 11:42:01 keys 100 - 200
-2026/05/31 11:42:02 keys 200 - 300
-2026/05/31 11:42:02 keys 300 - 400
-2026/05/31 11:42:03 keys 400 - 500
-2026/05/31 11:42:03 keys 500 - 600
-2026/05/31 11:42:04 keys 600 - 700
-2026/05/31 11:42:05 keys 700 - 800
-2026/05/31 11:42:05 keys 800 - 900
-2026/05/31 11:42:06 keys 900 - 1000
-2026/05/31 11:42:06 keys 1000 - 1100
-2026/05/31 11:42:07 keys 1100 - 1200
-2026/05/31 11:42:07 keys 1200 - 1300
-2026/05/31 11:42:08 keys 1300 - 1400
-2026/05/31 11:42:09 keys 1400 - 1500
-2026/05/31 11:42:09 keys 1500 - 1600
-2026/05/31 11:42:10 keys 1600 - 1700
-2026/05/31 11:42:10 keys 1700 - 1800
-2026/05/31 11:42:11 keys 1800 - 1900
-2026/05/31 11:42:11 keys 1900 - 2000
-2026/05/31 11:42:12 keys 2000 - 2100
-2026/05/31 11:42:12 keys 2100 - 2200
-2026/05/31 11:42:13 keys 2200 - 2300
-2026/05/31 11:42:14 keys 2300 - 2400
-2026/05/31 11:42:14 keys 2400 - 2500
-2026/05/31 11:42:15 keys 2500 - 2600
-2026/05/31 11:42:15 keys 2600 - 2700
-2026/05/31 11:42:16 keys 2700 - 2800
-2026/05/31 11:42:16 keys 2800 - 2900
-2026/05/31 11:42:17 keys 2900 - 3000
-2026/05/31 11:42:18 keys 3000 - 3100
-2026/05/31 11:42:18 keys 3100 - 3200
-2026/05/31 11:42:19 keys 3200 - 3300
-2026/05/31 11:42:19 keys 3300 - 3400
-2026/05/31 11:42:20 keys 3400 - 3500
-2026/05/31 11:42:20 keys 3500 - 3600
-2026/05/31 11:42:21 keys 3600 - 3700
-2026/05/31 11:42:21 keys 3700 - 3800
-2026/05/31 11:42:22 keys 3800 - 3900
-2026/05/31 11:42:22 keys 3900 - 4000
-2026/05/31 11:42:23 keys 4000 - 4100
-2026/05/31 11:42:23 keys 4100 - 4200
-2026/05/31 11:42:24 keys 4200 - 4300
-2026/05/31 11:42:25 keys 4300 - 4400
-2026/05/31 11:42:25 keys 4400 - 4500
-2026/05/31 11:42:26 keys 4500 - 4600
-2026/05/31 11:42:26 keys 4600 - 4700
-2026/05/31 11:42:27 keys 4700 - 4800
-2026/05/31 11:42:27 keys 4800 - 4900
-2026/05/31 11:42:28 keys 4900 - 5000
-2026/05/31 11:42:29 keys 5000 - 5100
-2026/05/31 11:42:29 keys 5100 - 5200
-2026/05/31 11:42:30 keys 5200 - 5300
-2026/05/31 11:42:30 keys 5300 - 5400
-2026/05/31 11:42:31 keys 5400 - 5500
-2026/05/31 11:42:31 keys 5500 - 5600
-2026/05/31 11:42:32 keys 5600 - 5700
-2026/05/31 11:42:32 keys 5700 - 5800
-2026/05/31 11:42:33 keys 5800 - 5900
-2026/05/31 11:42:34 keys 5900 - 6000
-2026/05/31 11:42:34 keys 6000 - 6100
-2026/05/31 11:42:35 keys 6100 - 6200
-2026/05/31 11:42:35 keys 6200 - 6300
-2026/05/31 11:42:36 keys 6300 - 6400
-2026/05/31 11:42:36 keys 6400 - 6500
-2026/05/31 11:42:37 keys 6500 - 6600
-2026/05/31 11:42:38 keys 6600 - 6700
-2026/05/31 11:42:38 keys 6700 - 6800
-2026/05/31 11:42:39 keys 6800 - 6900
-2026/05/31 11:42:39 keys 6900 - 7000
-2026/05/31 11:42:40 keys 7000 - 7100
-2026/05/31 11:42:40 keys 7100 - 7200
-2026/05/31 11:42:41 keys 7200 - 7300
-2026/05/31 11:42:42 keys 7300 - 7400
-2026/05/31 11:42:42 keys 7400 - 7500
-2026/05/31 11:42:43 keys 7500 - 7600
-2026/05/31 11:42:43 keys 7600 - 7700
-2026/05/31 11:42:44 keys 7700 - 7800
-2026/05/31 11:42:45 keys 7800 - 7900
-2026/05/31 11:42:45 keys 7900 - 8000
-2026/05/31 11:42:46 keys 8000 - 8100
-2026/05/31 11:42:46 keys 8100 - 8200
-2026/05/31 11:42:47 keys 8200 - 8300
-2026/05/31 11:42:48 keys 8300 - 8400
-2026/05/31 11:42:48 keys 8400 - 8500
-2026/05/31 11:42:49 keys 8500 - 8600
-2026/05/31 11:42:49 keys 8600 - 8700
-2026/05/31 11:42:50 keys 8700 - 8800
-2026/05/31 11:42:50 keys 8800 - 8900
-2026/05/31 11:42:51 keys 8900 - 9000
-2026/05/31 11:42:51 keys 9000 - 9100
-2026/05/31 11:42:52 keys 9100 - 9200
-2026/05/31 11:42:53 keys 9200 - 9300
-2026/05/31 11:42:53 keys 9300 - 9400
-2026/05/31 11:42:54 keys 9400 - 9500
-2026/05/31 11:42:54 keys 9500 - 9600
-2026/05/31 11:42:55 keys 9600 - 9700
-2026/05/31 11:42:55 keys 9700 - 9800
-2026/05/31 11:42:56 keys 9800 - 9900
-2026/05/31 11:42:56 keys 9900 - 10000
-2026/05/31 11:42:57 keys 10000 - 10100
-2026/05/31 11:42:57 keys 10100 - 10200
-2026/05/31 11:42:58 keys 10200 - 10300
-2026/05/31 11:42:58 keys 10300 - 10400
-2026/05/31 11:42:59 keys 10400 - 10500
-2026/05/31 11:43:00 keys 10500 - 10600
-2026/05/31 11:43:00 keys 10600 - 10700
-2026/05/31 11:43:01 keys 10700 - 10800
-2026/05/31 11:43:02 keys 10800 - 10900
-2026/05/31 11:43:02 keys 10900 - 11000
-2026/05/31 11:43:03 keys 11000 - 11100
-2026/05/31 11:43:03 keys 11100 - 11200
-2026/05/31 11:43:04 keys 11200 - 11300
-2026/05/31 11:43:04 keys 11300 - 11400
-2026/05/31 11:43:05 keys 11400 - 11500
-2026/05/31 11:43:05 keys 11500 - 11600
-2026/05/31 11:43:06 keys 11600 - 11700
-2026/05/31 11:43:07 keys 11700 - 11800
-2026/05/31 11:43:07 keys 11800 - 11900
-2026/05/31 11:43:08 keys 11900 - 12000
-2026/05/31 11:43:08 keys 12000 - 12100
-2026/05/31 11:43:09 keys 12100 - 12200
-2026/05/31 11:43:09 keys 12200 - 12300
-2026/05/31 11:43:10 keys 12300 - 12400
-2026/05/31 11:43:10 keys 12400 - 12500
-2026/05/31 11:43:11 keys 12500 - 12600
-2026/05/31 11:43:12 keys 12600 - 12700
-2026/05/31 11:43:12 keys 12700 - 12800
-2026/05/31 11:43:13 keys 12800 - 12900
-2026/05/31 11:43:13 keys 12900 - 13000
-2026/05/31 11:43:14 keys 13000 - 13100
-2026/05/31 11:43:14 keys 13100 - 13200
-2026/05/31 11:43:15 keys 13200 - 13300
-2026/05/31 11:43:16 keys 13300 - 13400
-2026/05/31 11:43:16 keys 13400 - 13500
-2026/05/31 11:43:17 keys 13500 - 13600
-2026/05/31 11:43:17 keys 13600 - 13700
-2026/05/31 11:43:18 keys 13700 - 13800
-2026/05/31 11:43:19 keys 13800 - 13900
-2026/05/31 11:43:19 keys 13900 - 14000
-2026/05/31 11:43:20 keys 14000 - 14100
-2026/05/31 11:43:20 keys 14100 - 14200
-2026/05/31 11:43:21 keys 14200 - 14300
-2026/05/31 11:43:21 keys 14300 - 14400
-2026/05/31 11:43:22 keys 14400 - 14500
-2026/05/31 11:43:22 keys 14500 - 14600
-2026/05/31 11:43:23 keys 14600 - 14700
-2026/05/31 11:43:24 keys 14700 - 14800
-2026/05/31 11:43:24 keys 14800 - 14900
-2026/05/31 11:43:25 keys 14900 - 15000
-2026/05/31 11:43:25 keys 15000 - 15100
-2026/05/31 11:43:26 keys 15100 - 15200
-2026/05/31 11:43:26 keys 15200 - 15300
-2026/05/31 11:43:27 keys 15300 - 15400
-2026/05/31 11:43:27 keys 15400 - 15500
-2026/05/31 11:43:28 keys 15500 - 15600
-2026/05/31 11:43:28 keys 15600 - 15700
-2026/05/31 11:43:29 keys 15700 - 15800
-2026/05/31 11:43:29 keys 15800 - 15900
-2026/05/31 11:43:30 keys 15900 - 16000
-2026/05/31 11:43:31 keys 16000 - 16100
-2026/05/31 11:43:31 keys 16100 - 16200
-2026/05/31 11:43:32 keys 16200 - 16300
-2026/05/31 11:43:32 keys 16300 - 16400
-2026/05/31 11:43:33 keys 16400 - 16500
-2026/05/31 11:43:33 keys 16500 - 16600
-2026/05/31 11:43:34 keys 16600 - 16700
-2026/05/31 11:43:34 keys 16700 - 16800
-2026/05/31 11:43:35 keys 16800 - 16900
-2026/05/31 11:43:35 keys 16900 - 17000
-2026/05/31 11:43:36 keys 17000 - 17100
-2026/05/31 11:43:36 keys 17100 - 17200
-2026/05/31 11:43:37 keys 17200 - 17300
-2026/05/31 11:43:37 keys 17300 - 17400
-2026/05/31 11:43:38 keys 17400 - 17500
-2026/05/31 11:43:39 keys 17500 - 17600
-2026/05/31 11:43:39 keys 17600 - 17700
-2026/05/31 11:43:40 keys 17700 - 17800
-2026/05/31 11:43:40 keys 17800 - 17900
-2026/05/31 11:43:41 keys 17900 - 18000
-2026/05/31 11:43:41 keys 18000 - 18100
-2026/05/31 11:43:42 keys 18100 - 18200
-2026/05/31 11:43:42 keys 18200 - 18300
-2026/05/31 11:43:43 keys 18300 - 18400
-2026/05/31 11:43:43 keys 18400 - 18500
-2026/05/31 11:43:44 keys 18500 - 18600
-2026/05/31 11:43:44 keys 18600 - 18700
-2026/05/31 11:43:45 keys 18700 - 18800
-2026/05/31 11:43:45 keys 18800 - 18900
-2026/05/31 11:43:46 keys 18900 - 19000
-2026/05/31 11:43:46 keys 19000 - 19100
-2026/05/31 11:43:47 keys 19100 - 19200
-2026/05/31 11:43:47 keys 19200 - 19300
-2026/05/31 11:43:48 keys 19300 - 19400
-2026/05/31 11:43:49 keys 19400 - 19500
-2026/05/31 11:43:49 keys 19500 - 19600
-2026/05/31 11:43:50 keys 19600 - 19700
-2026/05/31 11:43:50 keys 19700 - 19800
-2026/05/31 11:43:51 keys 19800 - 19900
-2026/05/31 11:43:52 keys 19900 - 20000
-2026/05/31 11:43:52 keys 20000 - 20100
-2026/05/31 11:43:53 keys 20100 - 20200
-2026/05/31 11:43:53 keys 20200 - 20300
-2026/05/31 11:43:54 keys 20300 - 20400
-2026/05/31 11:43:54 keys 20400 - 20500
-2026/05/31 11:43:55 keys 20500 - 20600
-2026/05/31 11:43:55 keys 20600 - 20700
-2026/05/31 11:43:56 keys 20700 - 20800
-2026/05/31 11:43:56 keys 20800 - 20900
-2026/05/31 11:43:57 keys 20900 - 21000
-2026/05/31 11:43:58 keys 21000 - 21100
-2026/05/31 11:43:58 keys 21100 - 21200
-2026/05/31 11:43:59 keys 21200 - 21300
-2026/05/31 11:43:59 keys 21300 - 21400
-2026/05/31 11:44:00 keys 21400 - 21500
-2026/05/31 11:44:00 keys 21500 - 21600
-2026/05/31 11:44:01 keys 21600 - 21700
-2026/05/31 11:44:02 keys 21700 - 21800
-2026/05/31 11:44:02 keys 21800 - 21900
-2026/05/31 11:44:03 keys 21900 - 22000
-2026/05/31 11:44:03 keys 22000 - 22100
-2026/05/31 11:44:04 keys 22100 - 22200
-2026/05/31 11:44:04 keys 22200 - 22300
-2026/05/31 11:44:05 keys 22300 - 22400
-2026/05/31 11:44:06 keys 22400 - 22500
-2026/05/31 11:44:06 keys 22500 - 22600
-2026/05/31 11:44:07 keys 22600 - 22700
-2026/05/31 11:44:07 keys 22700 - 22800
-2026/05/31 11:44:08 keys 22800 - 22900
-2026/05/31 11:44:08 keys 22900 - 23000
-2026/05/31 11:44:09 keys 23000 - 23100
-2026/05/31 11:44:10 keys 23100 - 23200
-2026/05/31 11:44:10 keys 23200 - 23300
-2026/05/31 11:44:11 keys 23300 - 23400
-2026/05/31 11:44:11 keys 23400 - 23500
-2026/05/31 11:44:12 keys 23500 - 23600
-2026/05/31 11:44:12 keys 23600 - 23700
-2026/05/31 11:44:13 keys 23700 - 23800
-2026/05/31 11:44:14 keys 23800 - 23900
-2026/05/31 11:44:14 keys 23900 - 24000
-2026/05/31 11:44:15 keys 24000 - 24100
-2026/05/31 11:44:15 keys 24100 - 24200
-2026/05/31 11:44:16 keys 24200 - 24300
-2026/05/31 11:44:16 keys 24300 - 24400
-2026/05/31 11:44:17 keys 24400 - 24500
-2026/05/31 11:44:18 keys 24500 - 24600
-2026/05/31 11:44:18 keys 24600 - 24700
-2026/05/31 11:44:19 keys 24700 - 24800
-2026/05/31 11:44:20 keys 24800 - 24900
-2026/05/31 11:44:20 keys 24900 - 25000
-2026/05/31 11:44:21 keys 25000 - 25100
-2026/05/31 11:44:21 keys 25100 - 25200
-2026/05/31 11:44:22 keys 25200 - 25300
-2026/05/31 11:44:22 keys 25300 - 25400
-2026/05/31 11:44:23 keys 25400 - 25500
-2026/05/31 11:44:24 keys 25500 - 25600
-2026/05/31 11:44:24 keys 25600 - 25700
-2026/05/31 11:44:25 keys 25700 - 25800
-2026/05/31 11:44:25 keys 25800 - 25900
-2026/05/31 11:44:26 keys 25900 - 26000
-2026/05/31 11:44:26 keys 26000 - 26100
-2026/05/31 11:44:27 keys 26100 - 26200
-2026/05/31 11:44:27 keys 26200 - 26300
-2026/05/31 11:44:28 keys 26300 - 26400
-2026/05/31 11:44:28 keys 26400 - 26500
-2026/05/31 11:44:29 keys 26500 - 26600
-2026/05/31 11:44:30 keys 26600 - 26700
-2026/05/31 11:44:30 keys 26700 - 26800
-2026/05/31 11:44:31 keys 26800 - 26900
-2026/05/31 11:44:31 keys 26900 - 27000
-2026/05/31 11:44:32 keys 27000 - 27100
-2026/05/31 11:44:32 keys 27100 - 27200
-2026/05/31 11:44:33 keys 27200 - 27300
-2026/05/31 11:44:34 keys 27300 - 27400
-2026/05/31 11:44:34 keys 27400 - 27500
-2026/05/31 11:44:35 keys 27500 - 27600
-2026/05/31 11:44:35 keys 27600 - 27700
-2026/05/31 11:44:36 keys 27700 - 27800
-2026/05/31 11:44:36 keys 27800 - 27900
-2026/05/31 11:44:37 keys 27900 - 28000
-2026/05/31 11:44:38 keys 28000 - 28100
-2026/05/31 11:44:38 keys 28100 - 28200
-2026/05/31 11:44:39 keys 28200 - 28300
-2026/05/31 11:44:39 keys 28300 - 28400
-2026/05/31 11:44:40 keys 28400 - 28500
-2026/05/31 11:44:40 keys 28500 - 28600
-2026/05/31 11:44:41 keys 28600 - 28700
-2026/05/31 11:44:42 keys 28700 - 28800
-2026/05/31 11:44:42 keys 28800 - 28900
-2026/05/31 11:44:43 keys 28900 - 29000
-2026/05/31 11:44:44 keys 29000 - 29100
-2026/05/31 11:44:44 keys 29100 - 29200
-2026/05/31 11:44:45 keys 29200 - 29300
-2026/05/31 11:44:45 keys 29300 - 29400
-2026/05/31 11:44:46 keys 29400 - 29500
-2026/05/31 11:44:47 keys 29500 - 29600
-2026/05/31 11:44:47 keys 29600 - 29700
-2026/05/31 11:44:48 keys 29700 - 29800
-2026/05/31 11:44:48 keys 29800 - 29900
-2026/05/31 11:44:49 keys 29900 - 30000
-2026/05/31 11:44:49 keys 30000 - 30100
-2026/05/31 11:44:50 keys 30100 - 30200
-2026/05/31 11:44:50 keys 30200 - 30300
-2026/05/31 11:44:51 keys 30300 - 30400
-2026/05/31 11:44:52 keys 30400 - 30500
-2026/05/31 11:44:52 keys 30500 - 30600
-2026/05/31 11:44:53 keys 30600 - 30700
-2026/05/31 11:44:53 keys 30700 - 30800
-2026/05/31 11:44:54 keys 30800 - 30900
-2026/05/31 11:44:54 keys 30900 - 31000
-2026/05/31 11:44:55 keys 31000 - 31100
-2026/05/31 11:44:55 keys 31100 - 31200
-2026/05/31 11:44:56 keys 31200 - 31300
-2026/05/31 11:44:56 keys 31300 - 31400
-2026/05/31 11:44:57 keys 31400 - 31500
-2026/05/31 11:44:58 keys 31500 - 31600
-2026/05/31 11:44:58 keys 31600 - 31700
-2026/05/31 11:44:59 keys 31700 - 31800
-2026/05/31 11:44:59 keys 31800 - 31900
-2026/05/31 11:45:00 keys 31900 - 32000
-2026/05/31 11:45:00 keys 32000 - 32100
-2026/05/31 11:45:01 keys 32100 - 32200
-2026/05/31 11:45:02 keys 32200 - 32300
-2026/05/31 11:45:02 keys 32300 - 32400
-2026/05/31 11:45:03 keys 32400 - 32500
-2026/05/31 11:45:03 keys 32500 - 32600
-2026/05/31 11:45:04 keys 32600 - 32700
-2026/05/31 11:45:05 keys 32700 - 32800
-2026/05/31 11:45:05 keys 32800 - 32900
-2026/05/31 11:45:06 keys 32900 - 33000
-2026/05/31 11:45:06 keys 33000 - 33100
-2026/05/31 11:45:07 keys 33100 - 33200
-2026/05/31 11:45:08 keys 33200 - 33300
-2026/05/31 11:45:08 keys 33300 - 33400
-2026/05/31 11:45:09 keys 33400 - 33500
-2026/05/31 11:45:09 keys 33500 - 33600
-2026/05/31 11:45:10 keys 33600 - 33700
-2026/05/31 11:45:10 keys 33700 - 33800
-2026/05/31 11:45:11 keys 33800 - 33900
-2026/05/31 11:45:11 keys 33900 - 34000
-2026/05/31 11:45:12 keys 34000 - 34100
-2026/05/31 11:45:13 keys 34100 - 34200
-2026/05/31 11:45:13 keys 34200 - 34300
-2026/05/31 11:45:14 keys 34300 - 34400
-2026/05/31 11:45:14 keys 34400 - 34500
-2026/05/31 11:45:15 keys 34500 - 34600
-2026/05/31 11:45:15 keys 34600 - 34700
-2026/05/31 11:45:16 keys 34700 - 34800
-2026/05/31 11:45:17 keys 34800 - 34900
-2026/05/31 11:45:17 keys 34900 - 35000
-2026/05/31 11:45:18 keys 35000 - 35100
-2026/05/31 11:45:18 keys 35100 - 35200
-2026/05/31 11:45:19 keys 35200 - 35300
-2026/05/31 11:45:19 keys 35300 - 35400
-2026/05/31 11:45:20 keys 35400 - 35500
-2026/05/31 11:45:20 keys 35500 - 35600
-2026/05/31 11:45:21 keys 35600 - 35700
-2026/05/31 11:45:21 keys 35700 - 35800
-2026/05/31 11:45:22 keys 35800 - 35900
-2026/05/31 11:45:23 keys 35900 - 36000
-2026/05/31 11:45:23 keys 36000 - 36100
-2026/05/31 11:45:24 keys 36100 - 36200
-2026/05/31 11:45:24 keys 36200 - 36300
-2026/05/31 11:45:25 keys 36300 - 36400
-2026/05/31 11:45:25 keys 36400 - 36500
-2026/05/31 11:45:26 keys 36500 - 36600
-2026/05/31 11:45:26 keys 36600 - 36700
-2026/05/31 11:45:27 keys 36700 - 36800
-2026/05/31 11:45:28 keys 36800 - 36900
-2026/05/31 11:45:28 keys 36900 - 37000
-2026/05/31 11:45:29 keys 37000 - 37100
-2026/05/31 11:45:29 keys 37100 - 37200
-2026/05/31 11:45:30 keys 37200 - 37300
-2026/05/31 11:45:30 keys 37300 - 37400
-2026/05/31 11:45:31 keys 37400 - 37500
-2026/05/31 11:45:31 keys 37500 - 37600
-2026/05/31 11:45:32 keys 37600 - 37700
-2026/05/31 11:45:33 keys 37700 - 37800
-2026/05/31 11:45:33 keys 37800 - 37900
-2026/05/31 11:45:34 keys 37900 - 38000
-2026/05/31 11:45:34 keys 38000 - 38100
-2026/05/31 11:45:35 keys 38100 - 38200
-2026/05/31 11:45:35 keys 38200 - 38300
-2026/05/31 11:45:36 keys 38300 - 38400
-2026/05/31 11:45:36 keys 38400 - 38500
-2026/05/31 11:45:37 keys 38500 - 38600
-2026/05/31 11:45:38 keys 38600 - 38700
-2026/05/31 11:45:38 keys 38700 - 38800
-2026/05/31 11:45:39 keys 38800 - 38900
-2026/05/31 11:45:39 keys 38900 - 39000
-2026/05/31 11:45:40 keys 39000 - 39100
-2026/05/31 11:45:40 keys 39100 - 39200
-2026/05/31 11:45:41 keys 39200 - 39300
-2026/05/31 11:45:41 keys 39300 - 39400
-2026/05/31 11:45:42 keys 39400 - 39500
-2026/05/31 11:45:42 keys 39500 - 39600
-2026/05/31 11:45:43 keys 39600 - 39700
-2026/05/31 11:45:44 keys 39700 - 39800
-2026/05/31 11:45:44 keys 39800 - 39900
-2026/05/31 11:45:45 keys 39900 - 40000
-2026/05/31 11:45:45 keys 40000 - 40100
-2026/05/31 11:45:46 keys 40100 - 40200
-2026/05/31 11:45:46 keys 40200 - 40300
-2026/05/31 11:45:47 keys 40300 - 40400
-2026/05/31 11:45:47 keys 40400 - 40500
-2026/05/31 11:45:48 keys 40500 - 40600
-2026/05/31 11:45:49 keys 40600 - 40700
-2026/05/31 11:45:49 keys 40700 - 40800
-2026/05/31 11:45:50 keys 40800 - 40900
-2026/05/31 11:45:50 keys 40900 - 41000
-2026/05/31 11:45:51 keys 41000 - 41100
-2026/05/31 11:45:51 keys 41100 - 41200
-2026/05/31 11:45:52 keys 41200 - 41300
-2026/05/31 11:45:52 keys 41300 - 41400
-2026/05/31 11:45:53 keys 41400 - 41500
-2026/05/31 11:45:53 keys 41500 - 41600
-2026/05/31 11:45:54 keys 41600 - 41700
-2026/05/31 11:45:55 keys 41700 - 41800
-2026/05/31 11:45:55 keys 41800 - 41900
-2026/05/31 11:45:56 keys 41900 - 42000
-2026/05/31 11:45:56 keys 42000 - 42100
-2026/05/31 11:45:57 keys 42100 - 42200
-2026/05/31 11:45:57 keys 42200 - 42300
-2026/05/31 11:45:58 keys 42300 - 42400
-2026/05/31 11:45:59 keys 42400 - 42500
-2026/05/31 11:45:59 keys 42500 - 42600
-2026/05/31 11:46:00 keys 42600 - 42700
-2026/05/31 11:46:00 keys 42700 - 42800
-2026/05/31 11:46:01 keys 42800 - 42900
-2026/05/31 11:46:02 keys 42900 - 43000
-2026/05/31 11:46:02 keys 43000 - 43100
-2026/05/31 11:46:03 keys 43100 - 43200
-2026/05/31 11:46:03 keys 43200 - 43300
-2026/05/31 11:46:04 keys 43300 - 43400
-2026/05/31 11:46:04 keys 43400 - 43500
-2026/05/31 11:46:05 keys 43500 - 43600
-2026/05/31 11:46:05 keys 43600 - 43700
-2026/05/31 11:46:06 keys 43700 - 43800
-2026/05/31 11:46:06 keys 43800 - 43900
-2026/05/31 11:46:07 keys 43900 - 44000
-2026/05/31 11:46:08 keys 44000 - 44100
-2026/05/31 11:46:08 keys 44100 - 44200
-2026/05/31 11:46:09 keys 44200 - 44300
-2026/05/31 11:46:09 keys 44300 - 44400
-2026/05/31 11:46:10 keys 44400 - 44500
-2026/05/31 11:46:10 keys 44500 - 44600
-2026/05/31 11:46:11 keys 44600 - 44700
-2026/05/31 11:46:11 keys 44700 - 44800
-2026/05/31 11:46:12 keys 44800 - 44900
-2026/05/31 11:46:12 keys 44900 - 45000
-2026/05/31 11:46:13 keys 45000 - 45100
-2026/05/31 11:46:13 keys 45100 - 45200
-2026/05/31 11:46:14 keys 45200 - 45300
-2026/05/31 11:46:14 keys 45300 - 45400
-2026/05/31 11:46:15 keys 45400 - 45500
-2026/05/31 11:46:16 keys 45500 - 45600
-2026/05/31 11:46:16 keys 45600 - 45700
-2026/05/31 11:46:17 keys 45700 - 45800
-2026/05/31 11:46:17 keys 45800 - 45900
-2026/05/31 11:46:18 keys 45900 - 46000
-2026/05/31 11:46:18 keys 46000 - 46100
-2026/05/31 11:46:19 keys 46100 - 46200
-2026/05/31 11:46:19 keys 46200 - 46300
-2026/05/31 11:46:20 keys 46300 - 46400
-2026/05/31 11:46:20 keys 46400 - 46500
-2026/05/31 11:46:21 keys 46500 - 46600
-2026/05/31 11:46:21 keys 46600 - 46700
-2026/05/31 11:46:22 keys 46700 - 46800
-2026/05/31 11:46:22 keys 46800 - 46900
-2026/05/31 11:46:23 keys 46900 - 47000
-2026/05/31 11:46:24 keys 47000 - 47100
-2026/05/31 11:46:24 keys 47100 - 47200
-2026/05/31 11:46:25 keys 47200 - 47300
-2026/05/31 11:46:26 keys 47300 - 47400
-2026/05/31 11:46:26 keys 47400 - 47500
-2026/05/31 11:46:27 keys 47500 - 47600
-2026/05/31 11:46:27 keys 47600 - 47700
-2026/05/31 11:46:28 keys 47700 - 47800
-2026/05/31 11:46:28 keys 47800 - 47900
-2026/05/31 11:46:29 keys 47900 - 48000
-2026/05/31 11:46:29 keys 48000 - 48100
-2026/05/31 11:46:30 keys 48100 - 48200
-2026/05/31 11:46:31 keys 48200 - 48300
-2026/05/31 11:46:31 keys 48300 - 48400
-2026/05/31 11:46:32 keys 48400 - 48500
-2026/05/31 11:46:32 keys 48500 - 48600
-2026/05/31 11:46:33 keys 48600 - 48700
-2026/05/31 11:46:33 keys 48700 - 48800
-2026/05/31 11:46:34 keys 48800 - 48900
-2026/05/31 11:46:34 keys 48900 - 49000
-2026/05/31 11:46:35 keys 49000 - 49100
-2026/05/31 11:46:35 keys 49100 - 49200
-2026/05/31 11:46:36 keys 49200 - 49300
-2026/05/31 11:46:37 keys 49300 - 49400
-2026/05/31 11:46:37 keys 49400 - 49500
-2026/05/31 11:46:38 keys 49500 - 49600
-2026/05/31 11:46:38 keys 49600 - 49700
-2026/05/31 11:46:39 keys 49700 - 49800
-2026/05/31 11:46:39 keys 49800 - 49900
-2026/05/31 11:46:40 keys 49900 - 50000
-2026/05/31 11:46:41 End of keys initialization
-2026/05/31 11:46:41 Testing 1 dbs
-2026/05/31 11:47:42 Testing 5 dbs
-2026/05/31 11:48:42 Testing 10 dbs
-2026/05/31 11:49:43 Testing 15 dbs
-2026/05/31 11:50:45 Testing 20 dbs
-2026/05/31 11:50:52 ERROR Commit End tx=ff5461475f368d3618b4a42994be8be4 err="log status 2: transaction was already finalized"
-2026/05/31 11:51:38 ERROR Commit End tx=1306719c13fb472f18b4a43477fa9161 err="log status 2: transaction was already finalized"
-2026/05/31 11:51:46 Testing 25 dbs
-2026/05/31 11:51:50 ERROR Commit End tx=6d4bf136809f5d2518b4a4375ca5ec74 err="log status 2: transaction was already finalized"
-2026/05/31 11:52:34 ERROR Commit End tx=1ad11c8f2900981818b4a4417be3389c err="log status 2: transaction was already finalized"
-2026/05/31 11:52:51 Testing 30 dbs
-2026/05/31 11:53:00 ERROR Commit End tx=c1b0c6d9c311cedd18b4a44759317f37 err="log status 2: transaction was already finalized"
-2026/05/31 11:53:53 Testing 35 dbs
-2026/05/31 11:54:54 Testing 40 dbs
-2026/05/31 11:55:48 ERROR Commit End tx=fb06884324c83def18b4a46e8b5159e8 err="log status 2: transaction was already finalized"
-2026/05/31 11:55:56 Testing 45 dbs
-2026/05/31 11:56:57 Testing 50 dbs
-2026/05/31 11:57:58 ERROR Commit End tx=f10d1d96d4599cea18b4a48cf2a1cd49 err="log status 2: transaction was already finalized"
++ ./rtbench -backend=s3 -test-name=rw9010 -max-dbs=50 -num-keys=50000 -duration=60s -samples-out=out/samples.csv -stats-out=out/stats.csv -throughput-out=out/throughput.csv -client-stats-out=out/client-stats.csv
+2026/05/31 15:37:52 Initialize keys
+2026/05/31 15:37:52 keys 0 - 100
+2026/05/31 15:37:53 keys 100 - 200
+2026/05/31 15:37:53 keys 200 - 300
+2026/05/31 15:37:54 keys 300 - 400
+2026/05/31 15:37:55 keys 400 - 500
+2026/05/31 15:37:55 keys 500 - 600
+2026/05/31 15:37:56 keys 600 - 700
+2026/05/31 15:37:56 keys 700 - 800
+2026/05/31 15:37:57 keys 800 - 900
+2026/05/31 15:37:58 keys 900 - 1000
+2026/05/31 15:37:58 keys 1000 - 1100
+2026/05/31 15:37:59 keys 1100 - 1200
+2026/05/31 15:37:59 keys 1200 - 1300
+2026/05/31 15:38:00 keys 1300 - 1400
+2026/05/31 15:38:01 keys 1400 - 1500
+2026/05/31 15:38:02 keys 1500 - 1600
+2026/05/31 15:38:02 keys 1600 - 1700
+2026/05/31 15:38:03 keys 1700 - 1800
+2026/05/31 15:38:03 keys 1800 - 1900
+2026/05/31 15:38:04 keys 1900 - 2000
+2026/05/31 15:38:05 keys 2000 - 2100
+2026/05/31 15:38:05 keys 2100 - 2200
+2026/05/31 15:38:06 keys 2200 - 2300
+2026/05/31 15:38:06 keys 2300 - 2400
+2026/05/31 15:38:07 keys 2400 - 2500
+2026/05/31 15:38:08 keys 2500 - 2600
+2026/05/31 15:38:08 keys 2600 - 2700
+2026/05/31 15:38:09 keys 2700 - 2800
+2026/05/31 15:38:10 keys 2800 - 2900
+2026/05/31 15:38:10 keys 2900 - 3000
+2026/05/31 15:38:11 keys 3000 - 3100
+2026/05/31 15:38:11 keys 3100 - 3200
+2026/05/31 15:38:12 keys 3200 - 3300
+2026/05/31 15:38:13 keys 3300 - 3400
+2026/05/31 15:38:13 keys 3400 - 3500
+2026/05/31 15:38:14 keys 3500 - 3600
+2026/05/31 15:38:14 keys 3600 - 3700
+2026/05/31 15:38:15 keys 3700 - 3800
+2026/05/31 15:38:16 keys 3800 - 3900
+2026/05/31 15:38:16 keys 3900 - 4000
+2026/05/31 15:38:17 keys 4000 - 4100
+2026/05/31 15:38:18 keys 4100 - 4200
+2026/05/31 15:38:18 keys 4200 - 4300
+2026/05/31 15:38:19 keys 4300 - 4400
+2026/05/31 15:38:19 keys 4400 - 4500
+2026/05/31 15:38:20 keys 4500 - 4600
+2026/05/31 15:38:21 keys 4600 - 4700
+2026/05/31 15:38:21 keys 4700 - 4800
+2026/05/31 15:38:22 keys 4800 - 4900
+2026/05/31 15:38:23 keys 4900 - 5000
+2026/05/31 15:38:23 keys 5000 - 5100
+2026/05/31 15:38:24 keys 5100 - 5200
+2026/05/31 15:38:24 keys 5200 - 5300
+2026/05/31 15:38:25 keys 5300 - 5400
+2026/05/31 15:38:25 keys 5400 - 5500
+2026/05/31 15:38:26 keys 5500 - 5600
+2026/05/31 15:38:27 keys 5600 - 5700
+2026/05/31 15:38:27 keys 5700 - 5800
+2026/05/31 15:38:28 keys 5800 - 5900
+2026/05/31 15:38:29 keys 5900 - 6000
+2026/05/31 15:38:30 keys 6000 - 6100
+2026/05/31 15:38:31 keys 6100 - 6200
+2026/05/31 15:38:31 keys 6200 - 6300
+2026/05/31 15:38:32 keys 6300 - 6400
+2026/05/31 15:38:33 keys 6400 - 6500
+2026/05/31 15:38:33 keys 6500 - 6600
+2026/05/31 15:38:34 keys 6600 - 6700
+2026/05/31 15:38:34 keys 6700 - 6800
+2026/05/31 15:38:35 keys 6800 - 6900
+2026/05/31 15:38:36 keys 6900 - 7000
+2026/05/31 15:38:36 keys 7000 - 7100
+2026/05/31 15:38:37 keys 7100 - 7200
+2026/05/31 15:38:37 keys 7200 - 7300
+2026/05/31 15:38:38 keys 7300 - 7400
+2026/05/31 15:38:39 keys 7400 - 7500
+2026/05/31 15:38:39 keys 7500 - 7600
+2026/05/31 15:38:40 keys 7600 - 7700
+2026/05/31 15:38:41 keys 7700 - 7800
+2026/05/31 15:38:41 keys 7800 - 7900
+2026/05/31 15:38:42 keys 7900 - 8000
+2026/05/31 15:38:43 keys 8000 - 8100
+2026/05/31 15:38:43 keys 8100 - 8200
+2026/05/31 15:38:44 keys 8200 - 8300
+2026/05/31 15:38:44 keys 8300 - 8400
+2026/05/31 15:38:45 keys 8400 - 8500
+2026/05/31 15:38:46 keys 8500 - 8600
+2026/05/31 15:38:46 keys 8600 - 8700
+2026/05/31 15:38:47 keys 8700 - 8800
+2026/05/31 15:38:48 keys 8800 - 8900
+2026/05/31 15:38:48 keys 8900 - 9000
+2026/05/31 15:38:49 keys 9000 - 9100
+2026/05/31 15:38:50 keys 9100 - 9200
+2026/05/31 15:38:51 keys 9200 - 9300
+2026/05/31 15:38:51 keys 9300 - 9400
+2026/05/31 15:38:52 keys 9400 - 9500
+2026/05/31 15:38:53 keys 9500 - 9600
+2026/05/31 15:38:53 keys 9600 - 9700
+2026/05/31 15:38:54 keys 9700 - 9800
+2026/05/31 15:38:55 keys 9800 - 9900
+2026/05/31 15:38:55 keys 9900 - 10000
+2026/05/31 15:38:56 keys 10000 - 10100
+2026/05/31 15:38:57 keys 10100 - 10200
+2026/05/31 15:38:57 keys 10200 - 10300
+2026/05/31 15:38:58 keys 10300 - 10400
+2026/05/31 15:38:58 keys 10400 - 10500
+2026/05/31 15:38:59 keys 10500 - 10600
+2026/05/31 15:39:00 keys 10600 - 10700
+2026/05/31 15:39:00 keys 10700 - 10800
+2026/05/31 15:39:01 keys 10800 - 10900
+2026/05/31 15:39:01 keys 10900 - 11000
+2026/05/31 15:39:02 keys 11000 - 11100
+2026/05/31 15:39:03 keys 11100 - 11200
+2026/05/31 15:39:03 keys 11200 - 11300
+2026/05/31 15:39:04 keys 11300 - 11400
+2026/05/31 15:39:04 keys 11400 - 11500
+2026/05/31 15:39:05 keys 11500 - 11600
+2026/05/31 15:39:06 keys 11600 - 11700
+2026/05/31 15:39:06 keys 11700 - 11800
+2026/05/31 15:39:07 keys 11800 - 11900
+2026/05/31 15:39:08 keys 11900 - 12000
+2026/05/31 15:39:08 keys 12000 - 12100
+2026/05/31 15:39:09 keys 12100 - 12200
+2026/05/31 15:39:09 keys 12200 - 12300
+2026/05/31 15:39:10 keys 12300 - 12400
+2026/05/31 15:39:11 keys 12400 - 12500
+2026/05/31 15:39:11 keys 12500 - 12600
+2026/05/31 15:39:12 keys 12600 - 12700
+2026/05/31 15:39:12 keys 12700 - 12800
+2026/05/31 15:39:13 keys 12800 - 12900
+2026/05/31 15:39:14 keys 12900 - 13000
+2026/05/31 15:39:14 keys 13000 - 13100
+2026/05/31 15:39:15 keys 13100 - 13200
+2026/05/31 15:39:15 keys 13200 - 13300
+2026/05/31 15:39:16 keys 13300 - 13400
+2026/05/31 15:39:17 keys 13400 - 13500
+2026/05/31 15:39:17 keys 13500 - 13600
+2026/05/31 15:39:18 keys 13600 - 13700
+2026/05/31 15:39:18 keys 13700 - 13800
+2026/05/31 15:39:19 keys 13800 - 13900
+2026/05/31 15:39:20 keys 13900 - 14000
+2026/05/31 15:39:20 keys 14000 - 14100
+2026/05/31 15:39:21 keys 14100 - 14200
+2026/05/31 15:39:22 keys 14200 - 14300
+2026/05/31 15:39:22 keys 14300 - 14400
+2026/05/31 15:39:23 keys 14400 - 14500
+2026/05/31 15:39:23 keys 14500 - 14600
+2026/05/31 15:39:24 keys 14600 - 14700
+2026/05/31 15:39:25 keys 14700 - 14800
+2026/05/31 15:39:25 keys 14800 - 14900
+2026/05/31 15:39:26 keys 14900 - 15000
+2026/05/31 15:39:27 keys 15000 - 15100
+2026/05/31 15:39:27 keys 15100 - 15200
+2026/05/31 15:39:28 keys 15200 - 15300
+2026/05/31 15:39:29 keys 15300 - 15400
+2026/05/31 15:39:29 keys 15400 - 15500
+2026/05/31 15:39:30 keys 15500 - 15600
+2026/05/31 15:39:30 keys 15600 - 15700
+2026/05/31 15:39:31 keys 15700 - 15800
+2026/05/31 15:39:32 keys 15800 - 15900
+2026/05/31 15:39:32 keys 15900 - 16000
+2026/05/31 15:39:33 keys 16000 - 16100
+2026/05/31 15:39:33 keys 16100 - 16200
+2026/05/31 15:39:34 keys 16200 - 16300
+2026/05/31 15:39:35 keys 16300 - 16400
+2026/05/31 15:39:35 keys 16400 - 16500
+2026/05/31 15:39:36 keys 16500 - 16600
+2026/05/31 15:39:37 keys 16600 - 16700
+2026/05/31 15:39:37 keys 16700 - 16800
+2026/05/31 15:39:38 keys 16800 - 16900
+2026/05/31 15:39:38 keys 16900 - 17000
+2026/05/31 15:39:39 keys 17000 - 17100
+2026/05/31 15:39:40 keys 17100 - 17200
+2026/05/31 15:39:40 keys 17200 - 17300
+2026/05/31 15:39:41 keys 17300 - 17400
+2026/05/31 15:39:41 keys 17400 - 17500
+2026/05/31 15:39:42 keys 17500 - 17600
+2026/05/31 15:39:43 keys 17600 - 17700
+2026/05/31 15:39:43 keys 17700 - 17800
+2026/05/31 15:39:44 keys 17800 - 17900
+2026/05/31 15:39:45 keys 17900 - 18000
+2026/05/31 15:39:45 keys 18000 - 18100
+2026/05/31 15:39:46 keys 18100 - 18200
+2026/05/31 15:39:46 keys 18200 - 18300
+2026/05/31 15:39:47 keys 18300 - 18400
+2026/05/31 15:39:48 keys 18400 - 18500
+2026/05/31 15:39:48 keys 18500 - 18600
+2026/05/31 15:39:49 keys 18600 - 18700
+2026/05/31 15:39:49 keys 18700 - 18800
+2026/05/31 15:39:50 keys 18800 - 18900
+2026/05/31 15:39:51 keys 18900 - 19000
+2026/05/31 15:39:51 keys 19000 - 19100
+2026/05/31 15:39:52 keys 19100 - 19200
+2026/05/31 15:39:53 keys 19200 - 19300
+2026/05/31 15:39:53 keys 19300 - 19400
+2026/05/31 15:39:54 keys 19400 - 19500
+2026/05/31 15:39:55 keys 19500 - 19600
+2026/05/31 15:39:55 keys 19600 - 19700
+2026/05/31 15:39:56 keys 19700 - 19800
+2026/05/31 15:39:57 keys 19800 - 19900
+2026/05/31 15:39:57 keys 19900 - 20000
+2026/05/31 15:39:58 keys 20000 - 20100
+2026/05/31 15:39:58 keys 20100 - 20200
+2026/05/31 15:39:59 keys 20200 - 20300
+2026/05/31 15:40:00 keys 20300 - 20400
+2026/05/31 15:40:00 keys 20400 - 20500
+2026/05/31 15:40:01 keys 20500 - 20600
+2026/05/31 15:40:02 keys 20600 - 20700
+2026/05/31 15:40:02 keys 20700 - 20800
+2026/05/31 15:40:03 keys 20800 - 20900
+2026/05/31 15:40:04 keys 20900 - 21000
+2026/05/31 15:40:04 keys 21000 - 21100
+2026/05/31 15:40:05 keys 21100 - 21200
+2026/05/31 15:40:05 keys 21200 - 21300
+2026/05/31 15:40:06 keys 21300 - 21400
+2026/05/31 15:40:07 keys 21400 - 21500
+2026/05/31 15:40:07 keys 21500 - 21600
+2026/05/31 15:40:08 keys 21600 - 21700
+2026/05/31 15:40:08 keys 21700 - 21800
+2026/05/31 15:40:09 keys 21800 - 21900
+2026/05/31 15:40:10 keys 21900 - 22000
+2026/05/31 15:40:10 keys 22000 - 22100
+2026/05/31 15:40:11 keys 22100 - 22200
+2026/05/31 15:40:11 keys 22200 - 22300
+2026/05/31 15:40:12 keys 22300 - 22400
+2026/05/31 15:40:13 keys 22400 - 22500
+2026/05/31 15:40:13 keys 22500 - 22600
+2026/05/31 15:40:14 keys 22600 - 22700
+2026/05/31 15:40:15 keys 22700 - 22800
+2026/05/31 15:40:15 keys 22800 - 22900
+2026/05/31 15:40:16 keys 22900 - 23000
+2026/05/31 15:40:17 keys 23000 - 23100
+2026/05/31 15:40:17 keys 23100 - 23200
+2026/05/31 15:40:18 keys 23200 - 23300
+2026/05/31 15:40:19 keys 23300 - 23400
+2026/05/31 15:40:19 keys 23400 - 23500
+2026/05/31 15:40:20 keys 23500 - 23600
+2026/05/31 15:40:21 keys 23600 - 23700
+2026/05/31 15:40:21 keys 23700 - 23800
+2026/05/31 15:40:22 keys 23800 - 23900
+2026/05/31 15:40:23 keys 23900 - 24000
+2026/05/31 15:40:23 keys 24000 - 24100
+2026/05/31 15:40:24 keys 24100 - 24200
+2026/05/31 15:40:24 keys 24200 - 24300
+2026/05/31 15:40:25 keys 24300 - 24400
+2026/05/31 15:40:26 keys 24400 - 24500
+2026/05/31 15:40:27 keys 24500 - 24600
+2026/05/31 15:40:27 keys 24600 - 24700
+2026/05/31 15:40:28 keys 24700 - 24800
+2026/05/31 15:40:28 keys 24800 - 24900
+2026/05/31 15:40:29 keys 24900 - 25000
+2026/05/31 15:40:30 keys 25000 - 25100
+2026/05/31 15:40:30 keys 25100 - 25200
+2026/05/31 15:40:31 keys 25200 - 25300
+2026/05/31 15:40:32 keys 25300 - 25400
+2026/05/31 15:40:32 keys 25400 - 25500
+2026/05/31 15:40:33 keys 25500 - 25600
+2026/05/31 15:40:33 keys 25600 - 25700
+2026/05/31 15:40:34 keys 25700 - 25800
+2026/05/31 15:40:35 keys 25800 - 25900
+2026/05/31 15:40:35 keys 25900 - 26000
+2026/05/31 15:40:36 keys 26000 - 26100
+2026/05/31 15:40:36 keys 26100 - 26200
+2026/05/31 15:40:37 keys 26200 - 26300
+2026/05/31 15:40:38 keys 26300 - 26400
+2026/05/31 15:40:38 keys 26400 - 26500
+2026/05/31 15:40:39 keys 26500 - 26600
+2026/05/31 15:40:40 keys 26600 - 26700
+2026/05/31 15:40:40 keys 26700 - 26800
+2026/05/31 15:40:41 keys 26800 - 26900
+2026/05/31 15:40:41 keys 26900 - 27000
+2026/05/31 15:40:42 keys 27000 - 27100
+2026/05/31 15:40:43 keys 27100 - 27200
+2026/05/31 15:40:43 keys 27200 - 27300
+2026/05/31 15:40:44 keys 27300 - 27400
+2026/05/31 15:40:45 keys 27400 - 27500
+2026/05/31 15:40:45 keys 27500 - 27600
+2026/05/31 15:40:46 keys 27600 - 27700
+2026/05/31 15:40:46 keys 27700 - 27800
+2026/05/31 15:40:47 keys 27800 - 27900
+2026/05/31 15:40:48 keys 27900 - 28000
+2026/05/31 15:40:48 keys 28000 - 28100
+2026/05/31 15:40:49 keys 28100 - 28200
+2026/05/31 15:40:49 keys 28200 - 28300
+2026/05/31 15:40:50 keys 28300 - 28400
+2026/05/31 15:40:50 keys 28400 - 28500
+2026/05/31 15:40:51 keys 28500 - 28600
+2026/05/31 15:40:51 keys 28600 - 28700
+2026/05/31 15:40:52 keys 28700 - 28800
+2026/05/31 15:40:53 keys 28800 - 28900
+2026/05/31 15:40:53 keys 28900 - 29000
+2026/05/31 15:40:54 keys 29000 - 29100
+2026/05/31 15:40:55 keys 29100 - 29200
+2026/05/31 15:40:55 keys 29200 - 29300
+2026/05/31 15:40:56 keys 29300 - 29400
+2026/05/31 15:40:56 keys 29400 - 29500
+2026/05/31 15:40:57 keys 29500 - 29600
+2026/05/31 15:40:58 keys 29600 - 29700
+2026/05/31 15:40:59 keys 29700 - 29800
+2026/05/31 15:40:59 keys 29800 - 29900
+2026/05/31 15:41:00 keys 29900 - 30000
+2026/05/31 15:41:00 keys 30000 - 30100
+2026/05/31 15:41:01 keys 30100 - 30200
+2026/05/31 15:41:02 keys 30200 - 30300
+2026/05/31 15:41:03 keys 30300 - 30400
+2026/05/31 15:41:03 keys 30400 - 30500
+2026/05/31 15:41:04 keys 30500 - 30600
+2026/05/31 15:41:05 keys 30600 - 30700
+2026/05/31 15:41:05 keys 30700 - 30800
+2026/05/31 15:41:06 keys 30800 - 30900
+2026/05/31 15:41:06 keys 30900 - 31000
+2026/05/31 15:41:07 keys 31000 - 31100
+2026/05/31 15:41:07 keys 31100 - 31200
+2026/05/31 15:41:08 keys 31200 - 31300
+2026/05/31 15:41:09 keys 31300 - 31400
+2026/05/31 15:41:09 keys 31400 - 31500
+2026/05/31 15:41:10 keys 31500 - 31600
+2026/05/31 15:41:10 keys 31600 - 31700
+2026/05/31 15:41:11 keys 31700 - 31800
+2026/05/31 15:41:12 keys 31800 - 31900
+2026/05/31 15:41:12 keys 31900 - 32000
+2026/05/31 15:41:13 keys 32000 - 32100
+2026/05/31 15:41:13 keys 32100 - 32200
+2026/05/31 15:41:14 keys 32200 - 32300
+2026/05/31 15:41:15 keys 32300 - 32400
+2026/05/31 15:41:15 keys 32400 - 32500
+2026/05/31 15:41:16 keys 32500 - 32600
+2026/05/31 15:41:16 keys 32600 - 32700
+2026/05/31 15:41:17 keys 32700 - 32800
+2026/05/31 15:41:18 keys 32800 - 32900
+2026/05/31 15:41:18 keys 32900 - 33000
+2026/05/31 15:41:19 keys 33000 - 33100
+2026/05/31 15:41:19 keys 33100 - 33200
+2026/05/31 15:41:20 keys 33200 - 33300
+2026/05/31 15:41:21 keys 33300 - 33400
+2026/05/31 15:41:21 keys 33400 - 33500
+2026/05/31 15:41:22 keys 33500 - 33600
+2026/05/31 15:41:22 keys 33600 - 33700
+2026/05/31 15:41:23 keys 33700 - 33800
+2026/05/31 15:41:24 keys 33800 - 33900
+2026/05/31 15:41:24 keys 33900 - 34000
+2026/05/31 15:41:25 keys 34000 - 34100
+2026/05/31 15:41:25 keys 34100 - 34200
+2026/05/31 15:41:26 keys 34200 - 34300
+2026/05/31 15:41:27 keys 34300 - 34400
+2026/05/31 15:41:27 keys 34400 - 34500
+2026/05/31 15:41:28 keys 34500 - 34600
+2026/05/31 15:41:29 keys 34600 - 34700
+2026/05/31 15:41:29 keys 34700 - 34800
+2026/05/31 15:41:30 keys 34800 - 34900
+2026/05/31 15:41:31 keys 34900 - 35000
+2026/05/31 15:41:31 keys 35000 - 35100
+2026/05/31 15:41:32 keys 35100 - 35200
+2026/05/31 15:41:33 keys 35200 - 35300
+2026/05/31 15:41:33 keys 35300 - 35400
+2026/05/31 15:41:34 keys 35400 - 35500
+2026/05/31 15:41:34 keys 35500 - 35600
+2026/05/31 15:41:35 keys 35600 - 35700
+2026/05/31 15:41:36 keys 35700 - 35800
+2026/05/31 15:41:36 keys 35800 - 35900
+2026/05/31 15:41:37 keys 35900 - 36000
+2026/05/31 15:41:37 keys 36000 - 36100
+2026/05/31 15:41:38 keys 36100 - 36200
+2026/05/31 15:41:39 keys 36200 - 36300
+2026/05/31 15:41:39 keys 36300 - 36400
+2026/05/31 15:41:40 keys 36400 - 36500
+2026/05/31 15:41:41 keys 36500 - 36600
+2026/05/31 15:41:41 keys 36600 - 36700
+2026/05/31 15:41:42 keys 36700 - 36800
+2026/05/31 15:41:43 keys 36800 - 36900
+2026/05/31 15:41:43 keys 36900 - 37000
+2026/05/31 15:41:44 keys 37000 - 37100
+2026/05/31 15:41:45 keys 37100 - 37200
+2026/05/31 15:41:46 keys 37200 - 37300
+2026/05/31 15:41:46 keys 37300 - 37400
+2026/05/31 15:41:47 keys 37400 - 37500
+2026/05/31 15:41:48 keys 37500 - 37600
+2026/05/31 15:41:48 keys 37600 - 37700
+2026/05/31 15:41:49 keys 37700 - 37800
+2026/05/31 15:41:49 keys 37800 - 37900
+2026/05/31 15:41:50 keys 37900 - 38000
+2026/05/31 15:41:51 keys 38000 - 38100
+2026/05/31 15:41:51 keys 38100 - 38200
+2026/05/31 15:41:52 keys 38200 - 38300
+2026/05/31 15:41:53 keys 38300 - 38400
+2026/05/31 15:41:53 keys 38400 - 38500
+2026/05/31 15:41:54 keys 38500 - 38600
+2026/05/31 15:41:55 keys 38600 - 38700
+2026/05/31 15:41:55 keys 38700 - 38800
+2026/05/31 15:41:56 keys 38800 - 38900
+2026/05/31 15:41:57 keys 38900 - 39000
+2026/05/31 15:41:57 keys 39000 - 39100
+2026/05/31 15:41:58 keys 39100 - 39200
+2026/05/31 15:41:59 keys 39200 - 39300
+2026/05/31 15:41:59 keys 39300 - 39400
+2026/05/31 15:42:00 keys 39400 - 39500
+2026/05/31 15:42:00 keys 39500 - 39600
+2026/05/31 15:42:01 keys 39600 - 39700
+2026/05/31 15:42:02 keys 39700 - 39800
+2026/05/31 15:42:02 keys 39800 - 39900
+2026/05/31 15:42:03 keys 39900 - 40000
+2026/05/31 15:42:03 keys 40000 - 40100
+2026/05/31 15:42:04 keys 40100 - 40200
+2026/05/31 15:42:05 keys 40200 - 40300
+2026/05/31 15:42:05 keys 40300 - 40400
+2026/05/31 15:42:06 keys 40400 - 40500
+2026/05/31 15:42:06 keys 40500 - 40600
+2026/05/31 15:42:07 keys 40600 - 40700
+2026/05/31 15:42:08 keys 40700 - 40800
+2026/05/31 15:42:09 keys 40800 - 40900
+2026/05/31 15:42:09 keys 40900 - 41000
+2026/05/31 15:42:10 keys 41000 - 41100
+2026/05/31 15:42:10 keys 41100 - 41200
+2026/05/31 15:42:11 keys 41200 - 41300
+2026/05/31 15:42:12 keys 41300 - 41400
+2026/05/31 15:42:12 keys 41400 - 41500
+2026/05/31 15:42:13 keys 41500 - 41600
+2026/05/31 15:42:13 keys 41600 - 41700
+2026/05/31 15:42:14 keys 41700 - 41800
+2026/05/31 15:42:15 keys 41800 - 41900
+2026/05/31 15:42:15 keys 41900 - 42000
+2026/05/31 15:42:16 keys 42000 - 42100
+2026/05/31 15:42:16 keys 42100 - 42200
+2026/05/31 15:42:17 keys 42200 - 42300
+2026/05/31 15:42:18 keys 42300 - 42400
+2026/05/31 15:42:19 keys 42400 - 42500
+2026/05/31 15:42:19 keys 42500 - 42600
+2026/05/31 15:42:20 keys 42600 - 42700
+2026/05/31 15:42:21 keys 42700 - 42800
+2026/05/31 15:42:21 keys 42800 - 42900
+2026/05/31 15:42:22 keys 42900 - 43000
+2026/05/31 15:42:22 keys 43000 - 43100
+2026/05/31 15:42:23 keys 43100 - 43200
+2026/05/31 15:42:24 keys 43200 - 43300
+2026/05/31 15:42:24 keys 43300 - 43400
+2026/05/31 15:42:25 keys 43400 - 43500
+2026/05/31 15:42:25 keys 43500 - 43600
+2026/05/31 15:42:26 keys 43600 - 43700
+2026/05/31 15:42:27 keys 43700 - 43800
+2026/05/31 15:42:27 keys 43800 - 43900
+2026/05/31 15:42:28 keys 43900 - 44000
+2026/05/31 15:42:28 keys 44000 - 44100
+2026/05/31 15:42:29 keys 44100 - 44200
+2026/05/31 15:42:30 keys 44200 - 44300
+2026/05/31 15:42:30 keys 44300 - 44400
+2026/05/31 15:42:31 keys 44400 - 44500
+2026/05/31 15:42:31 keys 44500 - 44600
+2026/05/31 15:42:32 keys 44600 - 44700
+2026/05/31 15:42:33 keys 44700 - 44800
+2026/05/31 15:42:33 keys 44800 - 44900
+2026/05/31 15:42:34 keys 44900 - 45000
+2026/05/31 15:42:34 keys 45000 - 45100
+2026/05/31 15:42:35 keys 45100 - 45200
+2026/05/31 15:42:36 keys 45200 - 45300
+2026/05/31 15:42:36 keys 45300 - 45400
+2026/05/31 15:42:37 keys 45400 - 45500
+2026/05/31 15:42:37 keys 45500 - 45600
+2026/05/31 15:42:38 keys 45600 - 45700
+2026/05/31 15:42:39 keys 45700 - 45800
+2026/05/31 15:42:40 keys 45800 - 45900
+2026/05/31 15:42:40 keys 45900 - 46000
+2026/05/31 15:42:41 keys 46000 - 46100
+2026/05/31 15:42:41 keys 46100 - 46200
+2026/05/31 15:42:42 keys 46200 - 46300
+2026/05/31 15:42:43 keys 46300 - 46400
+2026/05/31 15:42:43 keys 46400 - 46500
+2026/05/31 15:42:44 keys 46500 - 46600
+2026/05/31 15:42:44 keys 46600 - 46700
+2026/05/31 15:42:45 keys 46700 - 46800
+2026/05/31 15:42:46 keys 46800 - 46900
+2026/05/31 15:42:46 keys 46900 - 47000
+2026/05/31 15:42:47 keys 47000 - 47100
+2026/05/31 15:42:48 keys 47100 - 47200
+2026/05/31 15:42:48 keys 47200 - 47300
+2026/05/31 15:42:49 keys 47300 - 47400
+2026/05/31 15:42:50 keys 47400 - 47500
+2026/05/31 15:42:50 keys 47500 - 47600
+2026/05/31 15:42:51 keys 47600 - 47700
+2026/05/31 15:42:52 keys 47700 - 47800
+2026/05/31 15:42:52 keys 47800 - 47900
+2026/05/31 15:42:53 keys 47900 - 48000
+2026/05/31 15:42:53 keys 48000 - 48100
+2026/05/31 15:42:54 keys 48100 - 48200
+2026/05/31 15:42:55 keys 48200 - 48300
+2026/05/31 15:42:55 keys 48300 - 48400
+2026/05/31 15:42:56 keys 48400 - 48500
+2026/05/31 15:42:56 keys 48500 - 48600
+2026/05/31 15:42:57 keys 48600 - 48700
+2026/05/31 15:42:58 keys 48700 - 48800
+2026/05/31 15:42:59 keys 48800 - 48900
+2026/05/31 15:42:59 keys 48900 - 49000
+2026/05/31 15:43:00 keys 49000 - 49100
+2026/05/31 15:43:00 keys 49100 - 49200
+2026/05/31 15:43:01 keys 49200 - 49300
+2026/05/31 15:43:02 keys 49300 - 49400
+2026/05/31 15:43:02 keys 49400 - 49500
+2026/05/31 15:43:03 keys 49500 - 49600
+2026/05/31 15:43:04 keys 49600 - 49700
+2026/05/31 15:43:04 keys 49700 - 49800
+2026/05/31 15:43:05 keys 49800 - 49900
+2026/05/31 15:43:06 keys 49900 - 50000
+2026/05/31 15:43:07 End of keys initialization
+2026/05/31 15:43:07 Testing 1 dbs
+2026/05/31 15:44:08 clientmetrics num-db=1 cpu-util=1% (user=13.365s sys=2.247s wall=1m0.636s cores=48) http-req=33888 (559/s) throttle=0 5xx=0 new-conns=51 peak-goroutines=225
+2026/05/31 15:44:08 Testing 5 dbs
+2026/05/31 15:45:09 clientmetrics num-db=5 cpu-util=3% (user=1m17.157s sys=8.386s wall=1m0.636s cores=48) http-req=184943 (3050/s) throttle=0 5xx=0 new-conns=65 peak-goroutines=1240
+2026/05/31 15:45:09 Testing 10 dbs
+2026/05/31 15:46:10 clientmetrics num-db=10 cpu-util=7% (user=3m12.719s sys=19.222s wall=1m1.101s cores=48) http-req=406211 (6648/s) throttle=0 5xx=0 new-conns=120 peak-goroutines=2825
+2026/05/31 15:46:10 Testing 15 dbs
+2026/05/31 15:47:11 clientmetrics num-db=15 cpu-util=10% (user=4m29.243s sys=25.576s wall=1m1.222s cores=48) http-req=526976 (8608/s) throttle=0 5xx=0 new-conns=140 peak-goroutines=3530
+2026/05/31 15:47:11 Testing 20 dbs
+2026/05/31 15:48:13 clientmetrics num-db=20 cpu-util=12% (user=5m17.205s sys=29.838s wall=1m1.937s cores=48) http-req=594313 (9595/s) throttle=0 5xx=0 new-conns=162 peak-goroutines=4275
+2026/05/31 15:48:13 Testing 25 dbs
+2026/05/31 15:49:16 clientmetrics num-db=25 cpu-util=11% (user=5m15.187s sys=28.01s wall=1m3.018s cores=48) http-req=582311 (9240/s) throttle=0 5xx=0 new-conns=192 peak-goroutines=4546
+2026/05/31 15:49:16 Testing 30 dbs
+2026/05/31 15:50:21 clientmetrics num-db=30 cpu-util=11% (user=5m10.863s sys=29.41s wall=1m4.903s cores=48) http-req=576635 (8885/s) throttle=0 5xx=18 new-conns=274 peak-goroutines=5323
+2026/05/31 15:50:21 Testing 35 dbs
+2026/05/31 15:51:27 clientmetrics num-db=35 cpu-util=12% (user=5m52.804s sys=32.439s wall=1m5.12s cores=48) http-req=639877 (9826/s) throttle=0 5xx=1 new-conns=158 peak-goroutines=5967
+2026/05/31 15:51:27 Testing 40 dbs
+2026/05/31 15:52:33 clientmetrics num-db=40 cpu-util=12% (user=6m0.534s sys=32.387s wall=1m6.341s cores=48) http-req=647559 (9761/s) throttle=0 5xx=15 new-conns=295 peak-goroutines=6289
+2026/05/31 15:52:33 Testing 45 dbs
+2026/05/31 15:53:39 clientmetrics num-db=45 cpu-util=13% (user=6m9.003s sys=33.333s wall=1m5.229s cores=48) http-req=659420 (10109/s) throttle=0 5xx=15 new-conns=439 peak-goroutines=6597
+2026/05/31 15:53:39 Testing 50 dbs
+2026/05/31 15:54:46 clientmetrics num-db=50 cpu-util=13% (user=6m25.654s sys=34.696s wall=1m6.914s cores=48) http-req=693279 (10361/s) throttle=0 5xx=37 new-conns=422 peak-goroutines=7880
 + ./rtbench -backend=s3 -test-name=deadlock -duration=20s -deadlock-out=out/deadlock.csv
-2026/05/31 11:58:19 deadlock: keys=1 overlap=1 (100%) samples=564 p50=33.971404ms p90=41.479555ms
-2026/05/31 11:58:40 deadlock: keys=2 overlap=1 (50%) samples=324 p50=305.426505ms p90=337.460539ms
-2026/05/31 11:58:41 ERROR Commit End tx=da59a0b87434ed7418b4a496debdca91 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:42 ERROR Commit End tx=ffb72d669288527d18b4a49715dd105c err="log status 2: transaction was already finalized"
-2026/05/31 11:58:43 ERROR Commit End tx=c812a9b32eb20e0018b4a49756798771 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:43 ERROR Commit End tx=58754bf455aff7be18b4a4977768bb67 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:43 ERROR Commit End tx=e5cd6fa874578cf718b4a49725050a9d err="log status 2: transaction was already finalized"
-2026/05/31 11:58:43 ERROR Commit End tx=70014918fe0f6a4518b4a49756798771 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:43 ERROR Commit End tx=09e32e2ec5a41a0618b4a49789535839 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:44 ERROR Commit End tx=8291fdacd63c4dbf18b4a4977768bb67 err="log status 2: transaction was already finalized"
-2026/05/31 11:58:44 ERROR Commit End tx=c079ad6308c34b5e18b4a4979fc408d3 err="log status 2: transaction was already finalized"
-2026/05/31 11:59:00 deadlock: keys=2 overlap=2 (100%) samples=273 p50=307.811186ms p90=349.185493ms
-2026/05/31 11:59:21 deadlock: keys=3 overlap=1 (33%) samples=333 p50=301.511637ms p90=329.882032ms
-2026/05/31 11:59:21 ERROR Commit End tx=098152ffc4edeb4f18b4a4a06b9b10b2 err="log status 2: transaction was already finalized"
-2026/05/31 11:59:41 deadlock: keys=3 overlap=2 (66%) samples=303 p50=317.354872ms p90=380.316476ms
-2026/05/31 11:59:42 ERROR Commit End tx=c8b3f4c682cb995d18b4a4a52d6477a6 err="log status 2: transaction was already finalized"
-2026/05/31 11:59:42 ERROR Commit End tx=deb1923b3e65cfd218b4a4a53dceb2b8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:02 deadlock: keys=3 overlap=3 (100%) samples=295 p50=321.997475ms p90=398.387637ms
-2026/05/31 12:00:25 deadlock: keys=4 overlap=1 (25%) samples=341 p50=290.880283ms p90=332.50936ms
-2026/05/31 12:00:25 ERROR Commit End tx=72de46510d062d9118b4a4af3bb5d5c3 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:25 ERROR Commit End tx=70899f3092fa7dfa18b4a4af3bb66f21 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:26 ERROR Commit End tx=0ca66679bfc32c9118b4a4af4b04ef82 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:45 deadlock: keys=4 overlap=2 (50%) samples=319 p50=302.284795ms p90=366.341445ms
-2026/05/31 12:00:47 ERROR Commit End tx=325533765db67c5618b4a4b403c9a6e8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:47 ERROR Commit End tx=d402f9cc2561136a18b4a4b407eb9ed8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:47 ERROR Commit End tx=1ab8617f4157c1ef18b4a4b403c9a6e8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=b89c7e9144a0f18618b4a4b403cbdb1f err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=71a05641300a707818b4a4b407eb9ed8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=b1dbb08b706c89d718b4a4b403c9a6e8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=6aeec0bd5115834118b4a4b479e1b046 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=f48d82fd31a6e0e418b4a4b407eb9ed8 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:48 ERROR Commit End tx=1a5afcb9e91ea0f018b4a4b4a23b127a err="log status 2: transaction was already finalized"
-2026/05/31 12:00:49 ERROR Commit End tx=b066fee9889d036118b4a4b4b680f914 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:49 ERROR Commit End tx=86183e4caf89c96118b4a4b4c9f0b665 err="log status 2: transaction was already finalized"
-2026/05/31 12:00:49 ERROR Commit End tx=6b3eeb1e1cfbbcc318b4a4b4de1fe2f4 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:06 deadlock: keys=4 overlap=3 (75%) samples=262 p50=316.886694ms p90=400.758731ms
-2026/05/31 12:01:08 ERROR Commit End tx=f055150c2571508618b4a4b8c7548331 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:09 ERROR Commit End tx=8e1866a72fec46af18b4a4b933338160 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:09 ERROR Commit End tx=d1de541d436a2ce218b4a4b942a27cf6 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:11 ERROR Commit End tx=ef3606b8d6740f0218b4a4b942a27cf6 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:11 ERROR Commit End tx=01d4baa814ec465b18b4a4b9ed1af9c3 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:12 ERROR Commit End tx=fb4a2c81ade49a2518b4a4b9ed1af9c3 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:13 ERROR Commit End tx=6cdf39df990a80cb18b4a4b95b4151da err="log status 2: transaction was already finalized"
-2026/05/31 12:01:13 ERROR Commit End tx=fd2cc269ccbdcb0a18b4a4b9ed1af9c3 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:13 ERROR Commit End tx=6cc58eb8f9b7b1c718b4a4ba5a1603dc err="log status 2: transaction was already finalized"
-2026/05/31 12:01:15 ERROR Commit End tx=bc9158909bbcd7ec18b4a4ba6f9da0e6 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:16 ERROR Commit End tx=d4a7e00886b3201a18b4a4bad9d486e1 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:16 ERROR Commit End tx=bdba4d6f2c7f1fe618b4a4bae85a2f86 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:18 ERROR Commit End tx=5348079d3366bec118b4a4bae85a2f86 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:18 ERROR Commit End tx=a365463f504b128a18b4a4bb93651fd1 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:20 ERROR Commit End tx=f4790fb9e22de55418b4a4bafe53ad72 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:20 ERROR Commit End tx=95a8139820bede3118b4a4bbfe93ea6b err="log status 2: transaction was already finalized"
-2026/05/31 12:01:20 ERROR Commit End tx=f9880ed8dece045c18b4a4bafe53ad72 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=9e9ea98074637fee18b4a4bc1730fabc err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=da29ea53ba9e7f7018b4a4bbfe93ea6b err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=3d2fbe0c356ef6cf18b4a4bc300eb96d err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=7b843fe21d0a7deb18b4a4bc1730fabc err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=b1e2d2a0c4d7659c18b4a4bc439b35ab err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=e52fe0d5200c244d18b4a4bb93651fd1 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=68838e91baf1ca4c18b4a4bc530370b8 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:21 ERROR Commit End tx=b001f8fcaac352ea18b4a4bc439b35ab err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=02e05ffdb7a0b68618b4a4bc65b9490a err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=684c4510f9d6bae018b4a4bc530370b8 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=7734cff04aac0d3a18b4a4bc7a715c5b err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=cdae14eecb3e18fb18b4a4bc65b9490a err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=dbd7ff2e10d4b9f318b4a4bc8cee0bc0 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:22 ERROR Commit End tx=6e436047a62c3e8618b4a4bc7a715c5b err="log status 2: transaction was already finalized"
-2026/05/31 12:01:23 ERROR Commit End tx=ae78a911c44ab78218b4a4bc9fc210b2 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:23 ERROR Commit End tx=aaf0d1f1d671f4da18b4a4bc8cee0bc0 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:23 ERROR Commit End tx=4bfd140c1fbb5c4018b4a4bcb1faa9a3 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:23 ERROR Commit End tx=90e1d3b7a46d9d2418b4a4bc9fc210b2 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:23 ERROR Commit End tx=8ab9d9d6ee81449918b4a4bcb1faa9a3 err="log status 2: transaction was already finalized"
-2026/05/31 12:01:26 deadlock: keys=4 overlap=4 (100%) samples=71 p50=385.416784ms p90=5.316949317s
-2026/05/31 12:01:47 deadlock: keys=5 overlap=1 (20%) samples=344 p50=287.512563ms p90=317.41182ms
-2026/05/31 12:01:48 ERROR Commit End tx=555c0b75b8f3341818b4a4c26a287f29 err="log status 2: transaction was already finalized"
-2026/05/31 12:02:07 deadlock: keys=5 overlap=2 (40%) samples=307 p50=320.899257ms p90=360.744881ms
-2026/05/31 12:02:08 ERROR Commit End tx=5f6dd44df62d1fe218b4a4c732520dff err="log status 2: transaction was already finalized"
-2026/05/31 12:02:08 ERROR Commit End tx=77ef91b358f0b06a18b4a4c73252f3ec err="log status 2: transaction was already finalized"
-2026/05/31 12:02:08 ERROR Commit End tx=437bef0ee9c8486b18b4a4c7325844e9 err="log status 2: transaction was already finalized"
-2026/05/31 12:02:08 ERROR Commit End tx=0a2e17ecee8ebd4f18b4a4c73e7dfd9e err="log status 2: transaction was already finalized"
-2026/05/31 12:02:08 ERROR Commit End tx=34d3abc1315dd6da18b4a4c74c17ce4b err="log status 2: transaction was already finalized"
-2026/05/31 12:02:09 ERROR Commit End tx=f38287e8954e884018b4a4c7598a6cf0 err="log status 2: transaction was already finalized"
-2026/05/31 12:02:28 deadlock: keys=5 overlap=3 (60%) samples=305 p50=312.159859ms p90=358.494509ms
-2026/05/31 12:02:30 ERROR Commit End tx=ce9249534d088c5d18b4a4cc03fd1eff err="log status 2: transaction was already finalized"
-2026/05/31 12:02:32 ERROR Commit End tx=4778ebce83031ef718b4a4cc783641be err="log status 2: transaction was already finalized"
-2026/05/31 12:02:32 ERROR Commit End tx=05e2e7df127539a418b4a4cc8f923deb err="log status 2: transaction was already finalized"
-2026/05/31 12:02:32 ERROR Commit End tx=f4f049149111a34b18b4a4cca3c6a411 err="log status 2: transaction was already finalized"
-2026/05/31 12:02:32 ERROR Commit End tx=8cfd22a11fcb992918b4a4ccb749492f err="log status 2: transaction was already finalized"
-2026/05/31 12:02:32 ERROR Commit End tx=4a18f54bb19365fe18b4a4ccc980e7cb err="log status 2: transaction was already finalized"
-2026/05/31 12:02:49 deadlock: keys=5 overlap=4 (80%) samples=264 p50=321.035437ms p90=354.147567ms
-2026/05/31 12:02:49 ERROR Commit End tx=5a900d438b6b5f8f18b4a4d0cae5a05c err="log status 2: transaction was already finalized"
-2026/05/31 12:02:49 ERROR Commit End tx=160d268d623e087e18b4a4d0cae928fe err="log status 2: transaction was already finalized"
-2026/05/31 12:02:49 ERROR Commit End tx=005727af8f2345f718b4a4d0cae9cd90 err="log status 2: transaction was already finalized"
-2026/05/31 12:02:49 ERROR Commit End tx=c8d330d2cd1b4b9f18b4a4d0cae9dc4c err="log status 2: transaction was already finalized"
-2026/05/31 12:02:50 ERROR Commit End tx=5575256fa51b964918b4a4d0e363adba err="log status 2: transaction was already finalized"
-2026/05/31 12:03:09 deadlock: keys=5 overlap=5 (100%) samples=291 p50=329.069596ms p90=382.287822ms
-2026/05/31 12:03:30 deadlock: keys=6 overlap=1 (16%) samples=349 p50=287.358778ms p90=310.544407ms
-2026/05/31 12:03:33 ERROR Commit End tx=5a4e90b9b73498d718b4a4da66619c69 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:35 ERROR Commit End tx=71cdf4781e283eae18b4a4db01c80e83 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:38 ERROR Commit End tx=12666e14a935d37118b4a4dbb388638b err="log status 2: transaction was already finalized"
-2026/05/31 12:03:38 ERROR Commit End tx=15ac231a306f6c0318b4a4dc1c63dc3d err="log status 2: transaction was already finalized"
-2026/05/31 12:03:38 ERROR Commit End tx=468acd115290a83318b4a4db1ede9316 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:38 ERROR Commit End tx=3827bcf092e8b7ee18b4a4dbb388638b err="log status 2: transaction was already finalized"
-2026/05/31 12:03:39 ERROR Commit End tx=d3795bb540ecb45f18b4a4dc39b84e5d err="log status 2: transaction was already finalized"
-2026/05/31 12:03:39 ERROR Commit End tx=bdf02c5b6efb695118b4a4dc1c63dc3d err="log status 2: transaction was already finalized"
-2026/05/31 12:03:39 ERROR Commit End tx=4c4aede6d3452da118b4a4dc54d0eab3 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:50 deadlock: keys=6 overlap=2 (33%) samples=188 p50=303.524492ms p90=453.741674ms
-2026/05/31 12:03:51 ERROR Commit End tx=df11aac40414ff4218b4a4df302d2469 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:51 ERROR Commit End tx=3381a43b30292b2418b4a4df30323a9c err="log status 2: transaction was already finalized"
-2026/05/31 12:03:51 ERROR Commit End tx=d5237316a0ee65e518b4a4df302d2990 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:51 ERROR Commit End tx=ce812a7cf3f2a1e918b4a4df425725b5 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:52 ERROR Commit End tx=361c403d69f584b418b4a4df4c259937 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:52 ERROR Commit End tx=a4263e1652917d8718b4a4df30323a9c err="log status 2: transaction was already finalized"
-2026/05/31 12:03:52 ERROR Commit End tx=0650b00f54decb5e18b4a4df4c259937 err="log status 2: transaction was already finalized"
-2026/05/31 12:03:52 ERROR Commit End tx=c0fcd717c9ca76c018b4a4df741dc30e err="log status 2: transaction was already finalized"
-2026/05/31 12:03:53 ERROR Commit End tx=0957376d0c91120218b4a4df8541b8fe err="log status 2: transaction was already finalized"
-2026/05/31 12:03:53 ERROR Commit End tx=ebace3282e580d9318b4a4df999ee5ae err="log status 2: transaction was already finalized"
-2026/05/31 12:04:11 deadlock: keys=6 overlap=3 (50%) samples=289 p50=317.481821ms p90=401.576004ms
-2026/05/31 12:04:11 ERROR Commit End tx=f150e47961f881e318b4a4e3fc6668c1 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:12 ERROR Commit End tx=0b7e7875f8292b0918b4a4e3fc67747a err="log status 2: transaction was already finalized"
-2026/05/31 12:04:12 ERROR Commit End tx=b2ed5a7295590d7318b4a4e3fc671000 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:12 ERROR Commit End tx=b3e45562ad403c6818b4a4e3fc77c40f err="log status 2: transaction was already finalized"
-2026/05/31 12:04:12 ERROR Commit End tx=3e0ee79eb2df84a618b4a4e3fc67747a err="log status 2: transaction was already finalized"
-2026/05/31 12:04:32 deadlock: keys=6 overlap=4 (66%) samples=309 p50=312.516112ms p90=361.227104ms
-2026/05/31 12:04:32 ERROR Commit End tx=69c4f7ca2178510618b4a4e8c4e5d85c err="log status 2: transaction was already finalized"
-2026/05/31 12:04:32 ERROR Commit End tx=e74f6a26dd90d74718b4a4e8c4f0b2cb err="log status 2: transaction was already finalized"
-2026/05/31 12:04:32 ERROR Commit End tx=e4f68d0b0e047b1018b4a4e8c4f57d96 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:32 ERROR Commit End tx=6b29f9b3e7a1562c18b4a4e8d38ba496 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:33 ERROR Commit End tx=b73235adee3a73d218b4a4e8e2350cc0 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:33 ERROR Commit End tx=b834c447d5178aff18b4a4e8f8a0d94c err="log status 2: transaction was already finalized"
-2026/05/31 12:04:52 deadlock: keys=6 overlap=5 (83%) samples=298 p50=315.282778ms p90=372.092493ms
-2026/05/31 12:04:53 ERROR Commit End tx=22d1bb0a84d7203718b4a4ed8e9fff28 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=58502d6309d998f518b4a4ed8e9d8913 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=f6aacd05a83307a218b4a4ed8ea0ddf7 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=ddd95c0377feb98718b4a4ed9aa80955 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=0d8db53bcfc12d4e18b4a4ed8e9fff28 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=9b87d1d36af55d0718b4a4eda9121ae2 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:53 ERROR Commit End tx=683970ab18844c0818b4a4ed9aa80955 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=632d9adb77590f0918b4a4edbadaec93 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=b4cad9bec99b5a1518b4a4eda9121ae2 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=9607a5023c936ca518b4a4edceb7b5dc err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=2e00a960f1d896ce18b4a4edbadaec93 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=47bae258e1bf335018b4a4ede05ea0d4 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=880ef4b64e9e10cb18b4a4edceb7b5dc err="log status 2: transaction was already finalized"
-2026/05/31 12:04:54 ERROR Commit End tx=93e74824bd014b7d18b4a4edf2380805 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:55 ERROR Commit End tx=39bad26a7e51c05118b4a4ede05ea0d4 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:55 ERROR Commit End tx=5f96ffbe26217c9918b4a4edf2380805 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:55 ERROR Commit End tx=0da66eca145a116c18b4a4ee1b359efe err="log status 2: transaction was already finalized"
-2026/05/31 12:04:55 ERROR Commit End tx=c6f19e1137f2fe8b18b4a4ee2c4da28f err="log status 2: transaction was already finalized"
-2026/05/31 12:04:56 ERROR Commit End tx=44d473e6ad7da4ba18b4a4ee3e6707f2 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:56 ERROR Commit End tx=36d858645320192a18b4a4ee5104a57b err="log status 2: transaction was already finalized"
-2026/05/31 12:04:56 ERROR Commit End tx=9f1eb8f2620523d718b4a4ee644a34d6 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:57 ERROR Commit End tx=b94042c2f2a8402618b4a4ee76ad4405 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:57 ERROR Commit End tx=2cf130e087b17fc718b4a4ee88d4e44b err="log status 2: transaction was already finalized"
-2026/05/31 12:04:57 ERROR Commit End tx=5084ed85d408d81a18b4a4ee9bc8d46a err="log status 2: transaction was already finalized"
-2026/05/31 12:04:58 ERROR Commit End tx=cb4b428ea44353fa18b4a4eeb056f196 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:58 ERROR Commit End tx=b2ce6c6ff1691b7818b4a4eec014e0e7 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:58 ERROR Commit End tx=433b9509b6fde14d18b4a4eed501731e err="log status 2: transaction was already finalized"
-2026/05/31 12:04:59 ERROR Commit End tx=1064e062a29a9a8018b4a4eee8381176 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:59 ERROR Commit End tx=dd0f233285b12e0018b4a4eef6eb510f err="log status 2: transaction was already finalized"
-2026/05/31 12:04:59 ERROR Commit End tx=8d0a65d47279a49418b4a4ef0a38fec0 err="log status 2: transaction was already finalized"
-2026/05/31 12:04:59 ERROR Commit End tx=29c8b6600267c6a818b4a4ef1d492b86 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:00 ERROR Commit End tx=3a8768fa1d5e166d18b4a4ef302b4178 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:00 ERROR Commit End tx=98d3f23d9157b4ac18b4a4ef439f15a6 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:00 ERROR Commit End tx=24e8ae96a82ba5fb18b4a4ef5341e9bf err="log status 2: transaction was already finalized"
-2026/05/31 12:05:01 ERROR Commit End tx=1cf49449cef9d22518b4a4ef63804028 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:01 ERROR Commit End tx=8f825c0d9684b74a18b4a4ef73c9b28d err="log status 2: transaction was already finalized"
-2026/05/31 12:05:01 ERROR Commit End tx=1547b2ba74cae35118b4a4ef87a6e31f err="log status 2: transaction was already finalized"
-2026/05/31 12:05:02 ERROR Commit End tx=992a56ef16f595d318b4a4ef97bbe410 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:02 ERROR Commit End tx=c23cc9ed855e242418b4a4efaa95c9c7 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:02 ERROR Commit End tx=9bcb403bf33c4d5b18b4a4efbe93e417 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:03 ERROR Commit End tx=fb4b699c0bcd840b18b4a4efd171cb86 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:03 ERROR Commit End tx=c775384c7be34d3518b4a4efe4eb3b00 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:03 ERROR Commit End tx=f1df88f07babb1d318b4a4eff84f1ecf err="log status 2: transaction was already finalized"
-2026/05/31 12:05:03 ERROR Commit End tx=20b68269aa39591718b4a4f00c940339 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:04 ERROR Commit End tx=dd22eb1950da624918b4a4f01c39a95d err="log status 2: transaction was already finalized"
-2026/05/31 12:05:04 ERROR Commit End tx=5e5ecda26cdd252c18b4a4f02ee31080 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:04 ERROR Commit End tx=82593fad605c257e18b4a4f04118d090 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:05 ERROR Commit End tx=cc40ca4597847eac18b4a4f053b2cc72 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:05 ERROR Commit End tx=081beb7ed22726a718b4a4f065bd9058 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:05 ERROR Commit End tx=43fa05ebda6fea2418b4a4f0750a3b51 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:06 ERROR Commit End tx=2ba2dd21fc7a0c4618b4a4f087ee7ae1 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:07 ERROR Commit End tx=5d220f765430d56118b4a4f09bad4877 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:07 ERROR Commit End tx=14d18b5e10a3ce7c18b4a4f0d81ea14f err="log status 2: transaction was already finalized"
-2026/05/31 12:05:07 ERROR Commit End tx=23c3058717017b0118b4a4f0ec68599d err="log status 2: transaction was already finalized"
-2026/05/31 12:05:08 ERROR Commit End tx=696bb4d965162f9d18b4a4f0ffb96d4f err="log status 2: transaction was already finalized"
-2026/05/31 12:05:08 ERROR Commit End tx=f9fa8008319c625218b4a4f112b2d4c2 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:08 ERROR Commit End tx=bb1521138881f75e18b4a4f1229c2831 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:09 ERROR Commit End tx=df4abb98837b5ceb18b4a4f135d8fbca err="log status 2: transaction was already finalized"
-2026/05/31 12:05:09 ERROR Commit End tx=c0b6126568c650dd18b4a4f149890508 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:10 ERROR Commit End tx=124729b67929a7ce18b4a4f179ff387d err="log status 2: transaction was already finalized"
-2026/05/31 12:05:10 ERROR Commit End tx=6758d2a6c497117418b4a4f18ec9db40 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:10 ERROR Commit End tx=2c8e8cac3598397518b4a4f1a1bf2103 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:11 ERROR Commit End tx=d882ad4c2aed02f818b4a4f1b5c6108e err="log status 2: transaction was already finalized"
-2026/05/31 12:05:11 ERROR Commit End tx=9415dff37c1f41a818b4a4f1ca7c5488 err="log status 2: transaction was already finalized"
-2026/05/31 12:05:13 deadlock: keys=6 overlap=6 (100%) samples=183 p50=389.826227ms p90=878.832177ms
-+ aws s3 cp out/ s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/ --recursive
-Completed 29.4 KiB/31.1 MiB (483.7 KiB/s) with 4 file(s) remainingupload: out/throughput.csv to s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/throughput.csv
-Completed 29.4 KiB/31.1 MiB (483.7 KiB/s) with 3 file(s) remainingCompleted 38.5 KiB/31.1 MiB (553.9 KiB/s) with 3 file(s) remainingupload: out/stats.csv to s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/stats.csv
-Completed 38.5 KiB/31.1 MiB (553.9 KiB/s) with 2 file(s) remainingCompleted 1.0 MiB/31.1 MiB (13.0 MiB/s) with 2 file(s) remaining  Completed 2.0 MiB/31.1 MiB (25.6 MiB/s) with 2 file(s) remaining  Completed 3.0 MiB/31.1 MiB (37.7 MiB/s) with 2 file(s) remaining  Completed 3.1 MiB/31.1 MiB (38.5 MiB/s) with 2 file(s) remaining  upload: out/deadlock.csv to s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/deadlock.csv
-Completed 3.1 MiB/31.1 MiB (38.5 MiB/s) with 1 file(s) remainingCompleted 4.1 MiB/31.1 MiB (45.5 MiB/s) with 1 file(s) remainingCompleted 5.1 MiB/31.1 MiB (53.5 MiB/s) with 1 file(s) remainingCompleted 6.1 MiB/31.1 MiB (63.0 MiB/s) with 1 file(s) remainingCompleted 7.1 MiB/31.1 MiB (72.7 MiB/s) with 1 file(s) remainingCompleted 8.1 MiB/31.1 MiB (82.4 MiB/s) with 1 file(s) remainingCompleted 9.1 MiB/31.1 MiB (91.7 MiB/s) with 1 file(s) remainingCompleted 10.1 MiB/31.1 MiB (101.4 MiB/s) with 1 file(s) remainingCompleted 11.1 MiB/31.1 MiB (111.1 MiB/s) with 1 file(s) remainingCompleted 12.1 MiB/31.1 MiB (120.4 MiB/s) with 1 file(s) remainingCompleted 13.1 MiB/31.1 MiB (130.0 MiB/s) with 1 file(s) remainingCompleted 14.1 MiB/31.1 MiB (139.3 MiB/s) with 1 file(s) remainingCompleted 15.1 MiB/31.1 MiB (148.8 MiB/s) with 1 file(s) remainingCompleted 16.1 MiB/31.1 MiB (158.2 MiB/s) with 1 file(s) remainingCompleted 17.1 MiB/31.1 MiB (167.2 MiB/s) with 1 file(s) remainingCompleted 18.1 MiB/31.1 MiB (176.5 MiB/s) with 1 file(s) remainingCompleted 19.1 MiB/31.1 MiB (185.5 MiB/s) with 1 file(s) remainingCompleted 20.1 MiB/31.1 MiB (194.7 MiB/s) with 1 file(s) remainingCompleted 21.1 MiB/31.1 MiB (196.9 MiB/s) with 1 file(s) remainingCompleted 22.1 MiB/31.1 MiB (198.0 MiB/s) with 1 file(s) remainingCompleted 23.1 MiB/31.1 MiB (203.7 MiB/s) with 1 file(s) remainingCompleted 24.1 MiB/31.1 MiB (211.0 MiB/s) with 1 file(s) remainingCompleted 25.1 MiB/31.1 MiB (195.1 MiB/s) with 1 file(s) remainingCompleted 26.1 MiB/31.1 MiB (201.0 MiB/s) with 1 file(s) remainingCompleted 27.1 MiB/31.1 MiB (207.1 MiB/s) with 1 file(s) remainingCompleted 28.1 MiB/31.1 MiB (213.6 MiB/s) with 1 file(s) remainingCompleted 29.1 MiB/31.1 MiB (220.1 MiB/s) with 1 file(s) remainingCompleted 30.1 MiB/31.1 MiB (226.6 MiB/s) with 1 file(s) remainingCompleted 31.1 MiB/31.1 MiB (232.4 MiB/s) with 1 file(s) remainingCompleted 31.1 MiB/31.1 MiB (191.6 MiB/s) with 1 file(s) remainingupload: out/samples.csv to s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/samples.csv
-+ aws s3 cp /var/log/rtbench-bootstrap.log s3://glassdb-bench-benchbucket-sroa7w6f2ywb/results/20260531T114201/bootstrap.log
+2026/05/31 15:55:06 deadlock: keys=1 overlap=1 (100%) samples=528 p50=35.939292ms p90=44.824892ms
+2026/05/31 15:55:27 deadlock: keys=2 overlap=1 (50%) samples=301 p50=325.414452ms p90=397.476697ms
+2026/05/31 15:55:47 deadlock: keys=2 overlap=2 (100%) samples=221 p50=354.227821ms p90=465.130736ms
+2026/05/31 15:56:08 deadlock: keys=3 overlap=1 (33%) samples=304 p50=327.247696ms p90=365.145828ms
+2026/05/31 15:56:29 deadlock: keys=3 overlap=2 (66%) samples=283 p50=341.473534ms p90=387.113724ms
+2026/05/31 15:56:49 deadlock: keys=3 overlap=3 (100%) samples=264 p50=362.401008ms p90=422.5287ms
+2026/05/31 15:57:10 deadlock: keys=4 overlap=1 (25%) samples=288 p50=340.002381ms p90=404.734558ms
+2026/05/31 15:57:30 deadlock: keys=4 overlap=2 (50%) samples=280 p50=346.813337ms p90=410.300406ms
+2026/05/31 15:57:52 deadlock: keys=4 overlap=3 (75%) samples=210 p50=349.79417ms p90=553.742412ms
+2026/05/31 15:58:12 deadlock: keys=4 overlap=4 (100%) samples=116 p50=362.050486ms p90=1.842504631s
+2026/05/31 15:58:33 deadlock: keys=5 overlap=1 (20%) samples=300 p50=324.796509ms p90=375.091072ms
+2026/05/31 15:58:54 deadlock: keys=5 overlap=2 (40%) samples=271 p50=348.950082ms p90=429.4478ms
+2026/05/31 15:59:14 deadlock: keys=5 overlap=3 (60%) samples=280 p50=344.140296ms p90=391.056044ms
+2026/05/31 15:59:35 deadlock: keys=5 overlap=4 (80%) samples=169 p50=357.716069ms p90=510.281505ms
+2026/05/31 15:59:55 deadlock: keys=5 overlap=5 (100%) samples=266 p50=360.79381ms p90=420.722908ms
+2026/05/31 16:00:16 deadlock: keys=6 overlap=1 (16%) samples=243 p50=324.345797ms p90=452.512659ms
+2026/05/31 16:00:37 deadlock: keys=6 overlap=2 (33%) samples=231 p50=344.91844ms p90=441.35297ms
+2026/05/31 16:00:59 deadlock: keys=6 overlap=3 (50%) samples=14 p50=7.810906864s p90=13.747754192s
+2026/05/31 16:01:19 deadlock: keys=6 overlap=4 (66%) samples=163 p50=359.242898ms p90=784.258303ms
+2026/05/31 16:01:40 deadlock: keys=6 overlap=5 (83%) samples=17 p50=4.6373906s p90=15.316047207s
+2026/05/31 16:02:01 deadlock: keys=6 overlap=6 (100%) samples=86 p50=416.514826ms p90=1.850274109s
++ aws s3 cp out/ s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/ --recursive
+Completed 9.4 KiB/34.2 MiB (119.4 KiB/s) with 5 file(s) remainingupload: out/stats.csv to s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/stats.csv
+Completed 9.4 KiB/34.2 MiB (119.4 KiB/s) with 4 file(s) remainingCompleted 10.3 KiB/34.2 MiB (128.6 KiB/s) with 4 file(s) remainingupload: out/client-stats.csv to s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/client-stats.csv
+Completed 10.3 KiB/34.2 MiB (128.6 KiB/s) with 3 file(s) remainingCompleted 1.0 MiB/34.2 MiB (12.2 MiB/s) with 3 file(s) remaining  Completed 1.1 MiB/34.2 MiB (12.7 MiB/s) with 3 file(s) remaining  upload: out/deadlock.csv to s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/deadlock.csv
+Completed 1.1 MiB/34.2 MiB (12.7 MiB/s) with 2 file(s) remainingCompleted 2.1 MiB/34.2 MiB (19.9 MiB/s) with 2 file(s) remainingCompleted 3.1 MiB/34.2 MiB (29.1 MiB/s) with 2 file(s) remainingCompleted 4.1 MiB/34.2 MiB (37.9 MiB/s) with 2 file(s) remainingCompleted 5.1 MiB/34.2 MiB (47.1 MiB/s) with 2 file(s) remainingCompleted 5.1 MiB/34.2 MiB (44.4 MiB/s) with 2 file(s) remainingupload: out/throughput.csv to s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/throughput.csv
+Completed 5.1 MiB/34.2 MiB (44.4 MiB/s) with 1 file(s) remainingCompleted 6.1 MiB/34.2 MiB (47.9 MiB/s) with 1 file(s) remainingCompleted 7.1 MiB/34.2 MiB (55.0 MiB/s) with 1 file(s) remainingCompleted 8.1 MiB/34.2 MiB (62.2 MiB/s) with 1 file(s) remainingCompleted 9.1 MiB/34.2 MiB (68.7 MiB/s) with 1 file(s) remainingCompleted 10.1 MiB/34.2 MiB (75.8 MiB/s) with 1 file(s) remainingCompleted 11.1 MiB/34.2 MiB (81.6 MiB/s) with 1 file(s) remainingCompleted 12.1 MiB/34.2 MiB (88.5 MiB/s) with 1 file(s) remainingCompleted 13.1 MiB/34.2 MiB (94.1 MiB/s) with 1 file(s) remainingCompleted 14.1 MiB/34.2 MiB (100.1 MiB/s) with 1 file(s) remainingCompleted 15.1 MiB/34.2 MiB (106.4 MiB/s) with 1 file(s) remainingCompleted 16.1 MiB/34.2 MiB (112.8 MiB/s) with 1 file(s) remainingCompleted 17.1 MiB/34.2 MiB (119.6 MiB/s) with 1 file(s) remainingCompleted 18.1 MiB/34.2 MiB (125.9 MiB/s) with 1 file(s) remainingCompleted 19.1 MiB/34.2 MiB (132.2 MiB/s) with 1 file(s) remainingCompleted 20.1 MiB/34.2 MiB (139.1 MiB/s) with 1 file(s) remainingCompleted 21.1 MiB/34.2 MiB (144.9 MiB/s) with 1 file(s) remainingCompleted 22.1 MiB/34.2 MiB (151.4 MiB/s) with 1 file(s) remainingCompleted 23.1 MiB/34.2 MiB (157.8 MiB/s) with 1 file(s) remainingCompleted 24.1 MiB/34.2 MiB (164.2 MiB/s) with 1 file(s) remainingCompleted 25.1 MiB/34.2 MiB (170.0 MiB/s) with 1 file(s) remainingCompleted 26.1 MiB/34.2 MiB (176.3 MiB/s) with 1 file(s) remainingCompleted 27.1 MiB/34.2 MiB (181.5 MiB/s) with 1 file(s) remainingCompleted 28.1 MiB/34.2 MiB (187.9 MiB/s) with 1 file(s) remainingCompleted 29.1 MiB/34.2 MiB (193.7 MiB/s) with 1 file(s) remainingCompleted 30.1 MiB/34.2 MiB (199.5 MiB/s) with 1 file(s) remainingCompleted 31.1 MiB/34.2 MiB (205.2 MiB/s) with 1 file(s) remainingCompleted 32.1 MiB/34.2 MiB (210.8 MiB/s) with 1 file(s) remainingCompleted 33.1 MiB/34.2 MiB (216.5 MiB/s) with 1 file(s) remainingCompleted 34.1 MiB/34.2 MiB (222.4 MiB/s) with 1 file(s) remainingCompleted 34.2 MiB/34.2 MiB (179.1 MiB/s) with 1 file(s) remainingupload: out/samples.csv to s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/samples.csv
++ aws s3 cp /var/log/rtbench-bootstrap.log s3://glassdb-bench-benchbucket-gogc45ifcnsf/results/20260531T153752/bootstrap.log
