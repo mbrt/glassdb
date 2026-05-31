@@ -23,8 +23,10 @@ import (
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/backend/s3"
+	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/stringset"
 	"github.com/mbrt/glassdb/internal/testkit"
+	"github.com/mbrt/glassdb/internal/trans"
 )
 
 const (
@@ -621,6 +623,73 @@ func TestConcurrentMultipleRMW(t *testing.T) {
 			assert.Equal(t, int64(60), readInt(val))
 		})
 	}
+}
+
+// TestWoundWaitReverseContention exercises the classic deadlock setup: two
+// concurrent transactions touch the same two keys in opposite orders. Under the
+// wound-wait rule the older transaction wins and the younger one restarts,
+// rather than both stalling until the deadlock-timeout fallback fires.
+func TestWoundWaitReverseContention(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		db := initDB(t, initMemoryBackend(t))
+
+		coll := db.Collection([]byte("wound-wait-c"))
+		key1 := []byte("key1")
+		key2 := []byte("key2")
+		require.NoError(t, coll.Create(ctx))
+
+		// Deterministic priorities so the conflict has a well-defined winner:
+		// the "older" transaction has higher priority than the "younger" one.
+		ctxOld := trans.CtxWithTxID(ctx,
+			data.TIDWithPriority(time.Unix(1, 0), []byte("older")))
+		ctxYoung := trans.CtxWithTxID(ctx,
+			data.TIDWithPriority(time.Unix(2, 0), []byte("younger")))
+
+		incr := func(txCtx context.Context, first, second []byte) error {
+			return db.Tx(txCtx, func(tx *glassdb.Tx) error {
+				a, err := readIntFromT(tx, coll, first)
+				if err != nil {
+					return err
+				}
+				b, err := readIntFromT(tx, coll, second)
+				if err != nil {
+					return err
+				}
+				// In the synctest bubble the fake clock only advances once every
+				// goroutine is blocked, so sleeping here parks both transactions
+				// after their reads and before any write: they both observe the
+				// initial values and then commit concurrently, forcing the
+				// conflict the rule must resolve.
+				time.Sleep(time.Millisecond)
+				if err := tx.Write(coll, first, writeInt(a+1)); err != nil {
+					return err
+				}
+				return tx.Write(coll, second, writeInt(b+1))
+			})
+		}
+
+		start := time.Now()
+		g := errgroup.Group{}
+		g.Go(func() error { return incr(ctxOld, key1, key2) })
+		g.Go(func() error { return incr(ctxYoung, key2, key1) })
+		require.NoError(t, g.Wait())
+		elapsed := time.Since(start)
+
+		// Both increments landed exactly once on top of each other.
+		v1, err := coll.ReadStrong(ctx, key1)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), readInt(v1))
+		v2, err := coll.ReadStrong(ctx, key2)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), readInt(v2))
+
+		// The contention forced one transaction to restart...
+		assert.GreaterOrEqual(t, db.Stats().TxRetries, 1)
+		// ...but wound-wait resolved it promptly instead of waiting out the
+		// multi-second deadlock-timeout fallback (maxDeadlockTimeout = 5s).
+		assert.Less(t, elapsed, 5*time.Second)
+	})
 }
 
 func TestReadWeak(t *testing.T) {

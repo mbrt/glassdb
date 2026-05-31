@@ -212,6 +212,16 @@ func (d *DB) txImpl(ctx context.Context, fn func(tx *Tx) error, stats *Stats) (e
 			err = d.algo.Commit(ctx, handle)
 		})
 		if err != nil {
+			if errors.Is(err, trans.ErrWounded) {
+				// A higher-priority transaction aborted us. Release whatever we
+				// were holding and restart with a fresh ID that preserves our
+				// priority, so we are not starved on the retry.
+				_ = d.algo.End(ctx, handle)
+				handle = d.algo.Rebegin(ctx, handle, access)
+				tx.reset()
+				stats.TxRetries++
+				continue
+			}
 			if errors.Is(err, trans.ErrRetry) {
 				// Retry the transaction.
 				tx.reset()

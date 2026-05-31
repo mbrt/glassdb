@@ -194,8 +194,12 @@ type LockOps struct {
 	Update    LockUpdate
 	HasUpdate bool
 	// WaitFor is the list of transactions that need to unlock before any
-	// operation can be performed.
+	// operation can be performed. These are higher-priority (older) holders
+	// that the requester must wait for under the wound-wait rule.
 	WaitFor []data.TxID
+	// Wound is the list of lower-priority (younger) holders that the requester
+	// is allowed to abort, so it can take the lock without waiting.
+	Wound []data.TxID
 	// What effect these operations will have.
 	LockedFor   []data.TxID
 	UnlockedFor []data.TxID
@@ -228,8 +232,8 @@ func ComputeLockUpdate(curr LockInfo, req LockRequest, txs []TxPathState) (LockO
 	if err != nil {
 		return LockOps{}, fmt.Errorf("computing locks: %w", err)
 	}
-	if len(lockOps.WaitFor) > 0 && len(lockOps.UnlockedFor) > 0 {
-		// Instead of waiting, return the unlock update.
+	if (len(lockOps.WaitFor) > 0 || len(lockOps.Wound) > 0) && len(lockOps.UnlockedFor) > 0 {
+		// Instead of waiting (or wounding), apply the pending unlock first.
 		return handleNoOps(curr, unlockOps), nil
 	}
 	// Merge lock and unlock updates.
@@ -237,6 +241,7 @@ func ComputeLockUpdate(curr LockInfo, req LockRequest, txs []TxPathState) (LockO
 		Update:      unlockOps.Update, // Start with unlock ops.
 		HasUpdate:   unlockOps.HasUpdate || lockOps.HasUpdate,
 		WaitFor:     lockOps.WaitFor,
+		Wound:       lockOps.Wound,
 		LockedFor:   lockOps.LockedFor,
 		UnlockedFor: unlockOps.UnlockedFor,
 	}
@@ -337,11 +342,11 @@ func computeLockUpdate(curr LockInfo, lt LockType, lockers []data.TxID) (LockOps
 		}, nil
 	}
 
-	// Check whether we need to wait for the current lockers.
+	// Check whether we conflict with the current lockers. Under the wound-wait
+	// rule, the requester waits for higher-priority (older) holders and wounds
+	// lower-priority (younger) ones.
 	if isWriterType(curr.Type) || (curr.Type == LockTypeRead && isWriterType(lt)) {
-		return LockOps{
-			WaitFor: curr.LockedBy,
-		}, nil
+		return partitionWoundWait(curr.LockedBy, lockers), nil
 	}
 
 	// We should be able to lock.
@@ -399,6 +404,35 @@ func tidsIntersect(a, b []data.TxID) []data.TxID {
 
 func isWriterType(lt LockType) bool {
 	return lt == LockTypeCreate || lt == LockTypeWrite
+}
+
+// partitionWoundWait splits the (pending) holders of a lock into those the
+// requesters must wait for and those they may wound, following the wound-wait
+// rule. A holder is wounded when at least one requester is older (has higher
+// priority); otherwise the requesters must wait for it. A holder that is also
+// one of the requesters is never wounded.
+func partitionWoundWait(holders, requesters []data.TxID) LockOps {
+	reqSet := data.TxIDSet(requesters)
+	var ops LockOps
+	for _, h := range holders {
+		if !reqSet.Contains(h) && anyOlder(requesters, h) {
+			ops.Wound = append(ops.Wound, h)
+		} else {
+			ops.WaitFor = append(ops.WaitFor, h)
+		}
+	}
+	return ops
+}
+
+// anyOlder reports whether any of the requesters has higher priority (is older)
+// than the holder.
+func anyOlder(requesters []data.TxID, holder data.TxID) bool {
+	for _, r := range requesters {
+		if r.Older(holder) {
+			return true
+		}
+	}
+	return false
 }
 
 // LockInfo describes the current lock state of a storage object.

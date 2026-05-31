@@ -21,6 +21,11 @@ import (
 // ErrRetry signals that the transaction should be retried from the beginning.
 var ErrRetry = errors.New("retry transaction")
 
+// ErrWounded signals that the transaction was aborted by a higher-priority
+// transaction under the wound-wait rule. It must be retried from the beginning
+// with a fresh ID that preserves its original priority.
+var ErrWounded = errors.New("transaction was wounded")
+
 type statusType int
 
 const (
@@ -112,6 +117,12 @@ func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 	vstate := initValidation(tx)
 
 	for {
+		// Stop early if a higher-priority transaction wounded us while we were
+		// validating: there's no point acquiring more locks.
+		if t.wasWounded(ctx, tx) {
+			t.updateLocalCache(*vstate)
+			return ErrWounded
+		}
 		tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit round BEGIN")
 		err := t.validateRound(ctx, vstate, tx)
 		tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit round END", errAttr(err))
@@ -132,6 +143,12 @@ func (t Algo) Commit(ctx context.Context, tx *Handle) error {
 
 	// Validation succeeded.
 	if err := t.commitWrites(ctx, tx.data.Writes, tx.id); err != nil {
+		if errors.Is(err, ErrAlreadyFinalized) {
+			// The log was already finalized as aborted: we were wounded (or
+			// reclaimed as expired) between validation and commit. Keep the
+			// original error in the chain for callers that inspect it.
+			return fmt.Errorf("%w: %w", ErrWounded, err)
+		}
 		return fmt.Errorf("committing writes for tx %v: %w", tx.id, err)
 	}
 	// We are now considered committed.
@@ -193,6 +210,31 @@ func (t Algo) Reset(tx *Handle, data Data) {
 	tx.data = data
 }
 
+// Rebegin starts a fresh attempt for a transaction that was wounded, reusing
+// the original priority (timestamp) so it is not starved, but with a new ID so
+// it gets a distinct transaction log. The locks of the old attempt are not
+// carried over; callers should release them separately.
+func (t Algo) Rebegin(_ context.Context, old *Handle, d Data) *Handle {
+	tid := data.RenewTID(old.id)
+	return &Handle{
+		id:     tid,
+		data:   d,
+		status: statusNew,
+		log:    t.log.With("tx", txLog(tid)),
+	}
+}
+
+// wasWounded reports whether the transaction was already aborted by a
+// higher-priority transaction. It is best-effort: a status read error is not
+// treated as a wound.
+func (t Algo) wasWounded(ctx context.Context, tx *Handle) bool {
+	status, err := t.mon.TxStatus(ctx, tx.id)
+	if err != nil {
+		return false
+	}
+	return status == storage.TxCommitStatusAborted
+}
+
 // End aborts a non-committed transaction, releasing its locks and cleaning up
 // resources. It is a no-op if the transaction was already committed.
 func (t Algo) End(ctx context.Context, tx *Handle) error {
@@ -219,8 +261,11 @@ func (t Algo) validateReadWrite(ctx context.Context, vstate *validationState, tx
 		if !errors.Is(err, errLockTimeout) {
 			return err
 		}
-		// We are most likely deadlocked.
-		// We should start again with serialized locking.
+		// Deadlocks are normally prevented by the wound-wait rule during lock
+		// acquisition (older transactions wound younger holders). Reaching the
+		// timeout therefore means sustained contention rather than a true
+		// deadlock; fall back to serial, sorted-order locking as a safety net
+		// so we still make progress.
 		tx.serialLocking = true
 		return errValidateRetry
 	}
@@ -534,8 +579,10 @@ func (t Algo) checkReadVersionUnlocked(rv ReadVersion, meta backend.Metadata) er
 
 func (t Algo) parallelValidate(ctx context.Context, vstate *validationState, tx *Handle) error {
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit parallel BEGIN")
-	// Parallel locking may lead to deadlock. Make sure we detect those
-	// through a timeout and resort to serial locking and validation instead.
+	// Parallel locking acquires locks out of order, which could deadlock. The
+	// wound-wait rule normally breaks any cycle by aborting the younger party,
+	// but we still arm a timeout as a backstop: if we can't make progress we
+	// resort to serial, sorted-order locking and validation instead.
 	ctx, cancel := t.deadlockTimeoutCtx(ctx, *vstate)
 	defer cancel()
 
@@ -577,6 +624,10 @@ func (t Algo) lockCollections(ctx context.Context, vstate *validationState, tx *
 	return err
 }
 
+// serialValidate is the deadlock safety net used when the wound-wait rule and
+// the parallel path fail to make progress under heavy contention. It acquires
+// every lock in a globally consistent order (sorted collections, then sorted
+// keys), which by itself cannot deadlock.
 func (t Algo) serialValidate(ctx context.Context, vstate *validationState, tx *Handle) error {
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "Commit serial BEGIN")
 	if !t.alreadyLocked(vstate, tx) {
@@ -1009,10 +1060,12 @@ func (t Algo) deadlockTimeoutCtx(
 		// collection first, key after).
 		return ctx, func() {}
 	}
-	// We try to compute a reasonable timeout here. The balance is between
-	// timing out too early (so there was no deadlock, just strong contention)
-	// and too late, wasting a lot of time. We give more time to transactions
-	// locking many keys. This is because restarting those can be expensive.
+	// With wound-wait preventing true deadlocks, this timeout only guards
+	// against sustained contention where the parallel path keeps failing to
+	// acquire locks. The balance is between giving up too early (paying for an
+	// unnecessary serial restart) and too late (wasting time). We grant more
+	// time to transactions locking many keys, since restarting those is
+	// expensive.
 	timeout := min(4*lockLatency*time.Duration(len(vstate.Paths)), maxDeadlockTimeout)
 	return context.WithTimeout(ctx, timeout)
 }
@@ -1053,10 +1106,12 @@ type WriteAccess struct {
 
 // Handle is an opaque reference to an in-progress transaction managed by Algo.
 type Handle struct {
-	data          Data
-	status        statusType
-	id            data.TxID
-	requireLocks  bool
+	data         Data
+	status       statusType
+	id           data.TxID
+	requireLocks bool
+	// serialLocking switches validation to the sorted-order locking safety net
+	// after the parallel path hit the deadlock timeout despite wound-wait.
 	serialLocking bool
 	log           *slog.Logger
 }

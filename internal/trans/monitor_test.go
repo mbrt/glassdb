@@ -12,7 +12,6 @@ import (
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/internal/cache"
 	"github.com/mbrt/glassdb/internal/concurr"
-	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/data/paths"
 	"github.com/mbrt/glassdb/internal/storage"
 	"github.com/mbrt/glassdb/internal/testkit"
@@ -55,7 +54,7 @@ func TestStatus(t *testing.T) {
 		mon2, _ := newTestMonitor(t, tctx1.Backend)
 
 		key := paths.FromKey("example", []byte("key1"))
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon1.BeginTx(ctx, tx)
 
 		// Local pending.
@@ -79,7 +78,7 @@ func TestStatus(t *testing.T) {
 		assert.Equal(t, storage.TxCommitStatusAborted, status)
 
 		// New transaction.
-		tx = data.TxID("tx2")
+		tx = mkTID(2, "tx2")
 		mon1.BeginTx(ctx, tx)
 		// Commit.
 		err = mon1.CommitTx(ctx, storage.TxLog{
@@ -110,7 +109,7 @@ func TestCommittedValue(t *testing.T) {
 		_, err := tctx1.Global.Write(ctx, key, []byte("x"), backend.Tags{})
 		assert.NoError(t, err)
 
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon1.BeginTx(ctx, tx)
 
 		// Local pending.
@@ -134,7 +133,7 @@ func TestCommittedValue(t *testing.T) {
 		assert.Equal(t, KeyCommitStatus{Status: storage.TxCommitStatusAborted}, cs)
 
 		// New transaction.
-		tx = data.TxID("tx2")
+		tx = mkTID(2, "tx2")
 		mon1.BeginTx(ctx, tx)
 		// Commit.
 		err = mon1.CommitTx(ctx, storage.TxLog{
@@ -182,7 +181,7 @@ func TestMonWaitForLocalTx(t *testing.T) {
 		ctx := context.Background()
 		mon1, _ := initMonTest(t)
 
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon1.BeginTx(ctx, tx)
 
 		// Wait without a result.
@@ -211,7 +210,7 @@ func TestMonWaitForRemoteTx(t *testing.T) {
 		mon1, tctx1 := initMonTest(t)
 		mon2, _ := newTestMonitor(t, tctx1.Backend)
 
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon1.BeginTx(ctx, tx)
 
 		// Wait without a result.
@@ -248,7 +247,7 @@ func TestLongPendingTx(t *testing.T) {
 		ctx := context.Background()
 		mon, tctx := initMonTest(t)
 
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon.BeginTx(ctx, tx)
 		t.Cleanup(func() {
 			_ = mon.AbortTx(ctx, tx)
@@ -278,7 +277,7 @@ func TestRefreshCtxShouldNotCancel(t *testing.T) {
 		ctx := context.Background()
 		mon, tctx := initMonTest(t)
 
-		tx := data.TxID("tx1")
+		tx := mkTID(1, "tx1")
 		mon.BeginTx(ctx, tx)
 		t.Cleanup(func() {
 			_ = mon.AbortTx(ctx, tx)

@@ -242,7 +242,7 @@ func TestLockReadAfterDelete(t *testing.T) {
 		_, err := tctx.Global.Write(ctx, key, []byte("x"), backend.Tags{})
 		assert.NoError(t, err)
 
-		txw := data.TxID("txw")
+		txw := mkTID(1, "txw")
 		tctx.Monitor.BeginTx(ctx, txw)
 
 		// Lock, commit the transaction (deleting).
@@ -256,8 +256,8 @@ func TestLockReadAfterDelete(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		txr := data.TxID("txr")
-		tctx.Monitor.BeginTx(ctx, txw)
+		txr := mkTID(2, "txr")
+		tctx.Monitor.BeginTx(ctx, txr)
 		// LockRead should fail.
 		err = locker.LockRead(ctx, key, txr)
 		assert.ErrorIs(t, err, backend.ErrNotFound)
@@ -271,8 +271,10 @@ func TestWaitForTx(t *testing.T) {
 
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		txr := data.TxID("txr")
-		txw := data.TxID("txw")
+		// The read holder is older, so the later write request must wait for it
+		// rather than wound it.
+		txr := mkTID(1, "txr")
+		txw := mkTID(2, "txw")
 		tctx.Monitor.BeginTx(ctx, txr)
 		tctx.Monitor.BeginTx(ctx, txw)
 
@@ -332,7 +334,9 @@ func TestQueueUp(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		txw := data.TxID("txw")
+		// The original write holder is the oldest, so the queued read and write
+		// requests all wait for their turn instead of wounding each other.
+		txw := mkTID(1, "txw")
 		tctx.Monitor.BeginTx(ctx, txw)
 
 		// Initialize key.
@@ -352,7 +356,7 @@ func TestQueueUp(t *testing.T) {
 		gr := &errgroup.Group{}
 		var txrs []data.TxID
 		for i := range 3 {
-			tx := data.TxID(fmt.Sprintf("txr%d", i))
+			tx := mkTID(2, fmt.Sprintf("txr%d", i))
 			txrs = append(txrs, tx)
 
 			gr.Go(func() error {
@@ -362,7 +366,7 @@ func TestQueueUp(t *testing.T) {
 		}
 
 		// Wait for a bit and schedule a write lock as well.
-		txw0 := data.TxID("txw0")
+		txw0 := mkTID(3, "txw0")
 		gw := &errgroup.Group{}
 		gw.Go(func() error {
 			time.Sleep(50 * time.Millisecond)
@@ -592,7 +596,7 @@ func TestConcurrentLockUnlock(t *testing.T) {
 		_, err := tctx.Global.Write(ctx, key, []byte("x"), backend.Tags{})
 		assert.NoError(t, err)
 
-		tx := data.TxID("tx")
+		tx := mkTID(1, "tx")
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Lock in write but don't let it finish.
@@ -619,6 +623,42 @@ func TestConcurrentLockUnlock(t *testing.T) {
 	})
 }
 
+func TestWoundYoungerHolder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		locker, tctx := initTLTest(t)
+		key := paths.FromKey("example", []byte("key"))
+
+		// Initialize key.
+		_, err := tctx.Global.Write(ctx, key, []byte("x"), backend.Tags{})
+		assert.NoError(t, err)
+
+		// A younger transaction holds the write lock.
+		txYoung := mkTID(2, "young")
+		tctx.Monitor.BeginTx(ctx, txYoung)
+		err = locker.LockWrite(ctx, key, txYoung)
+		assert.NoError(t, err)
+
+		// An older (higher-priority) transaction wants the same lock. Under the
+		// wound-wait rule it aborts the younger holder and takes the lock
+		// without waiting.
+		txOld := mkTID(1, "old")
+		tctx.Monitor.BeginTx(ctx, txOld)
+		err = locker.LockWrite(ctx, key, txOld)
+		assert.NoError(t, err)
+
+		assertLockInfo(t, tctx.Global, key, storage.LockInfo{
+			Type:     storage.LockTypeWrite,
+			LockedBy: []data.TxID{txOld},
+		})
+
+		// The younger transaction was wounded (aborted).
+		status, err := tctx.Monitor.TxStatus(ctx, txYoung)
+		assert.NoError(t, err)
+		assert.Equal(t, storage.TxCommitStatusAborted, status)
+	})
+}
+
 func canceledCtx(parent context.Context) context.Context {
 	ctx, cancel := context.WithCancel(parent)
 	cancel()
@@ -640,4 +680,11 @@ func sortTxIDs(s []data.TxID) {
 	sort.Slice(s, func(i, j int) bool {
 		return s[i].String() < s[j].String()
 	})
+}
+
+// mkTID builds a deterministic, valid transaction ID for tests. A smaller
+// order yields an older (higher-priority) transaction under the wound-wait
+// rule; the name only affects the tiebreak between equal timestamps.
+func mkTID(order int, name string) data.TxID {
+	return data.TIDWithPriority(time.Unix(int64(order), 0), []byte(name))
 }
