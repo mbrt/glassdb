@@ -5,7 +5,6 @@ package trans
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"sort"
 	"time"
@@ -71,6 +70,7 @@ func NewAlgo(
 	gc *GC,
 	bg *concurr.Background,
 	log *slog.Logger,
+	txIDs data.TxIDSource,
 ) Algo {
 	return Algo{
 		global:     g,
@@ -81,6 +81,7 @@ func NewAlgo(
 		gc:         gc,
 		background: bg,
 		log:        log,
+		txIDs:      txIDs,
 	}
 }
 
@@ -95,11 +96,17 @@ type Algo struct {
 	gc         *GC
 	background *concurr.Background
 	log        *slog.Logger
+	txIDs      data.TxIDSource
 }
 
 // Begin starts a new transaction with the given data and returns a handle to it.
 func (t Algo) Begin(ctx context.Context, d Data) *Handle {
-	tid := newTxID(ctx)
+	// CtxWithTxID lets tests pin a specific ID (and thus priority); otherwise
+	// the ID comes from the configured source.
+	tid := TxIDFromCtx(ctx)
+	if tid == nil {
+		tid = t.txIDs.New()
+	}
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -215,8 +222,8 @@ func (t Algo) Reset(tx *Handle, data Data) {
 // the original priority (timestamp) so it is not starved, but with a new ID so
 // it gets a distinct transaction log. The locks of the old attempt are not
 // carried over; callers should release them separately.
-func (t Algo) Rebegin(ctx context.Context, old *Handle, d Data) *Handle {
-	tid := renewTID(ctx, old.id)
+func (t Algo) Rebegin(_ context.Context, old *Handle, d Data) *Handle {
+	tid := t.txIDs.Renew(old.id)
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -1145,12 +1152,11 @@ type Handle struct {
 // distinct keys never collide with each other or with keys from other packages.
 type ctxKey int
 
-const (
-	txIDKey ctxKey = iota
-	idSourceKey
-)
+const txIDKey ctxKey = iota
 
-// CtxWithTxID returns a new context carrying the given transaction ID.
+// CtxWithTxID returns a new context carrying the given transaction ID. It lets
+// tests pin a transaction's ID (and thus its wound-wait priority); production
+// leaves it unset and the ID comes from the Algo's configured TxID source.
 func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
 	return context.WithValue(ctx, txIDKey, id)
 }
@@ -1397,39 +1403,4 @@ type txLog data.TxID
 
 func (t txLog) LogValue() slog.Value {
 	return slog.StringValue(data.TxID(t).String())
-}
-
-func newTxID(ctx context.Context) data.TxID {
-	// Allow for deterministic transaction IDs (only in tests).
-	if id := TxIDFromCtx(ctx); id != nil {
-		return id
-	}
-	if src := idSourceFromCtx(ctx); src != nil {
-		return data.NewTIDFromSource(src, time.Now())
-	}
-	return data.NewTId()
-}
-
-func renewTID(ctx context.Context, old data.TxID) data.TxID {
-	if src := idSourceFromCtx(ctx); src != nil {
-		return data.RenewTIDFromSource(src, old)
-	}
-	return data.RenewTID(old)
-}
-
-// CtxWithIDSource returns a context that makes transactions begun (or wounded
-// and restarted) under it draw their ID random prefix from src instead of
-// crypto/rand. The transaction priority still comes from the clock, so this
-// does not change wound-wait ordering; it only removes the prefix as a source
-// of nondeterminism. Intended for deterministic tests; src should be safe for
-// concurrent use.
-func CtxWithIDSource(ctx context.Context, src io.Reader) context.Context {
-	return context.WithValue(ctx, idSourceKey, src)
-}
-
-func idSourceFromCtx(ctx context.Context) io.Reader {
-	if src, ok := ctx.Value(idSourceKey).(io.Reader); ok {
-		return src
-	}
-	return nil
 }

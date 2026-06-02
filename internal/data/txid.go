@@ -54,9 +54,15 @@ func (t TxID) priority() uint64 {
 	return binary.BigEndian.Uint64(t[txIDTSOff:])
 }
 
-// NewTId generates a new transaction ID using the current time as its priority.
-func NewTId() TxID {
-	return newTID(time.Now())
+// Time returns the priority timestamp encoded in the ID. RenewTID preserves it,
+// so a wounded transaction keeps the same Time across restarts.
+func (t TxID) Time() time.Time {
+	return time.Unix(0, int64(t.priority()))
+}
+
+// NewTID generates a new transaction ID using the current time as its priority.
+func NewTID() TxID {
+	return defaultTxIDSource.New()
 }
 
 // RenewTID returns a transaction ID that preserves the priority (timestamp) of
@@ -64,10 +70,7 @@ func NewTId() TxID {
 // on restart to avoid starvation, while the new prefix gives it a distinct log
 // object that lands in a different storage partition.
 func RenewTID(old TxID) TxID {
-	res := make([]byte, txIDLen)
-	randPrefix(res)
-	copy(res[txIDTSOff:], old[txIDTSOff:])
-	return res
+	return defaultTxIDSource.Renew(old)
 }
 
 // TIDWithPriority builds a transaction ID from an explicit timestamp and random
@@ -79,43 +82,43 @@ func TIDWithPriority(ts time.Time, prefix []byte) TxID {
 	return res
 }
 
-// NewTIDFromSource generates a transaction ID using ts as its priority and src
-// as the source of the random prefix. It lets deterministic tests (e.g. the
-// serializability fuzzer) control the otherwise-random prefix so that a given
-// input reproduces exactly; production code uses NewTId (crypto/rand).
-func NewTIDFromSource(src io.Reader, ts time.Time) TxID {
-	res := make([]byte, txIDLen)
-	prefixFromSource(src, res)
-	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
-	return res
+// defaultTxIDSource backs NewTId and RenewTID, drawing prefixes from crypto/rand.
+var defaultTxIDSource = NewTxIDSource(nil)
+
+// TxIDSource mints transaction IDs, drawing the random prefix from rand (nil
+// means crypto/rand). Deterministic tests pass a seeded reader so transaction
+// IDs reproduce exactly; the priority (timestamp) still comes from the clock.
+type TxIDSource struct {
+	rand io.Reader
 }
 
-// RenewTIDFromSource behaves like RenewTID but draws the fresh prefix from src,
-// keeping wounded-transaction restarts deterministic under a fixed source.
-func RenewTIDFromSource(src io.Reader, old TxID) TxID {
-	res := make([]byte, txIDLen)
-	prefixFromSource(src, res)
-	copy(res[txIDTSOff:], old[txIDTSOff:])
-	return res
-}
-
-func newTID(ts time.Time) TxID {
-	res := make([]byte, txIDLen)
-	randPrefix(res)
-	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
-	return res
-}
-
-func randPrefix(b []byte) {
-	if _, err := rand.Read(b[:txIDTSOff]); err != nil {
-		panic(fmt.Sprintf("Cannot read from random device: %v", err))
+// NewTxIDSource returns a TxIDSource that draws prefixes from r, defaulting to
+// crypto/rand when r is nil. r must be safe for concurrent use.
+func NewTxIDSource(r io.Reader) TxIDSource {
+	if r == nil {
+		r = rand.Reader
 	}
+	return TxIDSource{rand: r}
 }
 
-func prefixFromSource(src io.Reader, b []byte) {
-	if _, err := io.ReadFull(src, b[:txIDTSOff]); err != nil {
+// New returns a fresh transaction ID using the current time as its priority.
+func (s TxIDSource) New() TxID {
+	return s.tid(time.Now())
+}
+
+// Renew returns a transaction ID with a fresh prefix that preserves old's
+// priority (timestamp), mirroring a wounded transaction's restart.
+func (s TxIDSource) Renew(old TxID) TxID {
+	return s.tid(old.Time())
+}
+
+func (s TxIDSource) tid(ts time.Time) TxID {
+	res := make([]byte, txIDLen)
+	if _, err := io.ReadFull(s.rand, res[:txIDTSOff]); err != nil {
 		panic(fmt.Sprintf("Cannot read from random source: %v", err))
 	}
+	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
+	return res
 }
 
 // NewTxIDSet creates a TxIDSet containing the given transaction IDs, deduplicating any repeats.

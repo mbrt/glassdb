@@ -43,7 +43,7 @@ func newTestLocker(t *testing.T, b backend.Backend) (*Locker, tlTestCtx) {
 	tl := storage.NewTLogger(g, l, "test")
 	bg := concurr.NewBackground()
 	t.Cleanup(bg.Close)
-	mon := NewMonitor(l, tl, bg)
+	mon := NewMonitor(l, tl, bg, concurr.DefaultRetrier())
 	locker := NewLocker(l, g, tl, mon)
 
 	return locker, tlTestCtx{
@@ -60,7 +60,7 @@ func TestLockCreate(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Lock unlock without commit.
@@ -107,7 +107,7 @@ func TestLockCreateFail(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Initialize key.
@@ -125,7 +125,7 @@ func TestUnlockAfterCreateTimeout(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Locking will not succeed with an expired context.
@@ -146,7 +146,7 @@ func TestLockReadWrite(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Initialize key.
@@ -186,8 +186,8 @@ func TestLockMultipleR(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx1 := data.NewTId()
-		tx2 := data.NewTId()
+		tx1 := data.NewTID()
+		tx2 := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx1)
 		tctx.Monitor.BeginTx(ctx, tx2)
 
@@ -409,7 +409,7 @@ func TestLockUpgrade(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Initialize key.
@@ -437,10 +437,10 @@ func TestLockUpgradeWait(t *testing.T) {
 		ctx := context.Background()
 		locker, tctx := initTLTest(t)
 		key := paths.FromKey("example", []byte("key"))
-		tx := data.NewTId()
+		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
 
-		txr := data.NewTId()
+		txr := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, txr)
 
 		// Initialize key.
@@ -491,7 +491,7 @@ func TestLockReadRemote(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Lock the key from locker2.
-		tx2 := data.NewTId()
+		tx2 := data.NewTID()
 		tctx2.Monitor.BeginTx(ctx, tx2)
 		err = locker2.LockRead(ctx, key, tx2)
 		assert.NoError(t, err)
@@ -501,7 +501,7 @@ func TestLockReadRemote(t *testing.T) {
 		})
 
 		// Lock it from locker1 as well.
-		tx1 := data.NewTId()
+		tx1 := data.NewTID()
 		tctx1.Monitor.BeginTx(ctx, tx1)
 		err = locker1.LockRead(ctx, key, tx1)
 		assert.NoError(t, err)
@@ -529,7 +529,7 @@ func TestWaitRemote(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Lock in write from locker2.
-		tx2 := data.NewTId()
+		tx2 := data.NewTID()
 		tctx2.Monitor.BeginTx(ctx, tx2)
 		err = locker2.LockWrite(ctx, key, tx2)
 		assert.NoError(t, err)
@@ -547,7 +547,7 @@ func TestWaitRemote(t *testing.T) {
 		})
 
 		// Lock in write from locker1.
-		tx1 := data.NewTId()
+		tx1 := data.NewTID()
 		tctx1.Monitor.BeginTx(ctx, tx1)
 		err = locker1.LockWrite(ctx, key, tx1)
 		assert.NoError(t, err)

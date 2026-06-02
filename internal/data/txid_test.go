@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewTIdLayout(t *testing.T) {
-	id := NewTId()
+	id := NewTID()
 	assert.Len(t, []byte(id), txIDLen)
 	// The timestamp suffix should decode to something close to now.
 	got := time.Unix(0, int64(id.priority()))
@@ -61,7 +61,7 @@ func TestRenewTIDDoesNotFlipOrdering(t *testing.T) {
 }
 
 func TestRenewTIDPreservesPriority(t *testing.T) {
-	orig := NewTId()
+	orig := NewTID()
 	renewed := RenewTID(orig)
 
 	require.Len(t, []byte(renewed), txIDLen)
@@ -76,7 +76,7 @@ func TestRenewTIDPreservesPriority(t *testing.T) {
 func TestNewTIdUnique(t *testing.T) {
 	seen := make(map[string]struct{})
 	for range 1000 {
-		id := NewTId()
+		id := NewTID()
 		_, ok := seen[string(id)]
 		require.False(t, ok, "duplicate TxID generated")
 		seen[string(id)] = struct{}{}

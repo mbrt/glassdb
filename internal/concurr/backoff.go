@@ -8,10 +8,10 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-// TODO: Make these configurable. Compute them based on backend latency.
+// Default retry timing, used when a caller does not tune it explicitly.
 const (
-	initialInterval = 200 * time.Millisecond
-	maxInterval     = 5 * time.Second
+	defaultInitialInterval = 200 * time.Millisecond
+	defaultMaxInterval     = 5 * time.Second
 )
 
 // Permanent wraps an error to signal that retries should stop immediately.
@@ -25,32 +25,53 @@ func IsPermanent(err error) bool {
 	return errors.As(err, &perr)
 }
 
-// Retrier provides configurable exponential backoff retry logic.
+// RetryConfig configures the exponential backoff used by a Retrier.
+type RetryConfig struct {
+	// InitialInterval is the delay before the first retry; it grows
+	// exponentially up to MaxInterval.
+	InitialInterval time.Duration
+	// MaxInterval caps the per-retry delay.
+	MaxInterval time.Duration
+	// Jitter randomizes intervals to spread retries and avoid thundering-herd
+	// contention. Keep it enabled in production; disable it only where
+	// deterministic retry timing is required (e.g. tests), since it draws from
+	// the process-global math/rand that testing/synctest does not virtualize.
+	Jitter bool
+}
+
+// DefaultRetryConfig returns the production retry configuration.
+func DefaultRetryConfig() RetryConfig {
+	return RetryConfig{
+		InitialInterval: defaultInitialInterval,
+		MaxInterval:     defaultMaxInterval,
+		Jitter:          true,
+	}
+}
+
+// Retrier retries an operation with exponential backoff.
 type Retrier struct {
-	backoff.BackOff
+	cfg RetryConfig
 }
 
-// RetryOptions creates a Retrier with the given initial and maximum backoff intervals.
-func RetryOptions(initial, maxInterval time.Duration) Retrier {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = initial
-	b.MaxInterval = maxInterval
-	b.MaxElapsedTime = 0
-	// Disable interval randomization. Jitter would make retry timing depend on
-	// an uncontrolled global RNG, which makes the serializability fuzzer
-	// non-reproducible; progress under contention is guaranteed by the
-	// wound-wait rule and the serial-locking fallback, not by jitter.
-	b.RandomizationFactor = 0
-	return Retrier{b}
+// NewRetrier creates a Retrier from the given configuration.
+func NewRetrier(cfg RetryConfig) Retrier {
+	return Retrier{cfg: cfg}
 }
 
-// Retry calls fn repeatedly with exponential backoff until it succeeds or ctx is cancelled.
+// DefaultRetrier returns a Retrier using DefaultRetryConfig.
+func DefaultRetrier() Retrier {
+	return NewRetrier(DefaultRetryConfig())
+}
+
+// Retry calls fn repeatedly with exponential backoff until it succeeds, returns
+// a permanent error, or ctx is cancelled.
 func (r Retrier) Retry(ctx context.Context, fn func() error) error {
-	return backoff.Retry(fn, backoff.WithContext(r.BackOff, ctx))
-}
-
-// RetryWithBackoff retries f with default exponential backoff settings until it succeeds or ctx is cancelled.
-func RetryWithBackoff(ctx context.Context, f func() error) error {
-	r := RetryOptions(initialInterval, maxInterval)
-	return backoff.Retry(f, backoff.WithContext(r.BackOff, ctx))
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = r.cfg.InitialInterval
+	b.MaxInterval = r.cfg.MaxInterval
+	b.MaxElapsedTime = 0
+	if !r.cfg.Jitter {
+		b.RandomizationFactor = 0
+	}
+	return backoff.Retry(fn, backoff.WithContext(b, ctx))
 }

@@ -86,17 +86,23 @@ common path.
 Determinism is a prerequisite for diagnosing and regression-testing concurrency
 bugs, so the three nondeterminism sources above were removed:
 
-- **Injectable ID source.** `data.NewTIDFromSource` / `RenewTIDFromSource` draw
-  the random prefix from a caller-supplied `io.Reader`, and `trans.CtxWithIDSource`
-  threads one through the context. The timestamp (and therefore wound-wait
-  priority) is untouched, so this changes only the prefix entropy, not which
-  schedules the fuzzer explores. Production still uses `crypto/rand`.
+- **Injectable ID source.** `data.TxIDSource` wraps an `io.Reader` (defaulting to
+  `crypto/rand`) and mints IDs via `New` / `Renew`; `Renew` preserves the
+  timestamp (and therefore wound-wait priority) so only the prefix entropy
+  changes. The source is configured once per DB through `glassdb.Options.Rand`
+  and held by `Algo`, the same construction-time plumbing used for retry timing
+  — no per-call context lookup. The fuzzer opens each DB with a seeded reader.
+  (`trans.CtxWithTxID` remains a separate, minimal context override used only by
+  the wound-wait tests to pin a transaction's priority.)
 - **Stable ordering.** Commit-path slices built from maps are now sorted by path
   (`initValidation`, `collectionsLocks`, `tlocker.LockedPaths`), so the sequence
   of backend operations no longer depends on map iteration order.
-- **No jitter.** `concurr.RetryOptions` sets `RandomizationFactor = 0`. Progress
-  under contention is guaranteed by wound-wait and the serial-locking fallback,
-  not by jitter, so removing it is safe.
+- **Jitter as a retry option.** Backoff jitter is kept in production (it spreads
+  retries to avoid thundering-herd contention) but draws from the process-global
+  `math/rand`, which `synctest` does not virtualize. Whether to use jitter is a
+  field of `concurr.RetryConfig`, set once when the `Retrier` is constructed and
+  plumbed up to `glassdb.Options.Retry` (`RetryOptions.DisableJitter`). The
+  fuzzer opens its DBs with jitter disabled; production keeps the default.
 
 The two context keys in `internal/trans` were also changed from bare `struct{}{}`
 values (which compare equal, so they collided) to a private `ctxKey` type with
@@ -112,8 +118,12 @@ distinct constants.
   transaction does one extra retry (re-reading from storage) instead of trusting a
   cached guess. This trades a small amount of work under contention for
   correctness.
-- The transaction-ID prefix is now an injectable seam used by deterministic tests;
-  the rest of the codebase is unaffected.
-- Backoff retries are now strictly exponential (no jitter). If thundering-herd
-  retries ever become a concern, jitter should be reintroduced behind a
-  test-controllable RNG rather than the global `math/rand`.
+- The transaction-ID prefix is now an injectable seam (`glassdb.Options.Rand`
+  backed by `data.TxIDSource`) used by deterministic tests; production leaves it
+  unset and gets `crypto/rand`.
+- Production backoff keeps its jitter; only DBs opened with
+  `Options.Retry.DisableJitter` (currently just the fuzzer) get deterministic
+  retry timing. Retry timing (initial/max interval and jitter) is now a public
+  DB option, resolving the previous "add retry timing options" TODO. If
+  deterministic jitter is ever needed, it should be reintroduced behind a
+  per-retrier RNG rather than the global `math/rand`.

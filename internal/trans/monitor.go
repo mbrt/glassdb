@@ -33,16 +33,19 @@ const (
 )
 
 // NewMonitor returns a Monitor that tracks local and remote transaction state
-// using the given transaction logger and background executor.
+// using the given transaction logger, background executor, and retrier (used
+// when polling remote transaction state and writing the final log).
 func NewMonitor(
 	l storage.Local,
 	tl storage.TLogger,
 	b *concurr.Background,
+	r concurr.Retrier,
 ) *Monitor {
 	return &Monitor{
 		local:      l,
 		tl:         tl,
 		background: b,
+		retrier:    r,
 		shards: shard.New(func(int) *monitorShard {
 			return &monitorShard{
 				localTx:   make(map[string]txStatus),
@@ -59,6 +62,7 @@ type Monitor struct {
 	local      storage.Local
 	tl         storage.TLogger
 	background *concurr.Background
+	retrier    concurr.Retrier
 	shards     shard.Sharded[monitorShard]
 }
 
@@ -434,7 +438,7 @@ func (m *Monitor) tryAbortRemoteTx(
 func (m *Monitor) pollTxStatus(ctx context.Context, tid data.TxID) (storage.TxCommitStatus, error) {
 	res := storage.TxCommitStatusUnknown
 
-	err := concurr.RetryWithBackoff(ctx, func() error {
+	err := m.retrier.Retry(ctx, func() error {
 		s, err := m.fetchRemoteTxStatus(ctx, tid)
 		if err != nil {
 			return concurr.Permanent(fmt.Errorf("in get commit status: %w", err))
@@ -505,7 +509,7 @@ func (m *Monitor) setFinalLog(ctx context.Context, tlog storage.TxLog) error {
 	sh.mu.Unlock()
 
 	// TODO: Add timeout ~= refreshTimeout here.
-	err := concurr.RetryWithBackoff(ctx, func() error {
+	err := m.retrier.Retry(ctx, func() error {
 		var err error
 		if lastV.IsNull() {
 			_, err = m.tl.Set(ctx, tlog)

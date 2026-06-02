@@ -293,7 +293,11 @@ func (b *DelayBackend) List(ctx context.Context, dirPath string) (backend.ListIt
 }
 
 func (b *DelayBackend) backoff(ctx context.Context, path string) error {
-	r := concurr.RetryOptions(b.retryDelay, b.retryDelay*10)
+	r := concurr.NewRetrier(concurr.RetryConfig{
+		InitialInterval: b.retryDelay,
+		MaxInterval:     b.retryDelay * 10,
+		Jitter:          true,
+	})
 	return r.Retry(ctx, func() error {
 		if !b.rlimit.TryAcquireToken(path) {
 			return errBackoff

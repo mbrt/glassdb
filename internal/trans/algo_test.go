@@ -65,7 +65,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	tlogger := storage.NewTLogger(global, local, testCollName)
 	background := concurr.NewBackground()
 	t.Cleanup(background.Close)
-	tmon := NewMonitor(local, tlogger, background)
+	tmon := NewMonitor(local, tlogger, background, concurr.DefaultRetrier())
 	locker := NewLocker(local, global, tlogger, tmon)
 	gc := NewGC(background, tlogger, log)
 
@@ -77,7 +77,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	_, err := global.Write(ctx, paths.CollectionInfo(testCollName), collInfoContents, nil)
 	require.NoError(t, err)
 
-	tm := NewAlgo(global, local, locker, tmon, gc, background, log)
+	tm := NewAlgo(global, local, locker, tmon, gc, background, log, data.NewTxIDSource(nil))
 	return tm, testContext{
 		backend: b,
 		global:  global,
@@ -745,7 +745,7 @@ func TestCleanAbort(t *testing.T) {
 				assert.NoError(t, err)
 
 				// The keys should be lockable now.
-				txtest := data.NewTId()
+				txtest := data.NewTID()
 				tctx.tmon.BeginTx(ctx, txtest)
 				for _, key := range keys {
 					err := tctx.locker.LockWrite(ctx, key, txtest)
@@ -826,7 +826,7 @@ func TestChangeWritesCleanAbort(t *testing.T) {
 		assert.NoError(t, err)
 
 		// The keys should be lockable now.
-		txtest := data.NewTId()
+		txtest := data.NewTID()
 		tctx.tmon.BeginTx(ctx, txtest)
 		for _, key := range keys {
 			err := tctx.locker.LockWrite(ctx, key, txtest)
