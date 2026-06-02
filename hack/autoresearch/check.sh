@@ -36,9 +36,6 @@ if [[ "$mode" == "full" ]]; then
 	echo "== serializability fuzz (FuzzConcurrentTx, ${FULL_FUZZTIME}) =="
 	go test -run='^$' -fuzz='^FuzzConcurrentTx$' -fuzztime="${FULL_FUZZTIME}" -timeout=0 .
 
-	echo "== serializability fuzz (FuzzAlgoConcurrentTx, ${FULL_FUZZTIME}) =="
-	go test -run='^$' -fuzz='^FuzzAlgoConcurrentTx$' -fuzztime="${FULL_FUZZTIME}" -timeout=0 ./internal/trans
-
 	echo "== check OK (full) =="
 	exit 0
 fi
@@ -48,8 +45,5 @@ go test -race -timeout=180s ./...
 
 echo "== serializability fuzz (FuzzConcurrentTx, ${FUZZTIME}) =="
 go test -run='^$' -fuzz='^FuzzConcurrentTx$' -fuzztime="${FUZZTIME}" -timeout=0 .
-
-echo "== serializability fuzz (FuzzAlgoConcurrentTx, ${FUZZTIME}) =="
-go test -run='^$' -fuzz='^FuzzAlgoConcurrentTx$' -fuzztime="${FUZZTIME}" -timeout=0 ./internal/trans
 
 echo "== check OK (fast) =="

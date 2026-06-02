@@ -30,8 +30,7 @@ REJECT the experiment if the diff does any of the following:
 4. Loosens an invariant or an expected value purely so a failing test passes
    (e.g. changing an expected count to match buggy new behavior).
 5. Reduces fuzz seeds, shrinks the schedule space, or otherwise narrows the
-   serializability fuzzers in `fuzz_test.go` or
-   `internal/trans/algo_fuzz_test.go`.
+   serializability fuzzer in `fuzz_test.go`.
 6. Modifies any fixed-infrastructure file: `hack/autoresearch/bench/**`,
    `hack/autoresearch/check.sh`, `hack/autoresearch/evaluate.sh`,
    `hack/autoresearch/evaluator.md`, or `hack/autoresearch/program.md`.

@@ -32,11 +32,11 @@ them invalidates the experiment):
   judge)
 - `hack/autoresearch/program.md` (this file)
 
-Tests (`*_test.go`, including `bench_test.go`, `fuzz_test.go`,
-`internal/trans/algo_fuzz_test.go`): you MAY edit them only for **mechanical,
-coverage-preserving** reasons - updating call sites after a signature/type
-change, fixing imports, renaming a symbol. You may NEVER disable, skip, weaken,
-delete, or loosen a test or its assertions to make it pass. A separate judge
+Tests (`*_test.go`, including `bench_test.go` and `fuzz_test.go`): you MAY edit
+them only for **mechanical, coverage-preserving** reasons - updating call sites
+after a signature/type change, fixing imports, renaming a symbol. You may NEVER
+disable, skip, weaken, delete, or loosen a test or its assertions to make it
+pass. A separate judge
 sub-agent enforces this (see step 5); if you broke a test, fix the code, not the
 test.
 

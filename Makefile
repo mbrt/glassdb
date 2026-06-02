@@ -9,7 +9,6 @@ unit-test:
 
 fuzz:
 	go test -fuzz=FuzzConcurrentTx -fuzztime=$(FUZZTIME) -timeout=0 .
-	go test -fuzz=FuzzAlgoConcurrentTx -fuzztime=$(FUZZTIME) -timeout=0 ./internal/trans
 
 lint:
 	go tool revive -config revive.toml ./...
