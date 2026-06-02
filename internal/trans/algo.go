@@ -70,6 +70,7 @@ func NewAlgo(
 	gc *GC,
 	bg *concurr.Background,
 	log *slog.Logger,
+	txIDs data.TxIDSource,
 ) Algo {
 	return Algo{
 		global:     g,
@@ -80,6 +81,7 @@ func NewAlgo(
 		gc:         gc,
 		background: bg,
 		log:        log,
+		txIDs:      txIDs,
 	}
 }
 
@@ -94,11 +96,17 @@ type Algo struct {
 	gc         *GC
 	background *concurr.Background
 	log        *slog.Logger
+	txIDs      data.TxIDSource
 }
 
 // Begin starts a new transaction with the given data and returns a handle to it.
 func (t Algo) Begin(ctx context.Context, d Data) *Handle {
-	tid := newTxID(ctx)
+	// CtxWithTxID lets tests pin a specific ID (and thus priority); otherwise
+	// the ID comes from the configured source.
+	tid := TxIDFromCtx(ctx)
+	if tid == nil {
+		tid = t.txIDs.New()
+	}
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -215,7 +223,7 @@ func (t Algo) Reset(tx *Handle, data Data) {
 // it gets a distinct transaction log. The locks of the old attempt are not
 // carried over; callers should release them separately.
 func (t Algo) Rebegin(_ context.Context, old *Handle, d Data) *Handle {
-	tid := data.RenewTID(old.id)
+	tid := t.txIDs.Renew(old.id)
 	return &Handle{
 		id:     tid,
 		data:   d,
@@ -469,12 +477,20 @@ func (t Algo) validateLockedRead(
 	// Let's update our local copy and retry.
 	item.Result = vResultRetry
 
-	if expectedVal.Status == storage.TxCommitStatusUnknown {
+	if expectedVal.Status != storage.TxCommitStatusOK {
 		// Fetch the expected committed value.
 		expectedVal, err = t.mon.CommittedValue(ctx, item.Path, expectedWriter)
-		if err != nil || expectedVal.Value.NotWritten {
-			// No need to report an error here.
-			// We just can't update the local cache.
+		if err != nil || expectedVal.Status != storage.TxCommitStatusOK || expectedVal.Value.NotWritten {
+			// We cannot authoritatively resolve expectedWriter's value. This
+			// happens when expectedWriter committed through the single-RW fast
+			// path, which writes no transaction log, so its log-based status is
+			// unknown/aborted even though it did commit. Caching a guessed value
+			// here would be corrupting: it would pair value bytes with a writer
+			// that did not produce them, and a later read could trust that
+			// (writer matches the live last-writer) and overwrite a newer value,
+			// losing an update. Instead, invalidate the stale cached value so the
+			// retry re-reads the authoritative one straight from storage.
+			t.local.MarkValueOutated(item.Path, item.ReadVersion)
 			return nil
 		}
 	}
@@ -553,13 +569,19 @@ func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
 		return nil
 	}
 
-	// Was written to. Update local cache and retry.
-	t.updateLocal(
-		WriteAccess{
-			Path:   item.Path,
-			Val:    v.Value.Value,
-			Delete: v.Value.Deleted},
-		lastWriter)
+	// Was written to: retry. Only refresh the local cache when we could
+	// authoritatively resolve the value. If lastWriter committed via the
+	// single-RW fast path it has no transaction log, so the value is
+	// unresolvable here; caching a guessed value would corrupt the entry, so we
+	// just retry and let the next read fetch the authoritative value.
+	if v.Status == storage.TxCommitStatusOK && !v.Value.NotWritten {
+		t.updateLocal(
+			WriteAccess{
+				Path:   item.Path,
+				Val:    v.Value.Value,
+				Delete: v.Value.Deleted},
+			lastWriter)
+	}
 
 	item.Result = vResultRetry
 	return nil
@@ -1126,9 +1148,15 @@ type Handle struct {
 	log           *slog.Logger
 }
 
-var txIDKey = struct{}{}
+// ctxKey is a private type for context keys defined in this package, so that
+// distinct keys never collide with each other or with keys from other packages.
+type ctxKey int
 
-// CtxWithTxID returns a new context carrying the given transaction ID.
+const txIDKey ctxKey = iota
+
+// CtxWithTxID returns a new context carrying the given transaction ID. It lets
+// tests pin a transaction's ID (and thus its wound-wait priority); production
+// leaves it unset and the ID comes from the Algo's configured TxID source.
 func CtxWithTxID(ctx context.Context, id data.TxID) context.Context {
 	return context.WithValue(ctx, txIDKey, id)
 }
@@ -1244,6 +1272,13 @@ func initValidation(h *Handle) *validationState {
 	for _, v := range m {
 		res = append(res, v)
 	}
+	// Iterate in a stable path order so the sequence of backend operations a
+	// transaction issues does not depend on Go's randomized map iteration. This
+	// keeps the parallel validation path deterministic (the serial path already
+	// sorts), which is what makes the serializability fuzzer reproducible.
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Path < res[j].Path
+	})
 	return &validationState{
 		Paths: res,
 	}
@@ -1339,6 +1374,11 @@ func collectionsLocks(vstate *validationState) ([]storage.PathLock, error) {
 			Type: t,
 		})
 	}
+	// Stable order: the collection-lock acquisition sequence must not depend on
+	// map iteration order (see initValidation).
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Path < res[j].Path
+	})
 	return res, nil
 }
 
@@ -1363,12 +1403,4 @@ type txLog data.TxID
 
 func (t txLog) LogValue() slog.Value {
 	return slog.StringValue(data.TxID(t).String())
-}
-
-func newTxID(ctx context.Context) data.TxID {
-	// Allow for deterministic transaction IDs (only in tests).
-	if id := TxIDFromCtx(ctx); id != nil {
-		return id
-	}
-	return data.NewTId()
 }

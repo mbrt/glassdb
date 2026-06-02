@@ -65,7 +65,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	tlogger := storage.NewTLogger(global, local, testCollName)
 	background := concurr.NewBackground()
 	t.Cleanup(background.Close)
-	tmon := NewMonitor(local, tlogger, background)
+	tmon := NewMonitor(local, tlogger, background, concurr.DefaultRetrier())
 	locker := NewLocker(local, global, tlogger, tmon)
 	gc := NewGC(background, tlogger, log)
 
@@ -77,7 +77,7 @@ func newAlgoFromBackend(t *testing.T, b backend.Backend) (Algo, testContext) {
 	_, err := global.Write(ctx, paths.CollectionInfo(testCollName), collInfoContents, nil)
 	require.NoError(t, err)
 
-	tm := NewAlgo(global, local, locker, tmon, gc, background, log)
+	tm := NewAlgo(global, local, locker, tmon, gc, background, log, data.NewTxIDSource(nil))
 	return tm, testContext{
 		backend: b,
 		global:  global,
@@ -745,7 +745,7 @@ func TestCleanAbort(t *testing.T) {
 				assert.NoError(t, err)
 
 				// The keys should be lockable now.
-				txtest := data.NewTId()
+				txtest := data.NewTID()
 				tctx.tmon.BeginTx(ctx, txtest)
 				for _, key := range keys {
 					err := tctx.locker.LockWrite(ctx, key, txtest)
@@ -826,7 +826,7 @@ func TestChangeWritesCleanAbort(t *testing.T) {
 		assert.NoError(t, err)
 
 		// The keys should be lockable now.
-		txtest := data.NewTId()
+		txtest := data.NewTID()
 		tctx.tmon.BeginTx(ctx, txtest)
 		for _, key := range keys {
 			err := tctx.locker.LockWrite(ctx, key, txtest)
@@ -903,6 +903,105 @@ func TestSingleRWRetry(t *testing.T) {
 		})
 		err = tm.Commit(ctx, h)
 		assert.NoError(t, err)
+	})
+}
+
+// TestSingleRWLostUpdate is the deterministic regression test for ADR-007.
+//
+// A writer that commits through the single read-modify-write fast path
+// (commitSingleRW) writes no transaction log, so its committed value cannot be
+// resolved from the log afterwards. The bug: when another transaction validated
+// a stale read against such a writer, validateLockedRead cached the unresolved
+// (empty) value tagged with that writer's ID. The local cache then served value
+// bytes that disagreed with their writer tag, and a later read-modify-write
+// based on those bytes silently overwrote the committed value: a lost update.
+//
+// This test recreates that exact situation and asserts that, after validation,
+// a read returns the authoritative value v1 (with writer W1) rather than the
+// stale guess. Before the fix it returns an empty value, reproducing the bug.
+func TestSingleRWLostUpdate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		// Three independent clients sharing one backend, each with its own local
+		// cache: a writer, the victim, and a third client whose pending lock
+		// puts the key into the state that triggers the bug.
+		tmWriter, tctxW := testAlgoContext(t)
+		tmVictim, tctxV := newAlgoFromBackend(t, tctxW.backend)
+		_, tctxL := newAlgoFromBackend(t, tctxW.backend)
+		key := paths.FromKey("testp", []byte("k"))
+		v0 := []byte("v0")
+		v1 := []byte("v1")
+
+		// 1. Create k=v0 through a normal (logged) commit and flush it, so its
+		//    writer W0 is fully resolvable.
+		h0 := commitWrites(t, tmWriter, []WriteAccess{{Path: key, Val: v0}})
+		flushWrites(t, tmWriter, h0)
+
+		// 2. The victim reads k, caching v0@W0 in its local storage.
+		ra0, err := doRead(ctx, tctxV, key)
+		require.NoError(t, err)
+		require.True(t, ra0.Found)
+
+		// 3. The writer overwrites k=v1 through the single-RW fast path, which
+		//    writes no transaction log. The victim's cached read is now stale.
+		raW, err := doRead(ctx, tctxW, key)
+		require.NoError(t, err)
+		hW1 := commitAccess(t, tmWriter, Data{
+			Reads:  []ReadAccess{raW},
+			Writes: []WriteAccess{{Path: key, Val: v1}},
+		})
+		w1 := hW1.id
+		// The single-RW writer left no log: its status is unresolvable.
+		st, err := tctxW.tlogger.CommitStatus(ctx, w1)
+		require.NoError(t, err)
+		require.Equal(t, storage.TxCommitStatusUnknown, st.Status)
+		// Storage authoritatively holds v1, written by W1. Read it through the
+		// writer's client so the victim's stale cache is left untouched.
+		gr, err := tctxW.global.Read(ctx, key)
+		require.NoError(t, err)
+		require.Equal(t, v1, gr.Value)
+		require.True(t, w1.Equal(gr.Version.Writer))
+
+		// 4. A third client write-locks k and stays pending, so the victim
+		//    observes k locked in write while its last writer is the logless
+		//    single-RW writer. This drives validation into the unresolvable
+		//    branch (a committed locker would instead resolve the value). The
+		//    lock is taken from a separate client so the victim's cached read
+		//    stays stale (locking refreshes the locking client's own cache).
+		w2 := mkTID(5, "w2")
+		tctxL.tmon.BeginTx(ctx, w2)
+		require.NoError(t, tctxL.locker.LockWrite(ctx, key, w2))
+		info := lockInfo(ctx, t, tctxL, key)
+		require.Equal(t, storage.LockTypeWrite, info.Type)
+		require.Len(t, info.LockedBy, 1)
+		require.True(t, w2.Equal(info.LockedBy[0]))
+		require.True(t, w1.Equal(info.LastWriter))
+
+		// 5. The victim validates its now-stale read of k. Validation finds the
+		//    expected writer is the logless single-RW writer W1, which it cannot
+		//    resolve. The fix invalidates the stale cache entry instead of
+		//    caching a guessed value.
+		hv := tmVictim.Begin(ctx, Data{Reads: []ReadAccess{ra0}})
+		err = tmVictim.Commit(ctx, hv)
+		require.ErrorIs(t, err, ErrRetry)
+		require.NoError(t, tmVictim.End(ctx, hv))
+
+		// 6. The third client releases its lock; k is unlocked at v1@W1.
+		require.NoError(t, tctxL.locker.Unlock(ctx, key, w2))
+		info = lockInfo(ctx, t, tctxL, key)
+		require.Equal(t, storage.LockTypeNone, info.Type)
+		require.True(t, w1.Equal(info.LastWriter))
+		require.NoError(t, tctxL.tmon.AbortTx(ctx, w2))
+
+		// 7. Reading k must now return the authoritative committed value v1.
+		//    Before the fix, validation had cached an unresolved empty value
+		//    tagged with W1, so the reader served stale bytes whose contents
+		//    disagreed with the writer tag — the lost update.
+		reader := NewReader(tctxV.local, tctxV.global, tctxV.tmon)
+		rv, err := reader.Read(ctx, key, storage.MaxStaleness)
+		require.NoError(t, err)
+		assert.Equal(t, v1, rv.Value)
+		assert.True(t, w1.Equal(rv.Version.Writer))
 	})
 }
 

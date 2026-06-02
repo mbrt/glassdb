@@ -3,7 +3,10 @@ package trans
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"math/rand"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/mbrt/glassdb/backend/middleware"
 	"github.com/mbrt/glassdb/internal/cache"
 	"github.com/mbrt/glassdb/internal/concurr"
+	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/data/paths"
 	"github.com/mbrt/glassdb/internal/errors"
 	"github.com/mbrt/glassdb/internal/storage"
@@ -50,7 +54,25 @@ type fuzzAlgoEnv struct {
 	tctx   testContext
 }
 
-func newFuzzAlgoEnv(t testing.TB, b backend.Backend) fuzzAlgoEnv {
+// newDetReader returns a deterministic, concurrency-safe source of random bytes
+// used as an Algo's transaction-ID prefix source so a given schedule reproduces
+// exactly under a fixed seed.
+func newDetReader(seed int64) io.Reader {
+	return &lockedRand{r: rand.New(rand.NewSource(seed))}
+}
+
+type lockedRand struct {
+	mu sync.Mutex
+	r  *rand.Rand
+}
+
+func (l *lockedRand) Read(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.Read(p)
+}
+
+func newFuzzAlgoEnv(t testing.TB, b backend.Backend, src data.TxIDSource) fuzzAlgoEnv {
 	t.Helper()
 
 	log := slog.New(nilHandler{})
@@ -60,11 +82,13 @@ func newFuzzAlgoEnv(t testing.TB, b backend.Backend) fuzzAlgoEnv {
 	tlogger := storage.NewTLogger(global, local, testCollName)
 	background := concurr.NewBackground()
 	t.Cleanup(background.Close)
-	tmon := NewMonitor(local, tlogger, background)
+	// DefaultRetrier applies no jitter (its Rand source is nil), so retry
+	// timing is purely exponential and the fuzzer stays reproducible.
+	tmon := NewMonitor(local, tlogger, background, concurr.DefaultRetrier())
 	locker := NewLocker(local, global, tlogger, tmon)
 	gc := NewGC(background, tlogger, log)
 
-	tm := NewAlgo(global, local, locker, tmon, gc, nil, log)
+	tm := NewAlgo(global, local, locker, tmon, gc, nil, log, src)
 	return fuzzAlgoEnv{
 		algo:   tm,
 		reader: NewReader(local, global, tmon),
@@ -106,8 +130,10 @@ func fuzzAlgoConcurrentTx(t *testing.T, schedule []byte) {
 	sched := middleware.NewScheduler(schedule, time.Millisecond)
 	b := middleware.NewScheduledBackend(memory.New(), sched)
 
-	env1 := newFuzzAlgoEnv(t, b)
-	env2 := newFuzzAlgoEnv(t, b)
+	// Distinct seeds keep the two clients' transaction IDs disjoint and
+	// reproducible under a fixed schedule.
+	env1 := newFuzzAlgoEnv(t, b, data.NewTxIDSource(newDetReader(1)))
+	env2 := newFuzzAlgoEnv(t, b, data.NewTxIDSource(newDetReader(2)))
 
 	keys := []string{
 		paths.FromKey(testCollName, []byte("k1")),

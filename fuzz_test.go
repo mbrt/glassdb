@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"math/rand"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -42,12 +45,94 @@ func FuzzConcurrentTx(f *testing.F) {
 }
 
 func fuzzConcurrentTx(t *testing.T, schedule []byte) {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	sched := middleware.NewScheduler(schedule, time.Millisecond)
 	b := middleware.NewScheduledBackend(memory.New(), sched)
-	db1 := initFuzzDB(t, b)
-	db2 := initFuzzDB(t, b)
+	fuzzConcurrentTxWorkload(t, b)
+}
+
+// TestConcurrentTxDeterministicOutcome locks in the determinism the fuzzer
+// relies on. The algorithm deliberately issues backend operations through
+// concurrent fan-out and the two clients run in parallel, so the exact
+// operation interleaving is NOT reproducible (testing/synctest virtualizes the
+// clock but does not serialize concurrently-runnable goroutines). What the
+// deterministic fuzz settings do guarantee — seeded transaction-ID prefixes and
+// disabled backoff jitter (see docs/adr/007 and docs/adr/008) together with the
+// serializability guarantee — is that a given schedule always commits the same
+// result.
+//
+// The test replays each schedule many times. Because every replay interleaves
+// the two clients differently, any regression that lets the committed state
+// depend on that interleaving — e.g. the ADR-007 lost update, where a committed
+// increment could be silently dropped — would make the replays disagree and
+// fail here. fuzzConcurrentTxWorkload additionally checks, on every run, that
+// the committed values equal the increments the clients tracked.
+func TestConcurrentTxDeterministicOutcome(t *testing.T) {
+	t.Parallel()
+
+	// Fixed schedules chosen to drive a range of interleavings, including
+	// heavy contention (which triggers the aborts, retries and background
+	// status/refresh workers where nondeterminism would surface).
+	schedules := map[string][]byte{
+		"all-zero":             make([]byte, 64),
+		"alternating-extremes": {255, 0, 255, 0, 255, 0, 255, 0},
+		"gradual-ramp":         {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		"uniform-medium":       {128, 128, 128, 128, 128, 128, 128},
+		"mixed":                {7, 200, 13, 0, 255, 64, 1, 99, 128, 3, 240, 17},
+	}
+
+	const replays = 16
+
+	for name, schedule := range schedules {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			reference := runConcurrentTxOutcome(t, schedule)
+			for i := 1; i < replays; i++ {
+				got := runConcurrentTxOutcome(t, schedule)
+				require.Equal(t, reference, got,
+					"replay %d committed a different result than the first run: "+
+						"the schedule's outcome is no longer deterministic", i)
+			}
+		})
+	}
+}
+
+// runConcurrentTxOutcome runs the shared two-client workload for one schedule
+// inside its own synctest bubble and returns the committed outcome.
+func runConcurrentTxOutcome(t *testing.T, schedule []byte) fuzzOutcome {
+	t.Helper()
+	var out fuzzOutcome
+	synctest.Test(t, func(t *testing.T) {
+		sched := middleware.NewScheduler(schedule, time.Millisecond)
+		b := middleware.NewScheduledBackend(memory.New(), sched)
+		out = fuzzConcurrentTxWorkload(t, b)
+	})
+	return out
+}
+
+// fuzzOutcome is the observable committed result of fuzzConcurrentTxWorkload:
+// the final value of every key together with the per-key increment totals the
+// two clients believe they committed. For a given schedule it must be
+// identical on every replay; see TestConcurrentTxDeterministicOutcome.
+type fuzzOutcome struct {
+	Final [3]int64 // committed value of k1, k2, k3 read back after the workload
+	Want  [3]int64 // sum of successful increments both clients tracked per key
+}
+
+// fuzzConcurrentTxWorkload runs the two-client concurrent workload against the
+// given backend and checks the post-conditions. It is the deterministic core
+// shared by the fuzzer (FuzzConcurrentTx) and the determinism regression test
+// (TestConcurrentTxDeterministicOutcome).
+func fuzzConcurrentTxWorkload(t *testing.T, b backend.Backend) fuzzOutcome {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Give each DB its own deterministic source of transaction-ID prefixes so a
+	// given schedule reproduces exactly. Distinct seeds keep the two clients'
+	// IDs disjoint; transaction priority comes from the (deterministic) clock,
+	// so this does not bias which schedules the fuzzer explores. Backoff jitter
+	// (the other RNG-driven source of nondeterminism) is disabled in initFuzzDB.
+	db1 := initFuzzDB(t, b, newDetReader(1))
+	db2 := initFuzzDB(t, b, newDetReader(2))
 	defer func() {
 		cancel()
 		db1.Close(ctx)
@@ -151,6 +236,11 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 	assert.Equal(t, db1k1+db2k1, readInt(v1), "k1 mismatch")
 	assert.Equal(t, db1k2+db2k2, readInt(v2), "k2 mismatch")
 	assert.Equal(t, db1k3+db2k3, readInt(v3), "k3 mismatch")
+
+	return fuzzOutcome{
+		Final: [3]int64{readInt(v1), readInt(v2), readInt(v3)},
+		Want:  [3]int64{db1k1 + db2k1, db1k2 + db2k2, db1k3 + db2k3},
+	}
 }
 
 // fuzzRMW runs n single-key read-modify-write transactions, each
@@ -244,11 +334,35 @@ func fuzzReadOnly(
 	})
 }
 
-func initFuzzDB(t testing.TB, b backend.Backend) *glassdb.DB {
+// newDetReader returns a deterministic, concurrency-safe source of random bytes
+// used as a DB's transaction-ID prefix source so a given schedule reproduces
+// exactly under a fixed seed.
+func newDetReader(seed int64) io.Reader {
+	return &lockedRand{r: rand.New(rand.NewSource(seed))}
+}
+
+type lockedRand struct {
+	mu sync.Mutex
+	r  *rand.Rand
+}
+
+func (l *lockedRand) Read(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.Read(p)
+}
+
+func initFuzzDB(t testing.TB, b backend.Backend, rng io.Reader) *glassdb.DB {
 	t.Helper()
 	ctx := context.Background()
 	opts := glassdb.DefaultOptions()
 	opts.Logger = slog.New(nilHandler{})
+	// Seed transaction IDs from a deterministic source so a run is
+	// reproducible. Jitter stays off: the retrier runs in background goroutines
+	// whose interleaving testing/synctest does not serialize, so jitter reads
+	// from the seeded source would not be consumed in a reproducible order.
+	opts.Rand = rng
+	opts.Retry.DisableJitter = true
 	db, err := glassdb.OpenWith(ctx, "example", b, opts)
 	if err != nil {
 		t.Fatalf("creating DB: %v", err)

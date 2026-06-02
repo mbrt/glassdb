@@ -1,0 +1,104 @@
+{
+  "score": 435.2283828040185,
+  "secondary": {
+    "allocBytesPerTx": 21545.28550480772,
+    "allocsPerTx": 272.5607043199206,
+    "nsPerTx": 47733.062170631965,
+    "cpuNsPerTx": 111112.12848163705,
+    "mutexWaitNsPerTx": 1249.0693412237033
+  },
+  "weights": {
+    "objRead": 57,
+    "objWrite": 70,
+    "metaRead": 31,
+    "metaWrite": 31,
+    "objList": 31
+  },
+  "workloads": [
+    {
+      "name": "singleRMW",
+      "txn": 200,
+      "objReads": 1,
+      "objWrites": 202,
+      "metaReads": 3,
+      "metaWrites": 4,
+      "objLists": 0,
+      "retries": 0,
+      "costPerTx": 72.07,
+      "allocBytesPerTx": 3275,
+      "allocsPerTx": 43.11,
+      "nsPerTx": 11604.37,
+      "cpuNsPerTx": 15845,
+      "mutexWaitNsPerTx": 0
+    },
+    {
+      "name": "multiRMW10",
+      "txn": 100,
+      "objReads": 10,
+      "objWrites": 1100,
+      "metaReads": 10,
+      "metaWrites": 991,
+      "objLists": 0,
+      "retries": 0,
+      "costPerTx": 1086.01,
+      "allocBytesPerTx": 55792.24,
+      "allocsPerTx": 748.03,
+      "nsPerTx": 156904.4,
+      "cpuNsPerTx": 463280,
+      "mutexWaitNsPerTx": 63020.56
+    },
+    {
+      "name": "batchRead10",
+      "txn": 200,
+      "objReads": 0,
+      "objWrites": 10,
+      "metaReads": 2000,
+      "metaWrites": 1,
+      "objLists": 0,
+      "retries": 0,
+      "costPerTx": 313.655,
+      "allocBytesPerTx": 16376.56,
+      "allocsPerTx": 181.325,
+      "nsPerTx": 47589.045,
+      "cpuNsPerTx": 110120,
+      "mutexWaitNsPerTx": 18260.12
+    },
+    {
+      "name": "batchWrite100",
+      "txn": 50,
+      "objReads": 0,
+      "objWrites": 9950,
+      "metaReads": 10000,
+      "metaWrites": 99,
+      "objLists": 0,
+      "retries": 0,
+      "costPerTx": 20191.38,
+      "allocBytesPerTx": 608433.76,
+      "allocsPerTx": 7615.56,
+      "nsPerTx": 974239,
+      "cpuNsPerTx": 4750800,
+      "mutexWaitNsPerTx": 2642085.44
+    },
+    {
+      "name": "readRepeat",
+      "txn": 200,
+      "objReads": 0,
+      "objWrites": 1,
+      "metaReads": 200,
+      "metaWrites": 1,
+      "objLists": 0,
+      "retries": 0,
+      "costPerTx": 31.505,
+      "allocBytesPerTx": 2550,
+      "allocsPerTx": 33.78,
+      "nsPerTx": 2935.4,
+      "cpuNsPerTx": 4410,
+      "mutexWaitNsPerTx": 0
+    }
+  ],
+  "scores": [
+    435.2283828040185,
+    434.85332095444363,
+    435.2532270312585
+  ]
+}

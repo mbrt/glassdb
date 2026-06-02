@@ -4,8 +4,10 @@ package glassdb
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"regexp"
 	"sync"
@@ -14,6 +16,7 @@ import (
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/internal/cache"
 	"github.com/mbrt/glassdb/internal/concurr"
+	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/data/paths"
 	"github.com/mbrt/glassdb/internal/storage"
 	"github.com/mbrt/glassdb/internal/trace"
@@ -25,21 +28,52 @@ var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 // DefaultOptions provides the options used by `Open`. They should be a good
 // middle ground for a production deployment.
 func DefaultOptions() Options {
+	rc := concurr.DefaultRetryConfig()
 	return Options{
 		Logger:    slog.Default(),
 		CacheSize: 5012 * 1024 * 1024, // 512 MiB
+		Retry: RetryOptions{
+			InitialInterval: rc.InitialInterval,
+			MaxInterval:     rc.MaxInterval,
+		},
 	}
 }
 
 // Options makes it possible to tweak a client DB.
-//
-// TODO: Add retry timing options.
 type Options struct {
 	Logger *slog.Logger
 	// Cache size is the number of bytes dedicated to caching objects and
 	// and metadata. Setting this too small may impact performance, as
 	// more calls to the backend would be necessary.
 	CacheSize int
+	// Retry tunes the exponential backoff used to retry transient
+	// transaction-coordination operations.
+	Retry RetryOptions
+	// Rand is the source of randomness for transaction-ID prefixes. A nil
+	// value uses crypto/rand. Deterministic tests can supply a seeded reader
+	// to make transaction IDs (and thus a run) reproducible; the transaction
+	// priority still comes from the clock. Rand must be safe for concurrent
+	// use.
+	Rand io.Reader
+}
+
+// RetryOptions tunes the exponential backoff the DB uses when retrying
+// transient transaction-coordination operations, such as polling a peer
+// transaction's commit status or writing a transaction's final log.
+type RetryOptions struct {
+	// InitialInterval is the delay before the first retry; it grows
+	// exponentially up to MaxInterval. A non-positive value selects a default.
+	InitialInterval time.Duration
+	// MaxInterval caps the per-retry delay. A non-positive value selects a
+	// default.
+	MaxInterval time.Duration
+	// DisableJitter turns off interval randomization. Jitter is enabled by
+	// default because it spreads retries to avoid thundering-herd contention,
+	// and draws from the DB's Rand source. Disable it only when deterministic
+	// retry timing is required, e.g. in tests: the retrier runs in background
+	// goroutines whose interleaving testing/synctest does not serialize, so
+	// jitter reads from a seeded Rand source would not be reproducible.
+	DisableJitter bool
 }
 
 // Open opens a database with the given name using default options.
@@ -63,7 +97,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 	local := storage.NewLocal(cache)
 	global := storage.NewGlobal(backend, local)
 	tl := storage.NewTLogger(global, local, name)
-	tmon := trans.NewMonitor(local, tl, bg)
+	tmon := trans.NewMonitor(local, tl, bg, newRetrier(opts.Retry, opts.Rand))
 	locker := trans.NewLocker(local, global, tl, tmon)
 	gc := trans.NewGC(bg, tl, opts.Logger)
 	gc.Start(ctx)
@@ -75,6 +109,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 		gc,
 		bg,
 		opts.Logger,
+		data.NewTxIDSource(opts.Rand),
 	)
 
 	res := &DB{
@@ -150,6 +185,24 @@ func (d *DB) openCollection(prefix string) Collection {
 	local := storage.NewLocal(d.cache)
 	global := storage.NewGlobal(d.backend, local)
 	return Collection{prefix, global, local, d.algo, d}
+}
+
+// newRetrier builds the internal retrier from the public retry options.
+// Unset (non-positive) intervals are filled with defaults by NewRetrier. The
+// jitter randomness reuses the DB's Rand source (defaulting to crypto/rand)
+// unless jitter is disabled.
+func newRetrier(o RetryOptions, rnd io.Reader) concurr.Retrier {
+	cfg := concurr.RetryConfig{
+		InitialInterval: o.InitialInterval,
+		MaxInterval:     o.MaxInterval,
+	}
+	if !o.DisableJitter {
+		cfg.Rand = rnd
+		if cfg.Rand == nil {
+			cfg.Rand = rand.Reader
+		}
+	}
+	return concurr.NewRetrier(cfg)
 }
 
 func (d *DB) txImpl(ctx context.Context, fn func(tx *Tx) error, stats *Stats) (err error) {

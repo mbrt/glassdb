@@ -9,7 +9,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.1
 	github.com/aws/smithy-go v1.26.0
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/googleapis/gax-go/v2 v2.19.0
 	github.com/gorilla/mux v1.8.1
 	github.com/johannesboyne/gofakes3 v0.0.0-20260208201424-4c385a1f6a73

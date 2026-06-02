@@ -37,7 +37,7 @@ func newTestMonitor(t *testing.T, b backend.Backend) (*Monitor, monTestCtx) {
 	tl := storage.NewTLogger(g, l, "test")
 	bg := concurr.NewBackground()
 	t.Cleanup(bg.Close)
-	mon := NewMonitor(l, tl, bg)
+	mon := NewMonitor(l, tl, bg, concurr.DefaultRetrier())
 
 	return mon, monTestCtx{
 		Local:   l,
