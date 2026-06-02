@@ -5,3 +5,5 @@
 
 /hack/aws-bench/out/*.png
 /hack/aws-bench/out-fake/
+/hack/autoresearch/baseline.json
+/hack/autoresearch/best.json

@@ -1067,6 +1067,13 @@ func (t Algo) fanout(
 	if num == 0 {
 		return nil
 	}
+	if num == 1 {
+		// Avoid a goroutine spawn and errgroup setup for the common
+		// single-element case (e.g. validating one read, or locking the single
+		// collection of a transaction). With no siblings there is nothing to run
+		// concurrently or to cancel, so running inline is equivalent.
+		return fn(ctx, 0)
+	}
 	f := concurr.NewFanout(algoConcurrency)
 	return f.Spawn(ctx, num, fn).Wait()
 }
