@@ -4,6 +4,7 @@ package glassdb
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -67,9 +68,11 @@ type RetryOptions struct {
 	// default.
 	MaxInterval time.Duration
 	// DisableJitter turns off interval randomization. Jitter is enabled by
-	// default because it spreads retries to avoid thundering-herd contention;
-	// disable it only when deterministic retry timing is required, e.g. in
-	// tests, since it draws from the process-global RNG.
+	// default because it spreads retries to avoid thundering-herd contention,
+	// and draws from the DB's Rand source. Disable it only when deterministic
+	// retry timing is required, e.g. in tests: the retrier runs in background
+	// goroutines whose interleaving testing/synctest does not serialize, so
+	// jitter reads from a seeded Rand source would not be reproducible.
 	DisableJitter bool
 }
 
@@ -94,7 +97,7 @@ func OpenWith(ctx context.Context, name string, b backend.Backend, opts Options)
 	local := storage.NewLocal(cache)
 	global := storage.NewGlobal(backend, local)
 	tl := storage.NewTLogger(global, local, name)
-	tmon := trans.NewMonitor(local, tl, bg, newRetrier(opts.Retry))
+	tmon := trans.NewMonitor(local, tl, bg, newRetrier(opts.Retry, opts.Rand))
 	locker := trans.NewLocker(local, global, tl, tmon)
 	gc := trans.NewGC(bg, tl, opts.Logger)
 	gc.Start(ctx)
@@ -184,20 +187,20 @@ func (d *DB) openCollection(prefix string) Collection {
 	return Collection{prefix, global, local, d.algo, d}
 }
 
-// newRetrier builds the internal retrier from the public retry options,
-// filling unset (non-positive) intervals with defaults.
-func newRetrier(o RetryOptions) concurr.Retrier {
-	def := concurr.DefaultRetryConfig()
+// newRetrier builds the internal retrier from the public retry options.
+// Unset (non-positive) intervals are filled with defaults by NewRetrier. The
+// jitter randomness reuses the DB's Rand source (defaulting to crypto/rand)
+// unless jitter is disabled.
+func newRetrier(o RetryOptions, rnd io.Reader) concurr.Retrier {
 	cfg := concurr.RetryConfig{
 		InitialInterval: o.InitialInterval,
 		MaxInterval:     o.MaxInterval,
-		Jitter:          !o.DisableJitter,
 	}
-	if cfg.InitialInterval <= 0 {
-		cfg.InitialInterval = def.InitialInterval
-	}
-	if cfg.MaxInterval <= 0 {
-		cfg.MaxInterval = def.MaxInterval
+	if !o.DisableJitter {
+		cfg.Rand = rnd
+		if cfg.Rand == nil {
+			cfg.Rand = rand.Reader
+		}
 	}
 	return concurr.NewRetrier(cfg)
 }

@@ -82,11 +82,9 @@ func newFuzzAlgoEnv(t testing.TB, b backend.Backend, src data.TxIDSource) fuzzAl
 	tlogger := storage.NewTLogger(global, local, testCollName)
 	background := concurr.NewBackground()
 	t.Cleanup(background.Close)
-	// Disable backoff jitter so retry timing is deterministic and the fuzzer
-	// stays reproducible (jitter draws from the un-virtualized global RNG).
-	rcfg := concurr.DefaultRetryConfig()
-	rcfg.Jitter = false
-	tmon := NewMonitor(local, tlogger, background, concurr.NewRetrier(rcfg))
+	// DefaultRetrier applies no jitter (its Rand source is nil), so retry
+	// timing is purely exponential and the fuzzer stays reproducible.
+	tmon := NewMonitor(local, tlogger, background, concurr.DefaultRetrier())
 	locker := NewLocker(local, global, tlogger, tmon)
 	gc := NewGC(background, tlogger, log)
 

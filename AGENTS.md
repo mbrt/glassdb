@@ -15,6 +15,7 @@ make test
 
 - Test interfaces and intended behavior instead of internals
 - Prefer integration tests to mocks as much as possible
+- Add deterministic tests for bugs discovered by fuzz tests
 
 ### Formatting Code
 

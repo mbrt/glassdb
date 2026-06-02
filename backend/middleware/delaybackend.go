@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	crand "crypto/rand"
 	"errors"
 	"math"
 	"math/rand"
@@ -296,7 +297,7 @@ func (b *DelayBackend) backoff(ctx context.Context, path string) error {
 	r := concurr.NewRetrier(concurr.RetryConfig{
 		InitialInterval: b.retryDelay,
 		MaxInterval:     b.retryDelay * 10,
-		Jitter:          true,
+		Rand:            crand.Reader,
 	})
 	return r.Retry(ctx, func() error {
 		if !b.rlimit.TryAcquireToken(path) {

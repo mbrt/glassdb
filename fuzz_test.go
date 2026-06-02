@@ -275,8 +275,10 @@ func initFuzzDB(t testing.TB, b backend.Backend, rng io.Reader) *glassdb.DB {
 	ctx := context.Background()
 	opts := glassdb.DefaultOptions()
 	opts.Logger = slog.New(nilHandler{})
-	// Deterministic transaction IDs and retry timing: both otherwise draw from
-	// RNGs that testing/synctest does not virtualize.
+	// Seed transaction IDs from a deterministic source so a run is
+	// reproducible. Jitter stays off: the retrier runs in background goroutines
+	// whose interleaving testing/synctest does not serialize, so jitter reads
+	// from the seeded source would not be consumed in a reproducible order.
 	opts.Rand = rng
 	opts.Retry.DisableJitter = true
 	db, err := glassdb.OpenWith(ctx, "example", b, opts)

@@ -58,7 +58,7 @@ nondeterminism, none of them controlled by `testing/synctest`, were responsible:
 - **Go map iteration order.** Several commit-path steps built slices by ranging
   over a map, so the order of backend operations a transaction issued varied run
   to run.
-- **Backoff jitter.** `cenkalti/backoff` randomizes retry intervals using the
+- **Backoff jitter.** `cenkalti/backoff` randomized retry intervals using the
   process-global `math/rand`, which `synctest` does not virtualize, so retry
   timing — and thus the interleaving — drifted.
 
@@ -97,12 +97,25 @@ bugs, so the three nondeterminism sources above were removed:
 - **Stable ordering.** Commit-path slices built from maps are now sorted by path
   (`initValidation`, `collectionsLocks`, `tlocker.LockedPaths`), so the sequence
   of backend operations no longer depends on map iteration order.
-- **Jitter as a retry option.** Backoff jitter is kept in production (it spreads
-  retries to avoid thundering-herd contention) but draws from the process-global
-  `math/rand`, which `synctest` does not virtualize. Whether to use jitter is a
-  field of `concurr.RetryConfig`, set once when the `Retrier` is constructed and
-  plumbed up to `glassdb.Options.Retry` (`RetryOptions.DisableJitter`). The
-  fuzzer opens its DBs with jitter disabled; production keeps the default.
+- **Inlined backoff with an injectable jitter source.** The minimal exponential
+  backoff `cenkalti/backoff` provided is now inlined in `internal/concurr`
+  (`Retrier`, `RetryConfig`, `Permanent`), dropping the dependency and, more
+  importantly, the hidden coupling to the process-global `math/rand`. Jitter now
+  draws from a `RetryConfig.Rand io.Reader` (nil disables it), which
+  `glassdb.Options` wires to the DB's own `Rand` source — the same knob used for
+  transaction IDs — defaulting to `crypto/rand`. Jitter stays on in production
+  (it spreads retries to avoid thundering-herd contention); the fuzzer opens its
+  DBs with `RetryOptions.DisableJitter`.
+
+  Re-enabling jitter does **not** let the fuzzer keep it on, even with a seeded
+  `Rand`. The retrier runs inside background goroutines (the remote-status poll
+  worker spawned by `Monitor.WaitTx`, and the tx-refresh worker), and
+  `testing/synctest` does not serialize the interleaving of concurrently-runnable
+  goroutines. Those goroutines would therefore consume jitter bytes from the
+  shared seeded reader in a run-dependent order, so wake-up times — and the
+  schedule — would drift again. With jitter off, `NextBackOff` consumes no
+  randomness and intervals are purely exponential, which is what keeps replay
+  deterministic.
 
 The two context keys in `internal/trans` were also changed from bare `struct{}{}`
 values (which compare equal, so they collided) to a private `ctxKey` type with
@@ -112,6 +125,12 @@ distinct constants.
 
 - The fuzzer no longer reproduces the lost update: a 120k-schedule replay harness
   and a 3-minute (~1.1M-exec) fuzz run both pass, where they previously failed.
+- `TestSingleRWLostUpdate` (in `internal/trans/algo_test.go`) is a deterministic
+  regression test that recreates the exact poisoning sequence: a logless
+  single-RW writer, a victim with a stale read, and a pending lock that forces
+  validation down the unresolvable branch. It asserts the victim subsequently
+  reads the authoritative value rather than the cached guess; it fails against
+  the pre-fix validation code and passes after it.
 - The local cache can no longer hold a value whose bytes and writer tag come from
   different versions via the validation paths, closing the lost-update hole.
 - On the uncommon path where a single-RW writer's value is unresolvable, a
@@ -121,9 +140,3 @@ distinct constants.
 - The transaction-ID prefix is now an injectable seam (`glassdb.Options.Rand`
   backed by `data.TxIDSource`) used by deterministic tests; production leaves it
   unset and gets `crypto/rand`.
-- Production backoff keeps its jitter; only DBs opened with
-  `Options.Retry.DisableJitter` (currently just the fuzzer) get deterministic
-  retry timing. Retry timing (initial/max interval and jitter) is now a public
-  DB option, resolving the previous "add retry timing options" TODO. If
-  deterministic jitter is ever needed, it should be reintroduced behind a
-  per-retrier RNG rather than the global `math/rand`.
