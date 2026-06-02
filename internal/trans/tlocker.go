@@ -3,6 +3,7 @@ package trans
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -132,6 +133,11 @@ func (v *Locker) LockedPaths(tid data.TxID) []storage.PathLock {
 			Type: tp,
 		})
 	}
+	// Stable order so unlock/cleanup and tx-log lock lists do not depend on Go's
+	// randomized map iteration, keeping the serializability fuzzer reproducible.
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Path < res[j].Path
+	})
 	return res
 }
 

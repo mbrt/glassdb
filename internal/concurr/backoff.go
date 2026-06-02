@@ -36,6 +36,11 @@ func RetryOptions(initial, maxInterval time.Duration) Retrier {
 	b.InitialInterval = initial
 	b.MaxInterval = maxInterval
 	b.MaxElapsedTime = 0
+	// Disable interval randomization. Jitter would make retry timing depend on
+	// an uncontrolled global RNG, which makes the serializability fuzzer
+	// non-reproducible; progress under contention is guaranteed by the
+	// wound-wait rule and the serial-locking fallback, not by jitter.
+	b.RandomizationFactor = 0
 	return Retrier{b}
 }
 

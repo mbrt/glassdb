@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"math/rand"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/mbrt/glassdb/backend"
 	"github.com/mbrt/glassdb/backend/memory"
 	"github.com/mbrt/glassdb/backend/middleware"
+	"github.com/mbrt/glassdb/internal/trans"
 )
 
 const fuzzTxTimeout = 10 * time.Minute
@@ -54,6 +58,13 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 		db2.Close(ctx)
 	}()
 
+	// Give each DB its own deterministic source of transaction-ID prefixes so a
+	// given schedule reproduces exactly. Distinct seeds keep the two clients'
+	// IDs disjoint; transaction priority comes from the (deterministic) clock,
+	// so this does not bias which schedules the fuzzer explores.
+	ctx1 := trans.CtxWithIDSource(ctx, newDetSource(1))
+	ctx2 := trans.CtxWithIDSource(ctx, newDetSource(2))
+
 	coll1 := db1.Collection([]byte("fuzz-coll"))
 	coll2 := db2.Collection([]byte("fuzz-coll"))
 
@@ -62,9 +73,9 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 	key3 := []byte("k3")
 
 	// Initialize collection and keys to zero.
-	err := coll1.Create(ctx)
+	err := coll1.Create(ctx1)
 	require.NoError(t, err)
-	err = db1.Tx(ctx, func(tx *glassdb.Tx) error {
+	err = db1.Tx(ctx1, func(tx *glassdb.Tx) error {
 		for _, k := range [][]byte{key1, key2, key3} {
 			if err := tx.Write(coll1, k, writeInt(0)); err != nil {
 				return err
@@ -84,23 +95,23 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 	g.Go(func() error {
 		var err error
 		// 1. Single-key RMW on k1.
-		db1k1, err = fuzzRMW(ctx, db1, coll1, key1, 3)
+		db1k1, err = fuzzRMW(ctx1, db1, coll1, key1, 3)
 		if err != nil {
 			return fmt.Errorf("db1 rmw k1: %w", err)
 		}
 		// 2. Multi-key RMW on k1+k2.
-		n, err := fuzzMultiRMW(ctx, db1, coll1, key1, key2, 2)
+		n, err := fuzzMultiRMW(ctx1, db1, coll1, key1, key2, 2)
 		if err != nil {
 			return fmt.Errorf("db1 multi-rmw k1+k2: %w", err)
 		}
 		db1k1 += n
 		db1k2 += n
 		// 3. Read-only transaction: read all keys, verify non-negative.
-		if err := fuzzReadOnly(ctx, db1, coll1, key1, key2, key3); err != nil {
+		if err := fuzzReadOnly(ctx1, db1, coll1, key1, key2, key3); err != nil {
 			return fmt.Errorf("db1 read-only: %w", err)
 		}
 		// 4. Single-key RMW on k3.
-		n, err = fuzzRMW(ctx, db1, coll1, key3, 2)
+		n, err = fuzzRMW(ctx1, db1, coll1, key3, 2)
 		if err != nil {
 			return fmt.Errorf("db1 rmw k3: %w", err)
 		}
@@ -112,23 +123,23 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 	g.Go(func() error {
 		var err error
 		// 1. Single-key RMW on k2.
-		db2k2, err = fuzzRMW(ctx, db2, coll2, key2, 3)
+		db2k2, err = fuzzRMW(ctx2, db2, coll2, key2, 3)
 		if err != nil {
 			return fmt.Errorf("db2 rmw k2: %w", err)
 		}
 		// 2. Multi-key RMW on k2+k3.
-		n, err := fuzzMultiRMW(ctx, db2, coll2, key2, key3, 2)
+		n, err := fuzzMultiRMW(ctx2, db2, coll2, key2, key3, 2)
 		if err != nil {
 			return fmt.Errorf("db2 multi-rmw k2+k3: %w", err)
 		}
 		db2k2 += n
 		db2k3 += n
 		// 3. Read-only transaction: read all keys, verify non-negative.
-		if err := fuzzReadOnly(ctx, db2, coll2, key1, key2, key3); err != nil {
+		if err := fuzzReadOnly(ctx2, db2, coll2, key1, key2, key3); err != nil {
 			return fmt.Errorf("db2 read-only: %w", err)
 		}
 		// 4. Single-key RMW on k1.
-		n, err = fuzzRMW(ctx, db2, coll2, key1, 2)
+		n, err = fuzzRMW(ctx2, db2, coll2, key1, 2)
 		if err != nil {
 			return fmt.Errorf("db2 rmw k1: %w", err)
 		}
@@ -141,11 +152,11 @@ func fuzzConcurrentTx(t *testing.T, schedule []byte) {
 
 	// Verify invariants: final value of each key == total successful
 	// increments from both DBs.
-	v1, err := coll1.ReadStrong(ctx, key1)
+	v1, err := coll1.ReadStrong(ctx1, key1)
 	require.NoError(t, err)
-	v2, err := coll1.ReadStrong(ctx, key2)
+	v2, err := coll1.ReadStrong(ctx1, key2)
 	require.NoError(t, err)
-	v3, err := coll1.ReadStrong(ctx, key3)
+	v3, err := coll1.ReadStrong(ctx1, key3)
 	require.NoError(t, err)
 
 	assert.Equal(t, db1k1+db2k1, readInt(v1), "k1 mismatch")
@@ -242,6 +253,23 @@ func fuzzReadOnly(
 		}
 		return nil
 	})
+}
+
+// newDetSource returns a deterministic, concurrency-safe source of random
+// bytes used to make transaction-ID prefixes reproducible under a fixed seed.
+func newDetSource(seed int64) io.Reader {
+	return &lockedRand{r: rand.New(rand.NewSource(seed))}
+}
+
+type lockedRand struct {
+	mu sync.Mutex
+	r  *rand.Rand
+}
+
+func (l *lockedRand) Read(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.Read(p)
 }
 
 func initFuzzDB(t testing.TB, b backend.Backend) *glassdb.DB {

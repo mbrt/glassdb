@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -78,6 +79,26 @@ func TIDWithPriority(ts time.Time, prefix []byte) TxID {
 	return res
 }
 
+// NewTIDFromSource generates a transaction ID using ts as its priority and src
+// as the source of the random prefix. It lets deterministic tests (e.g. the
+// serializability fuzzer) control the otherwise-random prefix so that a given
+// input reproduces exactly; production code uses NewTId (crypto/rand).
+func NewTIDFromSource(src io.Reader, ts time.Time) TxID {
+	res := make([]byte, txIDLen)
+	prefixFromSource(src, res)
+	binary.BigEndian.PutUint64(res[txIDTSOff:], uint64(ts.UnixNano()))
+	return res
+}
+
+// RenewTIDFromSource behaves like RenewTID but draws the fresh prefix from src,
+// keeping wounded-transaction restarts deterministic under a fixed source.
+func RenewTIDFromSource(src io.Reader, old TxID) TxID {
+	res := make([]byte, txIDLen)
+	prefixFromSource(src, res)
+	copy(res[txIDTSOff:], old[txIDTSOff:])
+	return res
+}
+
 func newTID(ts time.Time) TxID {
 	res := make([]byte, txIDLen)
 	randPrefix(res)
@@ -88,6 +109,12 @@ func newTID(ts time.Time) TxID {
 func randPrefix(b []byte) {
 	if _, err := rand.Read(b[:txIDTSOff]); err != nil {
 		panic(fmt.Sprintf("Cannot read from random device: %v", err))
+	}
+}
+
+func prefixFromSource(src io.Reader, b []byte) {
+	if _, err := io.ReadFull(src, b[:txIDTSOff]); err != nil {
+		panic(fmt.Sprintf("Cannot read from random source: %v", err))
 	}
 }
 
