@@ -62,8 +62,13 @@ func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool)
 func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 	updated := time.Now()
 	writer, _ := lastWriterFromTags(meta.Tags)
-	newEntry := cacheEntry{
-		V: &cacheValue{
+	// Allocate the value and metadata together: WriteWithMeta always sets both
+	// at once, and this is the hottest cache-write path (every backend write and
+	// read-through miss). The cache's copy-on-write updates (MarkValueOutated,
+	// SetMeta) replace one pointer with a fresh allocation while the other keeps
+	// this backing struct alive, so sharing it is safe.
+	vm := &cacheValueMeta{
+		v: cacheValue{
 			Value: value,
 			Version: Version{
 				B:      meta.Version,
@@ -71,13 +76,13 @@ func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 			},
 			Updated: updated,
 		},
-		M: &cacheMeta{
+		m: cacheMeta{
 			Meta:    meta,
 			Writer:  writer,
 			Updated: updated,
 		},
 	}
-	c.cache.Set(key, newEntry)
+	c.cache.Set(key, cacheEntry{V: &vm.v, M: &vm.m})
 }
 
 func (c Local) Write(key string, value []byte, v Version) {
@@ -240,6 +245,13 @@ func (c cacheEntry) isValueOutdated() bool {
 	// The writers differ. If the metadata was updated last, the value is
 	// definitely outdated.
 	return c.M.Updated.After(c.V.Updated)
+}
+
+// cacheValueMeta backs a cacheEntry whose value and metadata are written
+// together, letting WriteWithMeta allocate both in a single heap object.
+type cacheValueMeta struct {
+	v cacheValue
+	m cacheMeta
 }
 
 type cacheValue struct {
