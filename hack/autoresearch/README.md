@@ -71,8 +71,9 @@ cursor-agent --force
 Then prompt:
 
 ```
-Have a look at hack/autoresearch/program.md and let's kick off a new experiment.
-Do the setup first, then start the loop.
+Follow hack/autoresearch/program.md exactly. Do the setup, then run the full experiment budget:
+25 experiments or 3 hours, whichever comes first, and do not stop early.
+Keep only improvements; log every experiment.
 ```
 
 ### Headless / unattended
@@ -80,9 +81,9 @@ Do the setup first, then start the loop.
 ```bash
 cd glassdb
 cursor-agent -p --force \
-  "Follow hack/autoresearch/program.md exactly. Do the setup, then run the full
-   experiment budget defined there - 25 experiments or 3 hours, whichever comes
-   first - and do not stop early. Keep only improvements; log every experiment."
+  "Follow hack/autoresearch/program.md exactly. Do the setup, then run the full experiment budget:
+  25 experiments or 3 hours, whichever comes first, and do not stop early.
+  Keep only improvements; log every experiment."
 ```
 
 Resume a previous session to keep going:
