@@ -434,6 +434,31 @@ session.
 
 - Commit: 50e480c
 
+## 10. Skip per-tx logger clone when logging is off - KEPT (secondary)
+- Hypothesis: alloc profiling shows `slog.Logger.clone` and `argsToAttrSlice`
+  among the per-tx allocators. `Algo.Begin` (and `Rebegin`) do
+  `t.log.With("tx", txLog(tid))` for every transaction, cloning the logger and
+  formatting the id - even when the logger discards everything (the bench uses a
+  nil handler; production typically runs at Info+). All tx logs in this package
+  are Debug or Error level, so "a log will actually fire" is exactly
+  `Enabled(LevelError)`; gate the clone on that.
+- Change: `internal/trans/algo.go` adds `handleLog(ctx, tid)` returning the base
+  logger when `!t.log.Enabled(ctx, slog.LevelError)`, else the `With`-tagged
+  clone; `Begin`/`Rebegin` use it (Rebegin now uses its ctx).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (legitimate gating, no test edits). Behavior
+  is identical whenever any log fires (Enabled(LevelError) true => clone as
+  before); the only change is skipping work when nothing would be logged.
+- Primary: 403.79 -> 404.04 (noise; op counts identical).
+- Secondary (back-to-back x3): allocsPerTx ~220-225 -> ~209-211 (-5%,
+  consistent), allocBytes ~17.9-18.6k -> ~17.6k (-2..5%), ns/cpu flat-or-lower.
+  No regressions.
+- Outcome & why: KEPT. Hits every workload, so even a few allocs/tx compound in
+  the geomean (the low-alloc workloads readRepeat/singleRMW gain the most
+  percentage). Lesson: eager per-tx structured-logging setup is a real cost on
+  short transactions; make it pay-for-what-you-log.
+- Commit: 05d7884
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
