@@ -515,6 +515,41 @@ session.
   an intrusive list is the idiomatic fix for hot LRU paths.
 - Commit: 910b401
 
+## 13. Encode storage-path base64 into the buffer - KEPT
+- Hypothesis: `paths.encode` (under FromKey/FromCollection/FromTransaction)
+  built every storage path by calling `encoding.EncodeToString(a)` - which
+  allocates a fresh base64 string - and then immediately copied that string
+  into the pooled `bytes.Buffer` and threw it away. An alloc_objects profile of
+  singleRMW showed `base64.EncodeToString` + `bytes.Buffer.String` together at
+  ~43% of all allocations. This is the single hottest universal path: every
+  key/collection/tx path is built here, so every read, write, and commit pays
+  it. Encoding directly into the buffer's spare capacity should remove one
+  allocation per encoded path across all workloads.
+- Change: in `internal/data/paths/paths.go`, replace
+  `buf.WriteString(encoding.EncodeToString(a))` with
+  `dst := buf.AvailableBuffer(); dst = encoding.AppendEncode(dst, a); buf.Write(dst)`.
+  Output is byte-for-byte identical (same encoding, same layout); only the
+  intermediate allocation is removed.
+- Correctness: fast gate PASS (incl. FuzzConcurrentTx), judge APPROVED, full
+  gate PASS (make test + 2m fuzz). Encode/decode round-trip is exercised
+  end-to-end by the storage/trans tests and the fuzzer.
+- Primary: ~404 -> ~404 (flat, within noise; paths are unchanged).
+- Secondary: measured on the stable internal benches (3000x, deterministic
+  allocs/op): singleRMW 33 -> 31 allocs/op (-2, -6%), batchWrite100
+  6356 -> 6253 allocs/op (-103, -1.6%); bytes/op also lower on both
+  (2670 -> 2657, 509711 -> 508573). Harness allocs geomean ~203 -> ~198.
+- Outcome & why: KEPT. Primary flat with a clear, deterministic allocation-
+  count reduction on every encoded path, helping even the smallest workloads
+  (which dominate the geomean). NOTE on methodology: the harness's MemStats
+  allocBytes geomean is noisy (+/-4% run-to-run for identical code) and on one
+  count=5 run appeared to rise; the deterministic testing.B per-op numbers
+  (bytes down on both representative workloads) are the reliable signal and
+  show no regression. Lesson: when a secondary axis looks like it regressed,
+  cross-check against the deterministic per-op benchmark before trusting the
+  harness's MemStats deltas. Also: EncodeToString-then-copy is a common
+  hidden allocation; AppendEncode into spare capacity is the idiomatic fix.
+- Commit: fff599b
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
