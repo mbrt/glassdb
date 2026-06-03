@@ -299,3 +299,30 @@ session.
   does not touch. Lesson: the lock-path allocation cost is the tag map + the
   memory backend's defensive `copyTags`, not the locker-id encoding; a real
   win would need to avoid the per-op map, which the backend API requires.
+
+## 5. Skip dedup map in initValidation for read-only / write-only tx - KEPT (secondary)
+- Hypothesis: `initValidation` always allocates an intermediate
+  `map[string]pathState` to merge reads and writes that touch the same path.
+  But `collectAccesses` already yields each path at most once within reads and
+  within writes, so the merge is only needed when a tx has BOTH reads and
+  writes (the only overlap source). Read-only (batchRead10, readRepeat) and
+  write-only (batchWrite100) transactions can build the `pathState` slice
+  directly and skip the map entirely. Pre-sizing the map in the remaining
+  read+write case (singleRMW, multiRMW10) also avoids growth reallocs.
+- Change: `internal/trans/algo.go` `initValidation` - when `len(reads)==0 ||
+  len(writes)==0`, append directly into a pre-sized slice (no map). Otherwise
+  use the map path but pre-size it to `len(reads)+len(writes)`.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (honest fast path, preserves merge path
+  when both reads and writes present, no test changes).
+- Primary: 404.31 -> 404.06 (-0.06%, noise; op counts identical).
+- Secondary (fair back-to-back control vs new): allocBytes ~19660-20450 ->
+  ~19170-19220 (-4%, consistent), allocs 246-251 -> 245 (-1.5..2.5%), ns/cpu
+  flat-or-better, mutexWait flat. Internal benches confirm: 10RMW B/op
+  10897->9261 (-15%, from map pre-size), 100W B/op 558783->543413 (-2.75%, map
+  skipped). No regressions.
+- Outcome & why: KEPT under the secondary-axis rule. allocBytes is the clearest
+  and most consistent signal; the map was avoidable scheduling/heap overhead on
+  every tx. Lesson: dedup structures are only worth their allocation when a
+  collision can actually occur; bound them by the access pattern.
+- Commit: c6067f8
