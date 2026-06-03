@@ -459,6 +459,28 @@ session.
   short transactions; make it pay-for-what-you-log.
 - Commit: 05d7884
 
+## 11. Skip errgroup SetLimit when fan-out fits the limit - DISCARDED (below noise)
+- Hypothesis: `concurr.Fanout.Spawn` always calls `errgroup.SetLimit(o.limit)`,
+  which allocates a semaphore channel. The limit (algoConcurrency=10) only binds
+  when there are more tasks than the limit; the common fan-outs (validate/lock
+  <=10 keys, e.g. multiRMW10, batchRead10) have num<=limit, so the channel is
+  allocated but never used. Skip SetLimit when `num <= o.limit`.
+- Change: `internal/concurr/fanout.go` `Spawn` - guard `g.SetLimit` with
+  `if num > o.limit`.
+- Correctness: not fully gated (discarded on measurement); behavior is identical
+  for num<=limit (the limit never binds, all tasks run immediately either way).
+- Primary: flat (op counts identical).
+- Secondary (back-to-back x3): allocsPerTx consistently ~1/tx lower (~209.3-210.0
+  vs 210.6-215.1) and allocBytes ~0.4% lower, but the magnitude is tiny and
+  ns/cpu ran flat-to-slightly-higher than the control's best runs (within noise).
+- Outcome & why: DISCARDED. The saved semaphore channel (cap-10 of struct{}) is
+  a single small allocation per fan-out, diluted to ~1 alloc/tx in the geomean -
+  below the secondary noise band, and with no ns/cpu benefit to corroborate it.
+  A real but immeasurable micro-win does not clear the "clearly improves" bar.
+  Lesson: errgroup's per-call setup (cancel ctx + optional semaphore) is small
+  relative to the fan-out's actual work; shaving one channel is not enough to
+  register.
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
