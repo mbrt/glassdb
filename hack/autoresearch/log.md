@@ -254,3 +254,29 @@ session.
   only added cost on the rare "blind write to an uncached existing key" path is
   one failed WriteIfNotExists, which is acceptable.
 - Commit: b2c586e
+
+## 3. Resolve cache-hit reads inline in ReadMulti - KEPT (secondary)
+- Hypothesis: `ReadMulti` spawns a goroutine per key (via `conc.WaitGroup`)
+  even when the value is already in the local cache - the steady state for
+  `multiRMW10` and `batchRead10`. A cache hit issues no backend op, so the
+  goroutine is pure scheduling overhead. Resolving cached reads inline should
+  cut allocs/CPU/ns/mutex on those two workloads with the primary unchanged
+  (cache hits do no backend ops either way).
+- Change: `internal/trans/reader.go` adds `Reader.ReadCached` (local-only fast
+  path: returns a present, non-empty, non-outdated cached value; ok=false for
+  miss/outdated/deleted/empty so the caller falls back to `Read`). `tx.go`
+  `ReadMulti` calls it inline before spawning, spawning goroutines only for
+  reads that need the backend.
+- Correctness: fast gate pass, full gate pass, judge approved (general cache
+  fast path, matches Read's non-empty cache behavior, no test changes).
+- Primary: 404.11 -> 404.31 (+0.05%, noise; op counts identical).
+- Secondary (fair back-to-back control vs new, medians): ns ~55k -> ~42k
+  (-24%), cpu ~128k -> ~93k (-27%), allocs 251.1 -> 246.9 (-1.7%),
+  allocBytes ~flat-down, mutexWait ~1119 -> ~946 (-15%). No regressions (the
+  448 in the prior best.json was a lucky low reading; the back-to-back control
+  put exp2 at ~1119).
+- Outcome & why: KEPT under the secondary-axis rule. The per-key goroutine on
+  the cache-hit read path was pure overhead. Lesson: like the earlier
+  single-element fanout inline, hot-path fan-out should short-circuit work that
+  is already local.
+- Commit: 5a7cfbc
