@@ -62,15 +62,21 @@ func TestLockCreate(t *testing.T) {
 		key := paths.FromKey("example", []byte("key"))
 		tx := data.NewTID()
 		tctx.Monitor.BeginTx(ctx, tx)
+		value := []byte("val")
 
 		// Lock unlock without commit.
 		for range 3 {
-			err := locker.LockCreate(ctx, key, tx)
+			err := locker.LockCreate(ctx, key, tx, storage.TValue{Value: value})
 			assert.NoError(t, err)
 			assertLockInfo(t, tctx.Global, key, storage.LockInfo{
 				Type:     storage.LockTypeCreate,
 				LockedBy: []data.TxID{tx},
 			})
+			// Create-with-value: the value is written straight into the
+			// placeholder at lock time.
+			gr, err := tctx.Global.Read(ctx, key)
+			assert.NoError(t, err)
+			assert.Equal(t, string(value), string(gr.Value))
 
 			err = locker.Unlock(ctx, key, tx)
 			assert.NoError(t, err)
@@ -79,9 +85,8 @@ func TestLockCreate(t *testing.T) {
 		}
 
 		// Lock, commit the transaction and unlock.
-		err := locker.LockCreate(ctx, key, tx)
+		err := locker.LockCreate(ctx, key, tx, storage.TValue{Value: value})
 		assert.NoError(t, err)
-		value := []byte("val")
 		err = tctx.Monitor.CommitTx(ctx, storage.TxLog{
 			ID: tx,
 			Writes: []storage.TxWrite{
@@ -115,7 +120,7 @@ func TestLockCreateFail(t *testing.T) {
 		assert.NoError(t, err)
 
 		// LockCreate should fail when the item is already present.
-		err = locker.LockCreate(ctx, key, tx)
+		err = locker.LockCreate(ctx, key, tx, storage.TValue{Value: []byte("y")})
 		assert.ErrorIs(t, err, backend.ErrPrecondition)
 	})
 }
@@ -129,7 +134,7 @@ func TestUnlockAfterCreateTimeout(t *testing.T) {
 		tctx.Monitor.BeginTx(ctx, tx)
 
 		// Locking will not succeed with an expired context.
-		err := locker.LockCreate(canceledCtx(ctx), key, tx)
+		err := locker.LockCreate(canceledCtx(ctx), key, tx, storage.TValue{Value: []byte("val")})
 		assert.ErrorIs(t, err, context.Canceled)
 
 		_, err = tctx.Global.GetMetadata(ctx, key)

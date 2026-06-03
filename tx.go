@@ -108,6 +108,18 @@ func (t *Tx) ReadMulti(ks []FQKey) []ReadResult {
 			continue
 		}
 
+		// Fast path: if the value is already in the local cache, resolve it
+		// inline. This avoids spawning a goroutine per key for the common case
+		// where the working set is cached (e.g. repeated multi-key RMW or batch
+		// reads), which is pure scheduling overhead since a cache hit issues no
+		// backend operation.
+		if rv, ok := t.reader.ReadCached(p); ok {
+			res[i] = ReadResult{Value: rv.Value}
+			infos[i].version = trans.ReadVersion{LastWriter: rv.Version.Writer}
+			infos[i].found = true
+			continue
+		}
+
 		// Fetch in parallel.
 		wg.Go(func() {
 			rv, err := t.reader.Read(t.ctx, p, storage.MaxStaleness)
@@ -179,8 +191,11 @@ func (t *Tx) reset() {
 }
 
 func (t *Tx) collectAccesses() trans.Data {
-	var reads []trans.ReadAccess
-	var writes []trans.WriteAccess
+	// Pre-size from the staged maps: every staged entry yields at most one
+	// access, so this is an exact upper bound and avoids slice regrowth on the
+	// commit hot path (notably for multi-key writes like batch inserts).
+	reads := make([]trans.ReadAccess, 0, len(t.reads))
+	writes := make([]trans.WriteAccess, 0, len(t.staged))
 
 	// Collect writes.
 	for k, v := range t.staged {

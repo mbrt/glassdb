@@ -48,14 +48,16 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 				s.local.WriteWithMeta(key, r.Contents, meta)
 
 				return GlobalRead{
-					Value:   r.Contents,
-					Version: VersionFromMeta(meta),
+					Value:          r.Contents,
+					Version:        VersionFromMeta(meta),
+					CreateLockedBy: CreateLockerFromTags(r.Tags),
 				}, nil
 			}
 			// The cached value is up to date, use that.
 			return GlobalRead{
-				Value:   e.Value,
-				Version: e.Version,
+				Value:          e.Value,
+				Version:        e.Version,
+				CreateLockedBy: e.CreateLockedBy,
 			}, nil
 		}
 	}
@@ -69,8 +71,9 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 	s.local.WriteWithMeta(key, r.Contents, meta)
 
 	return GlobalRead{
-		Value:   r.Contents,
-		Version: VersionFromMeta(meta),
+		Value:          r.Contents,
+		Version:        VersionFromMeta(meta),
+		CreateLockedBy: CreateLockerFromTags(r.Tags),
 	}, nil
 }
 
@@ -83,6 +86,14 @@ func (s Global) GetMetadata(ctx context.Context, key string) (backend.Metadata, 
 	}
 	s.local.SetMeta(key, meta)
 	return meta, nil
+}
+
+// GetMetadataUncached fetches the object metadata straight from the backend
+// without touching the local cache. It is for callers (e.g. read-only commit
+// validation) that need the freshest metadata for a one-shot version check and
+// whose result is not reused, so populating the cache would only allocate.
+func (s Global) GetMetadataUncached(ctx context.Context, key string) (backend.Metadata, error) {
+	return s.backend.GetMetadata(ctx, key)
 }
 
 // SetTagsIf conditionally sets tags on the object if its current version
@@ -171,6 +182,9 @@ func (s Global) DeleteIf(ctx context.Context, key string, expected backend.Versi
 type GlobalRead struct {
 	Value   []byte
 	Version Version
+	// CreateLockedBy is the transaction holding a create-lock on the object, or
+	// nil if it is not create-locked. See LocalRead.CreateLockedBy.
+	CreateLockedBy data.TxID
 }
 
 // Writer returns the transaction ID of the last writer of the value, as

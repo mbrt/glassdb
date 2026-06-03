@@ -33,11 +33,16 @@ func (c Local) Read(key string, maxStale time.Duration) (LocalRead, bool) {
 		return LocalRead{}, false
 	}
 
+	var createLockedBy data.TxID
+	if e.M != nil {
+		createLockedBy = e.M.CreateLockedBy
+	}
 	return LocalRead{
-		Value:    e.V.Value,
-		Version:  e.V.Version,
-		Deleted:  e.V.Deleted,
-		Outdated: e.isValueOutdated(),
+		Value:          e.V.Value,
+		Version:        e.V.Version,
+		Deleted:        e.V.Deleted,
+		Outdated:       e.isValueOutdated(),
+		CreateLockedBy: createLockedBy,
 	}, true
 }
 
@@ -62,8 +67,14 @@ func (c Local) GetMeta(key string, maxStale time.Duration) (LocalMetadata, bool)
 func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 	updated := time.Now()
 	writer, _ := lastWriterFromTags(meta.Tags)
-	newEntry := cacheEntry{
-		V: &cacheValue{
+	createLockedBy := CreateLockerFromTags(meta.Tags)
+	// Allocate the value and metadata together: WriteWithMeta always sets both
+	// at once, and this is the hottest cache-write path (every backend write and
+	// read-through miss). The cache's copy-on-write updates (MarkValueOutated,
+	// SetMeta) replace one pointer with a fresh allocation while the other keeps
+	// this backing struct alive, so sharing it is safe.
+	vm := &cacheValueMeta{
+		v: cacheValue{
 			Value: value,
 			Version: Version{
 				B:      meta.Version,
@@ -71,13 +82,14 @@ func (c Local) WriteWithMeta(key string, value []byte, meta backend.Metadata) {
 			},
 			Updated: updated,
 		},
-		M: &cacheMeta{
-			Meta:    meta,
-			Writer:  writer,
-			Updated: updated,
+		m: cacheMeta{
+			Meta:           meta,
+			Writer:         writer,
+			CreateLockedBy: createLockedBy,
+			Updated:        updated,
 		},
 	}
-	c.cache.Set(key, newEntry)
+	c.cache.Set(key, cacheEntry{V: &vm.v, M: &vm.m})
 }
 
 func (c Local) Write(key string, value []byte, v Version) {
@@ -100,9 +112,10 @@ func (c Local) Write(key string, value []byte, v Version) {
 func (c Local) SetMeta(key string, meta backend.Metadata) {
 	writer, _ := lastWriterFromTags(meta.Tags)
 	newMeta := &cacheMeta{
-		Meta:    meta,
-		Writer:  writer,
-		Updated: time.Now(),
+		Meta:           meta,
+		Writer:         writer,
+		CreateLockedBy: CreateLockerFromTags(meta.Tags),
+		Updated:        time.Now(),
 	}
 
 	c.cache.Update(key, func(v cache.Value) cache.Value {
@@ -181,6 +194,11 @@ type LocalRead struct {
 	Deleted bool
 	// Outdated is true if the value read is certainly outdated.
 	Outdated bool
+	// CreateLockedBy is the transaction holding a create-lock on the object, or
+	// nil if it is not create-locked. A non-nil value means the cached value is
+	// a create-with-value placeholder that may not be committed yet, so the
+	// caller must verify the creator's commit before trusting it.
+	CreateLockedBy data.TxID
 }
 
 // LocalMetadata holds cached metadata along with its freshness status.
@@ -242,6 +260,13 @@ func (c cacheEntry) isValueOutdated() bool {
 	return c.M.Updated.After(c.V.Updated)
 }
 
+// cacheValueMeta backs a cacheEntry whose value and metadata are written
+// together, letting WriteWithMeta allocate both in a single heap object.
+type cacheValueMeta struct {
+	v cacheValue
+	m cacheMeta
+}
+
 type cacheValue struct {
 	Value   []byte
 	Deleted bool
@@ -256,6 +281,11 @@ type cacheMeta struct {
 	Meta backend.Metadata
 	// Writer is the decoded last-writer parsed from Meta.Tags, cached here to
 	// avoid re-parsing on every cache lookup. Nil when the tag is absent.
-	Writer  data.TxID
-	Updated time.Time
+	Writer data.TxID
+	// CreateLockedBy is the decoded create-lock holder parsed from Meta.Tags,
+	// cached here so the read path can tell an uncommitted create-with-value
+	// placeholder from a committed value without re-parsing tags. Nil when the
+	// object is not create-locked.
+	CreateLockedBy data.TxID
+	Updated        time.Time
 }

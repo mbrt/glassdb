@@ -205,3 +205,510 @@ session.
 - Stopped because the safe primary-optimization space for the current workloads
   is exhausted (see "Analyzed but not attempted"); further gains would require
   protocol changes that weaken strict-serializability reasoning.
+
+---
+
+# Session 3 (budget: 25 experiments or 3 hours)
+
+## 1. Baseline - ESTABLISHED
+- Tree/branch: clean working tree on `autoresearch-2` (the working branch for
+  this run; HEAD carries Session 2's kept commits). Baseline taken after a
+  passing full gate (`check.sh --full`: build + `make test` + 120s
+  FuzzConcurrentTx, all green; took ~3.5 min).
+- Baseline primary score (median of 3): **420.87**. Per-workload cost/tx:
+  singleRMW 72.23, multiRMW10 1082.6, batchRead10 313.66, batchWrite100
+  17091.38, readRepeat 31.51.
+- Per-workload backend ops/tx (deterministic): singleRMW 1 objW; multiRMW10
+  ~10 metaW (locks) + ~11 objW (10 write-back + 1 log); batchRead10 10 metaR
+  (per-key read validation); batchWrite100 100 metaR (absence probe) + ~199
+  objW (100 create placeholders + ~99 write-back + log); readRepeat 1 metaR.
+- Secondary (per tx, geomean): allocBytes 20179, allocs 255.6, ns 36285,
+  cpuNs 79269, mutexWait 659.
+- `baseline.json` and `best.json` written (both = 420.87). New experiments must
+  beat `best.json`.
+
+## 2. Blind-write create-first (skip absence probe) - KEPT
+- Hypothesis: `batchWrite100` does ~100 backend metadata reads/tx. Each blind
+  write to a fresh key first attempts a write-lock, whose `fetchLockInfo`
+  GetMetadata only discovers the key is absent before the code falls back to
+  create. For a key that is written-not-read with no cached evidence it exists,
+  going straight to the create path (collection lock + WriteIfNotExists) skips
+  that wasted read. (The `algo.go` "Blind write optimization" TODO.)
+- Change: `internal/trans/algo.go` `lockValidateFoundKey` - for a pure blind
+  write (`Write && !Read && !NotFound`) whose key the local cache does not show
+  present, mark it NotFound and route to the existing create path
+  (needs-collection-lock, then `lockValidateNotFoundKey` -> `lockCreate`). If
+  the key actually exists, `lockCreate`'s WriteIfNotExists fails precondition
+  and falls back to a write-lock, so the guess is self-correcting and never
+  unsafe. New helper `localIndicatesPresent`.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (general fast path, reuses create logic, no
+  test weakening).
+- Primary: 420.87 -> 404.11 (-3.98%).
+- Secondary: allocBytes 20179 -> 19940, allocs 255.6 -> 250.8 (-1.9%), ns ~flat
+  (noisy), cpu ~flat (noisy), mutexWait 659 -> 448. No regressions.
+- Outcome & why: KEPT. `batchWrite100` metaReads dropped 100->0/tx (cost
+  17091->13991, -18%); every other workload unchanged (none do pure blind
+  writes). Confirms the absence probe was pure overhead for inserts. The
+  collection lock is taken for blind writes regardless (create needs it), so the
+  only added cost on the rare "blind write to an uncached existing key" path is
+  one failed WriteIfNotExists, which is acceptable.
+- Commit: b2c586e
+
+## 3. Resolve cache-hit reads inline in ReadMulti - KEPT (secondary)
+- Hypothesis: `ReadMulti` spawns a goroutine per key (via `conc.WaitGroup`)
+  even when the value is already in the local cache - the steady state for
+  `multiRMW10` and `batchRead10`. A cache hit issues no backend op, so the
+  goroutine is pure scheduling overhead. Resolving cached reads inline should
+  cut allocs/CPU/ns/mutex on those two workloads with the primary unchanged
+  (cache hits do no backend ops either way).
+- Change: `internal/trans/reader.go` adds `Reader.ReadCached` (local-only fast
+  path: returns a present, non-empty, non-outdated cached value; ok=false for
+  miss/outdated/deleted/empty so the caller falls back to `Read`). `tx.go`
+  `ReadMulti` calls it inline before spawning, spawning goroutines only for
+  reads that need the backend.
+- Correctness: fast gate pass, full gate pass, judge approved (general cache
+  fast path, matches Read's non-empty cache behavior, no test changes).
+- Primary: 404.11 -> 404.31 (+0.05%, noise; op counts identical).
+- Secondary (fair back-to-back control vs new, medians): ns ~55k -> ~42k
+  (-24%), cpu ~128k -> ~93k (-27%), allocs 251.1 -> 246.9 (-1.7%),
+  allocBytes ~flat-down, mutexWait ~1119 -> ~946 (-15%). No regressions (the
+  448 in the prior best.json was a lucky low reading; the back-to-back control
+  put exp2 at ~1119).
+- Outcome & why: KEPT under the secondary-axis rule. The per-key goroutine on
+  the cache-hit read path was pure overhead. Lesson: like the earlier
+  single-element fanout inline, hot-path fan-out should short-circuit work that
+  is already local.
+- Commit: 5a7cfbc
+
+## 4. Single-locker fast path in applyLockTags - DISCARDED (no effect)
+- Hypothesis: `applyLockTags` runs per lock/unlock op (core, all backends) and
+  builds an intermediate `[]string` + `strings.Join` for the `locked-by` tag.
+  Special-casing the common single-locker case should cut per-lock allocations
+  on lock-heavy workloads (multiRMW10, batchWrite100).
+- Change: `internal/storage/locker.go` - replace the slice+Join with a
+  `joinLockers` helper that returns `tidToTag(lockers[0])` directly for one
+  locker (and "" for none).
+- Correctness: not gated (discarded on measurement; change is a pure encoding
+  refactor with identical output).
+- Primary: 404.31 -> 404.31 (op counts identical).
+- Secondary: allocs/op unchanged (10RMW 125->125, 100W 6899->6899); B/op flat.
+- Outcome & why: DISCARDED. No measurable effect. `strings.Join` already skips
+  allocation for a single-element slice (returns s[0]), and the dominant
+  allocation in `applyLockTags` is the 2-entry `newTags` map, which this change
+  does not touch. Lesson: the lock-path allocation cost is the tag map + the
+  memory backend's defensive `copyTags`, not the locker-id encoding; a real
+  win would need to avoid the per-op map, which the backend API requires.
+
+## 5. Skip dedup map in initValidation for read-only / write-only tx - KEPT (secondary)
+- Hypothesis: `initValidation` always allocates an intermediate
+  `map[string]pathState` to merge reads and writes that touch the same path.
+  But `collectAccesses` already yields each path at most once within reads and
+  within writes, so the merge is only needed when a tx has BOTH reads and
+  writes (the only overlap source). Read-only (batchRead10, readRepeat) and
+  write-only (batchWrite100) transactions can build the `pathState` slice
+  directly and skip the map entirely. Pre-sizing the map in the remaining
+  read+write case (singleRMW, multiRMW10) also avoids growth reallocs.
+- Change: `internal/trans/algo.go` `initValidation` - when `len(reads)==0 ||
+  len(writes)==0`, append directly into a pre-sized slice (no map). Otherwise
+  use the map path but pre-size it to `len(reads)+len(writes)`.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (honest fast path, preserves merge path
+  when both reads and writes present, no test changes).
+- Primary: 404.31 -> 404.06 (-0.06%, noise; op counts identical).
+- Secondary (fair back-to-back control vs new): allocBytes ~19660-20450 ->
+  ~19170-19220 (-4%, consistent), allocs 246-251 -> 245 (-1.5..2.5%), ns/cpu
+  flat-or-better, mutexWait flat. Internal benches confirm: 10RMW B/op
+  10897->9261 (-15%, from map pre-size), 100W B/op 558783->543413 (-2.75%, map
+  skipped). No regressions.
+- Outcome & why: KEPT under the secondary-axis rule. allocBytes is the clearest
+  and most consistent signal; the map was avoidable scheduling/heap overhead on
+  every tx. Lesson: dedup structures are only worth their allocation when a
+  collision can actually occur; bound them by the access pattern.
+- Commit: c6067f8
+
+## 6. Presize commit slices in toLog and collectAccesses - KEPT (secondary)
+- Hypothesis: alloc profiling of batchWrite100 (the biggest allocator) shows
+  `toLog` (41MB flat) and `Tx.collectAccesses` (33MB flat) among the top
+  non-backend allocators. Both build slices via `append` from a source of known
+  length (`writes` and the `staged`/`reads` maps), so a multi-key commit regrows
+  the backing array log2(n) times. Presizing to the exact upper bound replaces
+  that with a single allocation.
+- Change: `internal/trans/algo.go` `toLog` sets
+  `Writes: make([]storage.TxWrite, 0, len(writes))`; `tx.go` `collectAccesses`
+  presizes `reads`/`writes` to `len(t.reads)`/`len(t.staged)` (exact upper bound
+  - each staged/read entry yields at most one access).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (honest preallocation, no test edits). Both
+  are single-threaded per-tx paths, so no concurrency risk; empty non-nil slices
+  behave identically to nil downstream (len-based logic, incl. exp5).
+- Primary: 404.06 -> 404.00 (noise; op counts identical).
+- Secondary: deterministic internal benches: 10RMW B/op 9277->8121 (-12.5%),
+  allocs 122->118; batchWrite100 B/op 543419->519418 (-4.4%), allocs 6876->6862.
+  Autoresearch allocBytes ~3-4% lower across back-to-back pairs; ns/cpu
+  flat-or-better; no regressions.
+- Outcome & why: KEPT under the secondary-axis rule. Cheap, obviously-correct
+  capacity hints on the commit hot path. Lesson: when a slice is built from a
+  collection of known size, presize it - the regrowth copies dominate bytes even
+  when they barely move the allocation count.
+- Commit: f534ed8
+
+## 7. Co-allocate value and metadata in WriteWithMeta - KEPT (secondary)
+- Hypothesis: `storage.Local.WriteWithMeta` is the 2nd-largest non-backend
+  allocator in the profile (81MB flat) and runs on every backend write and
+  read-through miss. It allocates the `cacheValue` and `cacheMeta` as two
+  separate heap objects (`&cacheValue{}`, `&cacheMeta{}`). Since both are always
+  written together here, backing them with a single heap object halves the
+  allocation count on this path.
+- Change: `internal/storage/local.go` adds an unexported `cacheValueMeta{v,m}`
+  struct; `WriteWithMeta` allocates one `&cacheValueMeta` and points the entry's
+  `V`/`M` at its fields. The cache's copy-on-write updates (`MarkValueOutated`,
+  `SetMeta`) replace one pointer with a fresh allocation while the other keeps
+  the shared backing struct alive, so no aliasing hazard is introduced.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (hot-path co-allocation, no test edits).
+- Primary: 404.00 -> 403.71 (noise; op counts identical).
+- Secondary: deterministic internal bench batchWrite100 allocs 6862 -> 6661
+  (-201/tx, -2.9%), singleRMW 39 -> 38; B/op flat everywhere. Autoresearch
+  allocsPerTx ~249 -> ~242-246 (consistent across back-to-back pairs),
+  allocBytes flat-or-lower, ns/cpu flat-or-better. No regressions.
+- Outcome & why: KEPT under the secondary-axis rule. This is the first change to
+  move the allocation *count* (vs bytes), because it removes a whole object per
+  cache   write rather than just right-sizing one. Lesson: when two values share a
+  lifetime and are always set together, co-allocate them.
+- Commit: feade9f
+
+## 8. Presize res.Writes/res.Locks in TLogger.Get - DISCARDED (below aggregate noise)
+- Hypothesis: `TLogger.Get` (61MB flat in the profile) decodes a committed log
+  and builds `res.Writes`/`res.Locks` via `append` without presizing; a
+  multi-key transaction reads its whole log back on the writeback path, so a
+  100-write log regrows the slice ~7 times. Presizing (count entries in a cheap
+  first pass over the decoded collections) should cut allocBytes on batchWrite.
+- Change: `internal/storage/tlogger.go` `Get` - sum `len(cw.GetWrites())` and
+  lock counts first, then `make([]TxWrite,0,n)` / `make([]PathLock,0,m)`.
+- Correctness: not fully gated (discarded on measurement); change is a pure
+  capacity hint with identical output.
+- Primary: 404.00 -> ~404 (op counts identical).
+- Secondary: deterministic internal bench confirms the win - batchWrite100 B/op
+  519411 -> 500756 (-3.6%), allocs 6661 -> 6647; all other workloads and op
+  counts flat. BUT the harness's reported secondary is a geomean across 5
+  workloads, and only batchWrite benefits, so the aggregate allocBytesPerTx moves
+  only ~0.7% - below the run-to-run noise band (~+/-3-4%). Back-to-back
+  count-3 pairs overlapped (exp8 18495/19204 vs ctrl 18623/18624).
+- Outcome & why: DISCARDED. The change is real and strictly safe (less memory,
+  identical behavior), but the acceptance rule requires a secondary axis to
+  *clearly* improve in the reported metric, and a single-workload byte win is
+  diluted below noise by the geomean. Contrast exp6, which also improved 10RMW
+  and so showed a detectable aggregate move. Lesson: to clear the secondary bar,
+  a change must help a workload whose metric carries enough geomean weight, or
+  help several workloads at once - an isolated batchWrite-only byte win will not
+  register.
+
+## 9. Skip cache write in read-only commit validation - KEPT (secondary)
+- Hypothesis: on the read-only commit path, `validateRead`/`validateReadNotFound`
+  fetch the freshest metadata via `Global.GetMetadata`, which also calls
+  `Local.SetMeta` to populate the cache. But that cached metadata is never
+  reused - the next validation always re-reads fresh from the backend - so the
+  SetMeta write is pure overhead: it allocates a cacheMeta + copies the cache
+  entry, and (worse) takes the cache shard mutex from each of the parallel
+  per-key validation goroutines. Skipping it should cut allocs and, because it
+  removes shard-lock contention, ns/cpu on batchRead10 and readRepeat.
+- Change: `internal/storage/global.go` adds `GetMetadataUncached` (backend
+  GetMetadata with no SetMeta); `internal/trans/algo.go` `validateRead` and
+  `validateReadNotFound` use it. No backend op changes (GetMetadata already
+  always hits the backend here), so the primary is unaffected; the cached value
+  stays consistent (its writer is unchanged, so reads still hit cache).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (still reads backend metadata, just skips
+  cache population; no test edits). Safe under concurrency: the cache is only a
+  perf hint and staleness is always caught by fresh validation reads and
+  conditional lock writes.
+- Primary: 404.06 -> 403.79 (noise; op counts identical).
+- Secondary (back-to-back x3): allocsPerTx ~241-246 -> ~221-225 (-8.5%,
+  consistent), nsPerTx ~32-36k -> ~24-31k (-20%+), cpuNsPerTx ~69-74k -> ~49-66k
+  (-20%+), allocBytes flat-or-lower, mutexWait flat. No regressions.
+- Outcome & why: KEPT - the strongest secondary win of the session. The lesson:
+  a "free" cache write on a hot parallel path is not free - the allocation is
+  minor next to the shard-mutex contention it creates across fan-out goroutines.
+  Validation should read, not write.
+
+- Commit: 50e480c
+
+## 10. Skip per-tx logger clone when logging is off - KEPT (secondary)
+- Hypothesis: alloc profiling shows `slog.Logger.clone` and `argsToAttrSlice`
+  among the per-tx allocators. `Algo.Begin` (and `Rebegin`) do
+  `t.log.With("tx", txLog(tid))` for every transaction, cloning the logger and
+  formatting the id - even when the logger discards everything (the bench uses a
+  nil handler; production typically runs at Info+). All tx logs in this package
+  are Debug or Error level, so "a log will actually fire" is exactly
+  `Enabled(LevelError)`; gate the clone on that.
+- Change: `internal/trans/algo.go` adds `handleLog(ctx, tid)` returning the base
+  logger when `!t.log.Enabled(ctx, slog.LevelError)`, else the `With`-tagged
+  clone; `Begin`/`Rebegin` use it (Rebegin now uses its ctx).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (legitimate gating, no test edits). Behavior
+  is identical whenever any log fires (Enabled(LevelError) true => clone as
+  before); the only change is skipping work when nothing would be logged.
+- Primary: 403.79 -> 404.04 (noise; op counts identical).
+- Secondary (back-to-back x3): allocsPerTx ~220-225 -> ~209-211 (-5%,
+  consistent), allocBytes ~17.9-18.6k -> ~17.6k (-2..5%), ns/cpu flat-or-lower.
+  No regressions.
+- Outcome & why: KEPT. Hits every workload, so even a few allocs/tx compound in
+  the geomean (the low-alloc workloads readRepeat/singleRMW gain the most
+  percentage). Lesson: eager per-tx structured-logging setup is a real cost on
+  short transactions; make it pay-for-what-you-log.
+- Commit: 05d7884
+
+## 11. Skip errgroup SetLimit when fan-out fits the limit - DISCARDED (below noise)
+- Hypothesis: `concurr.Fanout.Spawn` always calls `errgroup.SetLimit(o.limit)`,
+  which allocates a semaphore channel. The limit (algoConcurrency=10) only binds
+  when there are more tasks than the limit; the common fan-outs (validate/lock
+  <=10 keys, e.g. multiRMW10, batchRead10) have num<=limit, so the channel is
+  allocated but never used. Skip SetLimit when `num <= o.limit`.
+- Change: `internal/concurr/fanout.go` `Spawn` - guard `g.SetLimit` with
+  `if num > o.limit`.
+- Correctness: not fully gated (discarded on measurement); behavior is identical
+  for num<=limit (the limit never binds, all tasks run immediately either way).
+- Primary: flat (op counts identical).
+- Secondary (back-to-back x3): allocsPerTx consistently ~1/tx lower (~209.3-210.0
+  vs 210.6-215.1) and allocBytes ~0.4% lower, but the magnitude is tiny and
+  ns/cpu ran flat-to-slightly-higher than the control's best runs (within noise).
+- Outcome & why: DISCARDED. The saved semaphore channel (cap-10 of struct{}) is
+  a single small allocation per fan-out, diluted to ~1 alloc/tx in the geomean -
+  below the secondary noise band, and with no ns/cpu benefit to corroborate it.
+  A real but immeasurable micro-win does not clear the "clearly improves" bar.
+  Lesson: errgroup's per-call setup (cancel ctx + optional semaphore) is small
+  relative to the fan-out's actual work; shaving one channel is not enough to
+  register.
+
+## 12. Intrusive LRU cache (drop container/list) - KEPT
+- Hypothesis: the cache shard backs its LRU with `container/list`, which (a)
+  allocates a `list.Element` per insert and (b) boxes the `entry{key,value}`
+  struct into the element's `any` field on every `update` - including updates
+  to keys that already exist. Existing-key updates happen on every transaction
+  (lock SetMeta + value write-back per key), so this boxing is a per-tx,
+  per-key allocation that buys nothing. An intrusive doubly-linked list whose
+  nodes hold key/value/prev/next directly removes both: inserts allocate one
+  node, and in-place updates allocate nothing.
+- Change: rewrote `internal/cache/cache.go`'s `cacheShard` to use a sentinel
+  circular doubly-linked list of `*node` (key, value, prev, next) plus the
+  existing `map[string]*node`. Public API (`Cache`, `New`, `Get/Set/Update/
+  Delete/SizeB`), `newShard`, shard method signatures, and eviction semantics
+  (never evict the MRU entry; bounded overshoot) are all unchanged. No test
+  edits: the existing `cache_test.go` shard-level tests cover get/set/update/
+  delete/eviction and all pass under -race.
+- Correctness: fast gate PASS (incl. FuzzConcurrentTx), judge APPROVED, full
+  gate PASS (make test + 2m fuzz).
+- Primary: 404.36 -> 403.7 (flat, within noise; op counts unchanged).
+- Secondary (same-machine, back-to-back, count=5): allocs/tx geomean
+  210.6 -> 203.5 (-3.4%); allocBytes/tx 17610 -> 17368 (-1.4%). Per-workload
+  allocs/tx: multiRMW 721.6 -> 689.4 (-32), batchWrite 6760.4 -> 6461.2 (-299),
+  singleRMW 36.2 -> 34.1 (-2.1), readRepeat 20.9 -> 20.5; batchRead flat (reads
+  are gets, no update). ns/cpu/mutexWait within noise (mixed small deltas).
+- Outcome & why: KEPT. Primary flat with a clear, deterministic allocation
+  reduction on every write-touching workload and no regression on the others -
+  this is the acceptance case "primary within noise AND a secondary axis
+  clearly improves without regressing the rest". The win is broad because the
+  eliminated interface-boxing happens on the common existing-key update path,
+  not just inserts. Lesson: `container/list` is convenient but its `any`-typed
+  element value forces a heap box for any multi-word entry on every mutation;
+  an intrusive list is the idiomatic fix for hot LRU paths.
+- Commit: 910b401
+
+## 13. Encode storage-path base64 into the buffer - KEPT
+- Hypothesis: `paths.encode` (under FromKey/FromCollection/FromTransaction)
+  built every storage path by calling `encoding.EncodeToString(a)` - which
+  allocates a fresh base64 string - and then immediately copied that string
+  into the pooled `bytes.Buffer` and threw it away. An alloc_objects profile of
+  singleRMW showed `base64.EncodeToString` + `bytes.Buffer.String` together at
+  ~43% of all allocations. This is the single hottest universal path: every
+  key/collection/tx path is built here, so every read, write, and commit pays
+  it. Encoding directly into the buffer's spare capacity should remove one
+  allocation per encoded path across all workloads.
+- Change: in `internal/data/paths/paths.go`, replace
+  `buf.WriteString(encoding.EncodeToString(a))` with
+  `dst := buf.AvailableBuffer(); dst = encoding.AppendEncode(dst, a); buf.Write(dst)`.
+  Output is byte-for-byte identical (same encoding, same layout); only the
+  intermediate allocation is removed.
+- Correctness: fast gate PASS (incl. FuzzConcurrentTx), judge APPROVED, full
+  gate PASS (make test + 2m fuzz). Encode/decode round-trip is exercised
+  end-to-end by the storage/trans tests and the fuzzer.
+- Primary: ~404 -> ~404 (flat, within noise; paths are unchanged).
+- Secondary: measured on the stable internal benches (3000x, deterministic
+  allocs/op): singleRMW 33 -> 31 allocs/op (-2, -6%), batchWrite100
+  6356 -> 6253 allocs/op (-103, -1.6%); bytes/op also lower on both
+  (2670 -> 2657, 509711 -> 508573). Harness allocs geomean ~203 -> ~198.
+- Outcome & why: KEPT. Primary flat with a clear, deterministic allocation-
+  count reduction on every encoded path, helping even the smallest workloads
+  (which dominate the geomean). NOTE on methodology: the harness's MemStats
+  allocBytes geomean is noisy (+/-4% run-to-run for identical code) and on one
+  count=5 run appeared to rise; the deterministic testing.B per-op numbers
+  (bytes down on both representative workloads) are the reliable signal and
+  show no regression. Lesson: when a secondary axis looks like it regressed,
+  cross-check against the deterministic per-op benchmark before trusting the
+  harness's MemStats deltas. Also: EncodeToString-then-copy is a common
+  hidden allocation; AppendEncode into spare capacity is the idiomatic fix.
+- Commit: fff599b
+
+## 14. Replace grouping map with slice in commit-log marshalling - DISCARDED (flat)
+- Hypothesis: `marshalLog` allocates a `map[string]*pb.CollectionWrites` on every
+  commit to group writes/locks by collection prefix. Since every benchmark
+  workload touches a single collection, the map holds one entry; a small slice
+  with linear find-or-create should be cheaper than a per-commit map allocation
+  and shave ~1 alloc/tx universally on the commit path.
+- Change: `internal/storage/tlogger.go` - introduce a `collWrites` slice type
+  with `forPrefix` find-or-create; `marshalWrite`/`marshalLock` take `*collWrites`
+  instead of the map; `tr.Writes` is assigned the slice directly.
+- Correctness: build + storage unit tests (incl. tx-log round-trip) PASS;
+  discarded on measurement, so full gate not run.
+- Primary: flat (op counts identical).
+- Secondary (stable internal benches, 3000x): singleRMW 31 -> 31 allocs/op,
+  2655 -> 2655 B/op; batchWrite100 6252 -> 6252 allocs/op; 10RMW 105 -> 105
+  allocs/op. Completely flat.
+- Outcome & why: DISCARDED. Trading a one-entry map for a one-element slice
+  nets the same allocation count (both allocate a backing structure), and there
+  is no other effect since proto.Marshal is unchanged. No measurable win, so
+  not worth the added indirection. Lesson: a small map and a small slice cost
+  about the same single allocation; swapping containers only helps when it
+  removes an allocation outright (it did not here).
+
+## 15. create-with-value: write inserts into the create placeholder - KEPT
+- Hypothesis: inserts cost two object writes per key - an empty create-lock
+  placeholder (WriteIfNotExists, 70) plus a value write-back at commit (70). If
+  the value is written straight into the placeholder at create time, committing
+  the create only needs to clear the create-lock tag (a metaWrite, 31). That
+  replaces ~one objWrite per inserted key with a metaWrite (-39 each), ~-28% on
+  batchWrite100 and ~-6% on the primary. This is the lever deferred all of
+  session 4; the user asked to implement it past the deadline.
+- Change (8 files, the most serializability-critical paths): the write value
+  flows from `initValidation`'s `pathState.Val` into `locker.LockCreate` via a
+  new `LockRequest.Value`, through `ComputeLockUpdate` into `applyLockTags`,
+  which now `WriteIfNotExists(value)` for creates and, when finalizing a
+  committed create (`PrevType == Create`), does `SetTagsIf` (untag) instead of a
+  value write-back. The placeholder value is immutable until commit and equals
+  the committed value by construction, so the creator and any tx finishing a
+  wounded/crashed creator both finalize by untagging; an aborted create is still
+  `DeleteIf`'d by `handleLockDeletion` (unchanged). Read path made safe for
+  non-empty placeholders: the create-locker is parsed once from tags, cached in
+  `cacheMeta.CreateLockedBy`, surfaced through `LocalRead`/`GlobalRead`;
+  `handleLockCreate` now verifies the creator's commit for any create-locked
+  value (not just empty), and `ReadCached` rejects create-locked entries so the
+  fast path never returns uncommitted data. A non-create-locked value is always
+  committed (value+tag written atomically; commit only clears the tag), so the
+  common read stays a single cheap tag check with no extra backend op - and the
+  old empty-value `GetMetadata` probe is removed.
+- Correctness: fast gate PASS; judge APPROVED; full gate PASS. Extra 6-minute
+  `FuzzConcurrentTx` run (~1.8M execs, 96 new coverage paths in the new code, no
+  violations) plus the full gate's `make test` (-count=10 root + trans tests,
+  race) and 120s fuzz. Key safety argument: if the wound-takeover-then-abort
+  interleaving could leave a phantom, it would surface a value no committed tx
+  wrote - exactly what the serializability fuzzer checks - and it did not, here
+  or in the 1383-case corpus (which the old empty-placeholder scheme also never
+  tripped).
+- Primary: 403.99 -> 377.87 (-6.5%).
+- Secondary: allocsPerTx 198.2 -> 196.0, allocBytesPerTx 18004 -> 17730, nsPerTx
+  28597 -> 28386, cpuNsPerTx 62203 -> 60497; mutexWaitNsPerTx 569 -> 805 (small
+  and noisy on batchWrite100; the dominant cost is backend ops, which dropped).
+  No regressions on any workload (only batchWrite100's body inserts, so the
+  others are flat: batchWrite100 costPerTx 13991 -> 10169, -27%).
+- Outcome & why: KEPT - the largest primary win of the whole effort and exactly
+  the structural change deferred in session 4. The breadth fear was justified
+  (8 interlocking files across commit, read, and recovery), but the safety
+  argument held: the create-lock tag is the single source of truth for "value
+  not yet committed", it is written atomically with the value and only cleared
+  on commit, so surfacing it inline on the read path keeps the protocol's
+  invariant intact with zero extra backend ops on the hot read path. Lesson: a
+  multi-file commit+read+recovery change is tractable when one invariant
+  (atomic value+lock-tag, cleared only on commit) anchors every path, and an
+  extended fuzz budget is what makes keeping it defensible.
+- Commit: b1fd449
+
+## Primary-score wins considered but deferred (risk-bounded)
+- RESOLVED in exp15 (session 5): the create-with-value change below was
+  implemented and kept (-6.5% primary). The analysis that follows is the
+  pre-implementation reasoning, left for the record.
+- batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
+  an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
+  Writing the value directly into the create placeholder would replace the
+  write-back objWrite (70) with a cheap untag metaWrite (31), ~-28% on the
+  workload (~-6% primary). It is NOT safe under the current read protocol:
+  `Reader.handleLockCreate` treats any non-empty value as committed and only
+  probes the create lock for empty values, so a non-empty placeholder would let
+  a concurrent reader return uncommitted data. Making it safe requires surfacing
+  tags from `Global.Read` and changing the read path to detect create-locks by
+  tag for every read - a core-protocol change whose serializability cannot be
+  validated within one experiment slot. Deferred as too risky for the budget.
+  Session-4 update: confirmed `Global.Read` already receives the object tags
+  for free (the backend Read/ReadIfModified reply carries `Tags`, written to
+  the local cache via `WriteWithMeta`), so the read could detect a create-lock
+  inline with no extra backend op - either by surfacing lock state through
+  GlobalRead/LocalRead or by a follow-up `local.GetMeta` cache hit. The real
+  blocker is not the enabler but the breadth: the value must be threaded into
+  `locker.LockCreate` from `h.data.Writes` through the validation/lock path,
+  the creator's commit must untag (metaWrite) while recovery still writes back
+  from the log, and the read path's create-lock detection must stay correct
+  under stale cache + wound-wait recovery. That is ~5-6 interlocking changes in
+  the most serializability-critical code; a subtle visibility bug could pass a
+  2-minute fuzz. Best done as a dedicated session with an extended fuzz budget.
+- Read-set validation (batchRead10: 10 metaReads/tx; readRepeat: 1/tx) and the
+  RMW write protocol (1 lock metaWrite + 1 write-back objWrite per key) are at
+  the OCC protocol's theoretical minimum; List-based batch validation was
+  rejected earlier on object-store list-consistency grounds. No safe primary win
+  found here beyond exp2's metaRead elimination.
+
+## Session summary (session 4)
+- Experiments this session: 13 (exp2-exp14). Kept: 9 (exp2, 3, 5, 6, 7, 9, 10,
+  12, 13). Discarded: 4 (exp4, 8, 11, 14). No experiment ever failed a
+  correctness gate or the judge; discards were measurement decisions (no win or
+  below noise) and reverted to a clean tree, log preserved.
+- Primary score: 420.87 (baseline) -> 403.99 (best) = -4.01%. The whole primary
+  gain came from exp2 (blind-write create-first: drop the absence-probe metaRead
+  on bulk inserts); all later keeps held the primary flat while improving the
+  secondary axes.
+- Secondary (geomean over the suite), baseline -> best:
+  allocBytesPerTx 20179 -> 18004 (-10.8%), allocsPerTx 255.6 -> 198.2 (-22.5%),
+  nsPerTx 36285 -> 28597 (-21.2%), cpuNsPerTx 79269 -> 62203 (-21.5%),
+  mutexWaitNsPerTx 659 -> 569 (-13.7%).
+- Where the secondary wins came from: removing per-tx/per-op scheduling and
+  allocation overhead - inline cache-hit reads (exp3), skip the dedup map for
+  read-only/write-only validation (exp5), presize commit slices (exp6),
+  co-allocate cached value+meta (exp7), skip the cache write on read-only
+  validation (exp9, the biggest ns/cpu win), skip the per-tx logger clone when
+  logging is off (exp10), an intrusive LRU cache that removes per-write
+  interface boxing (exp12), and encoding storage-path base64 directly into the
+  buffer (exp13, a universal ~2 allocs/path cut).
+- State at stop: clean working tree; best.json reflects exp13; all keeps are on
+  the autoresearch-2 branch as code+log commit pairs.
+- Stopping point: concluded a few minutes before the 3h ceiling. The safe,
+  confidently-measurable optimization space for the fixed suite was swept end to
+  end with allocation profiles (path encoding, cache, commit-log marshalling, tx
+  staging, lock path, dedup, stats wrapper); the remaining allocations are
+  interface-mandated (`backend.Tags` maps), need unsafe object pooling (Tx,
+  dedup call, single-element TxID slices), live only in the in-memory test
+  backend (optimizing it would not reflect GCS/S3 and risks gaming the metric),
+  or sit behind the deferred create-with-value protocol change. The single
+  biggest remaining lever is that primary win (see deferred section): ~-6%
+  primary on the suite, but it is a multi-file commit+read+recovery change that
+  needs a dedicated session and an extended fuzz budget to validate safely.
+
+## Session summary (session 5)
+- Single follow-up experiment (exp15), at the user's request, to implement the
+  create-with-value primary lever that session 4 deferred. KEPT.
+- Primary score: 403.99 (session-4 best) -> 377.87 = -6.5%, the largest single
+  improvement of the whole effort and now the session-best. Cumulative from the
+  original baseline: 420.87 -> 377.87 = -10.2%.
+- The win is entirely on batchWrite100 (the only workload whose measured body
+  inserts keys): costPerTx 13991 -> 10169 (-27%) by turning ~98 per-tx value
+  write-backs (objWrite 70) into create-lock untags (metaWrite 31). All other
+  workloads are flat; secondary axes flat-to-better (mutexWait the only small,
+  noisy uptick).
+- How it was made safe: the create-lock tag is the single source of truth for
+  "this value is not committed yet"; it is written atomically with the value and
+  cleared only at commit. Surfacing that tag inline on the read path
+  (cacheMeta.CreateLockedBy -> Local/GlobalRead -> handleLockCreate/ReadCached)
+  lets every read tell an uncommitted placeholder from a committed value with a
+  single cheap tag check and no extra backend op. Validated with a 6-minute
+  FuzzConcurrentTx run on top of the full gate.
+- State at stop: clean tree; best.json reflects exp15 (377.87); change committed
+  on autoresearch-2 as b1fd449 (code) + the log commit. Stopping here as
+  instructed (past the original deadline, single requested experiment done).

@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Accepted. The change-size and test-editing policy described under "Test-integrity
+judge" was later loosened by [ADR-009](009-autoresearch-bigger-changes.md): the
+loop may now make large, multi-file changes and freely edit the unit tests in
+subpackages, while only the autoresearch infrastructure and the repo-root
+verification tests stay frozen.
 
 ## Context
 

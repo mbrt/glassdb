@@ -15,13 +15,17 @@ You program the loop by editing `program.md`, not by touching the database code.
 |------|------|------------------------|
 | [`program.md`](program.md) | The instructions the agent follows (the "brain") | No - the human edits this |
 | [`bench/`](bench) | Scoring harness; defines the primary + secondary metrics | No (off-limits) |
-| [`check.sh`](check.sh) | Correctness gate (race tests + serializability fuzzers) | No (off-limits) |
-| [`evaluate.sh`](evaluate.sh) + [`evaluator.md`](evaluator.md) | Read-only judge sub-agent enforcing test integrity | No (off-limits) |
-| `log.md` | The running experiment log (the "morning log") | Yes - appended each experiment |
+| [`check.sh`](check.sh) | Correctness gate (race tests + serializability fuzzer) | No (off-limits) |
+| [`evaluate.sh`](evaluate.sh) + [`evaluator.md`](evaluator.md) | Read-only judge sub-agent enforcing the off-limits set | No (off-limits) |
+| Repo-root `*_test.go` (`fuzz_test.go`, `glassdb_test.go`, `bench_test.go`, `version_test.go`) | Integration / verification tests; the correctness contract | No (off-limits) |
+| `log.md` | The running experiment log (the "morning log") | Yes - appended every experiment (kept or discarded) |
 | `baseline.json`, `best.json` | Baseline and best-kept scores (gitignored) | Yes - bookkeeping |
 
 The implementation files (`db.go`, `tx.go`, `internal/**`, `backend/**`, ...)
-are what the agent actually optimizes.
+are what the agent actually optimizes; changes may be large and span multiple
+files. The agent may also rewrite the **unit tests** that live alongside that
+code (under `internal/**` and `backend/**`) to match. Only the repo-root
+verification tests and the infrastructure above are frozen.
 
 ## The metric
 
@@ -39,7 +43,10 @@ go run ./hack/autoresearch/bench                  # human-readable table
 ## Correctness
 
 Every experiment must pass the gate before it can be kept; this is what protects
-strict serializability.
+strict serializability. The gate runs the frozen repo-root tests and the
+`FuzzConcurrentTx` serializability fuzzer (plus `make test`, which also runs the
+agent-editable unit tests), so the correctness contract holds even when the
+implementation and its unit tests change substantially.
 
 ```bash
 hack/autoresearch/check.sh          # fast: build + race tests + bounded fuzz
@@ -64,8 +71,9 @@ cursor-agent --force
 Then prompt:
 
 ```
-Have a look at hack/autoresearch/program.md and let's kick off a new experiment.
-Do the setup first, then start the loop.
+Follow hack/autoresearch/program.md exactly. Do the setup, then run the full experiment budget:
+25 experiments or 3 hours, whichever comes first, and do not stop early.
+Keep only improvements; log every experiment.
 ```
 
 ### Headless / unattended
@@ -73,9 +81,9 @@ Do the setup first, then start the loop.
 ```bash
 cd glassdb
 cursor-agent -p --force \
-  "Follow hack/autoresearch/program.md exactly. Do the setup, then run experiments
-   in a loop until you have completed 25 experiments or 3 hours have passed.
-   Keep only improvements; log every experiment."
+  "Follow hack/autoresearch/program.md exactly. Do the setup, then run the full experiment budget:
+  25 experiments or 3 hours, whichever comes first, and do not stop early.
+  Keep only improvements; log every experiment."
 ```
 
 Resume a previous session to keep going:

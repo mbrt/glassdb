@@ -111,8 +111,21 @@ func (t Algo) Begin(ctx context.Context, d Data) *Handle {
 		id:     tid,
 		data:   d,
 		status: statusNew,
-		log:    t.log.With("tx", txLog(tid)),
+		log:    t.handleLog(ctx, tid),
 	}
+}
+
+// handleLog returns a logger tagged with the transaction id. The per-tx With
+// clone and id formatting are only worth paying for when the logger would emit
+// something; all of this package's tx logs are at Debug or Error level, so
+// "any log will fire" is exactly Enabled(LevelError). When logging is off (the
+// common production and benchmark case) reuse the base logger and skip the
+// per-transaction allocation entirely.
+func (t Algo) handleLog(ctx context.Context, tid data.TxID) *slog.Logger {
+	if !t.log.Enabled(ctx, slog.LevelError) {
+		return t.log
+	}
+	return t.log.With("tx", txLog(tid))
 }
 
 // Commit validates all reads and applies all writes for the transaction,
@@ -222,13 +235,13 @@ func (t Algo) Reset(tx *Handle, data Data) {
 // the original priority (timestamp) so it is not starved, but with a new ID so
 // it gets a distinct transaction log. The locks of the old attempt are not
 // carried over; callers should release them separately.
-func (t Algo) Rebegin(_ context.Context, old *Handle, d Data) *Handle {
+func (t Algo) Rebegin(ctx context.Context, old *Handle, d Data) *Handle {
 	tid := t.txIDs.Renew(old.id)
 	return &Handle{
 		id:     tid,
 		data:   d,
 		status: statusNew,
-		log:    t.log.With("tx", txLog(tid)),
+		log:    t.handleLog(ctx, tid),
 	}
 }
 
@@ -378,8 +391,10 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 // validateRead validates that the item is still consistent with the read we
 // did earlier, without holding any lock on it.
 func (t Algo) validateRead(ctx context.Context, item *pathState) error {
-	// We need the freshest possible meta, because we don't have a lock.
-	meta, err := t.global.GetMetadata(ctx, item.Path)
+	// We need the freshest possible meta, because we don't have a lock. This is
+	// a one-shot version check on the read-only commit path; the result is not
+	// reused, so read straight from the backend without populating the cache.
+	meta, err := t.global.GetMetadataUncached(ctx, item.Path)
 	if err != nil {
 		if errors.Is(err, backend.ErrNotFound) {
 			// The item is not there anymore. Retry.
@@ -505,8 +520,9 @@ func (t Algo) validateLockedRead(
 }
 
 func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
-	// We need the freshest possible meta, because we don't have a lock.
-	meta, err := t.global.GetMetadata(ctx, item.Path)
+	// We need the freshest possible meta, because we don't have a lock. One-shot
+	// version check on the read-only commit path; do not populate the cache.
+	meta, err := t.global.GetMetadataUncached(ctx, item.Path)
 	if err != nil {
 		if errors.Is(err, backend.ErrNotFound) {
 			// All good here, the item is still not found now.
@@ -761,6 +777,23 @@ func (t Algo) lockValidateKey(ctx context.Context, item *pathState, tx *Handle) 
 }
 
 func (t Algo) lockValidateFoundKey(ctx context.Context, item *pathState, tx *Handle) error {
+	// Blind-write optimization: a key that is written but never read, with no
+	// cached evidence that it exists, is most likely a fresh insert. Probing it
+	// with a write-lock first only to discover the key is absent costs a wasted
+	// backend metadata read per key (the dominant cost of bulk inserts). Route
+	// such keys straight to the create path instead: acquire the collection
+	// lock and attempt WriteIfNotExists. If the key turns out to exist after
+	// all, lockValidateNotFoundKey falls back to a normal write-lock, so the
+	// guess is self-correcting and never unsafe.
+	if item.Write && !item.Read && !item.NotFound && !t.localIndicatesPresent(item.Path) {
+		item.NotFound = true
+		if t.isKeyCollectionLocked(item.Path, storage.LockTypeWrite, tx) {
+			return t.lockValidateNotFoundKey(ctx, item, tx)
+		}
+		item.Result = vResultNeedsCLock
+		return nil
+	}
+
 	// First thing, lock.
 	var err error
 	if item.Write {
@@ -808,12 +841,26 @@ func (t Algo) lockValidateFoundKey(ctx context.Context, item *pathState, tx *Han
 	return nil
 }
 
+// localIndicatesPresent reports whether the local cache holds positive evidence
+// that the key exists (a non-deleted value or non-null metadata). A false
+// result means "unknown" - the key may or may not exist - which the blind-write
+// optimization treats as a likely fresh insert.
+func (t Algo) localIndicatesPresent(path string) bool {
+	if lr, ok := t.local.Read(path, storage.MaxStaleness); ok && !lr.Deleted {
+		return true
+	}
+	if lm, ok := t.local.GetMeta(path, storage.MaxStaleness); ok && !lm.M.Version.IsNull() {
+		return true
+	}
+	return false
+}
+
 func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *Handle) error {
 	if item.Read && item.Write {
 		// The item was read, not found and written to. We need to lock it
 		// in write and check that it's still not found afterwards.
 		// Lock create will do exactly that.
-		err := t.lockCreate(ctx, item.Path, tx)
+		err := t.lockCreate(ctx, item.Path, item.Val, tx)
 		if err != nil {
 			if errors.Is(err, backend.ErrPrecondition) {
 				// The item is there now, so the read is stale.
@@ -858,7 +905,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 	if item.Write {
 		// The item was written to, not read and it turned out to be not
 		// found while locking it. We need to lock-create it.
-		err := t.lockCreate(ctx, item.Path, tx)
+		err := t.lockCreate(ctx, item.Path, item.Val, tx)
 		if err == nil {
 			// All good.
 			item.Result = vResultOK
@@ -893,7 +940,9 @@ func (t Algo) lockPath(
 	case storage.LockTypeWrite:
 		err = t.lockWrite(ctx, path, tx)
 	case storage.LockTypeCreate:
-		err = t.lockCreate(ctx, path, tx)
+		// Only collection locks flow through lockPath, and those are never
+		// create locks, so there is no value to write here.
+		err = t.lockCreate(ctx, path, nil, tx)
 	default:
 		return fmt.Errorf("unsupported lock type %v", lt)
 	}
@@ -935,12 +984,13 @@ func (t Algo) lockWrite(
 func (t Algo) lockCreate(
 	ctx context.Context,
 	key string,
+	value []byte,
 	tx *Handle,
 ) error {
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-create", func() {
-		err = t.locker.LockCreate(ctx, key, tx.id)
+		err = t.locker.LockCreate(ctx, key, tx.id, storage.TValue{Value: value})
 	})
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate END", pathAttr(key), errAttr(err))
 	return err
@@ -1222,6 +1272,10 @@ type pathState struct {
 	Delete      bool
 	ReadVersion storage.Version
 	Result      vResult
+	// Val is the value to write for a written path. It is carried here so that
+	// a fresh insert can write it straight into the create placeholder
+	// (create-with-value).
+	Val []byte
 }
 
 func (p pathState) AccessType() accessType {
@@ -1258,26 +1312,55 @@ func (p pathState) NeedsLocks() ([]storage.PathLock, error) {
 }
 
 func initValidation(h *Handle) *validationState {
-	m := map[string]pathState{}
-	for _, r := range h.data.Reads {
-		i := m[r.Path]
-		i.Path = r.Path
-		i.Read = true
-		i.ReadVersion = r.Version.ToStorageVersion()
-		i.NotFound = !r.Found
-		m[r.Path] = i
-	}
-	for _, w := range h.data.Writes {
-		i := m[w.Path]
-		i.Path = w.Path
-		i.Write = true
-		i.Delete = w.Delete
-		m[w.Path] = i
-	}
+	reads := h.data.Reads
+	writes := h.data.Writes
 
-	res := make([]pathState, 0, len(m))
-	for _, v := range m {
-		res = append(res, v)
+	var res []pathState
+	if len(reads) == 0 || len(writes) == 0 {
+		// A path cannot be both read and written here, so no per-path merge is
+		// needed: collectAccesses yields each path at most once within reads and
+		// within writes. Build the slice directly and skip the map allocation.
+		// This is the common case for read-only and blind-write transactions.
+		res = make([]pathState, 0, len(reads)+len(writes))
+		for _, r := range reads {
+			res = append(res, pathState{
+				Path:        r.Path,
+				Read:        true,
+				ReadVersion: r.Version.ToStorageVersion(),
+				NotFound:    !r.Found,
+			})
+		}
+		for _, w := range writes {
+			res = append(res, pathState{
+				Path:   w.Path,
+				Write:  true,
+				Delete: w.Delete,
+				Val:    w.Val,
+			})
+		}
+	} else {
+		m := make(map[string]pathState, len(reads)+len(writes))
+		for _, r := range reads {
+			i := m[r.Path]
+			i.Path = r.Path
+			i.Read = true
+			i.ReadVersion = r.Version.ToStorageVersion()
+			i.NotFound = !r.Found
+			m[r.Path] = i
+		}
+		for _, w := range writes {
+			i := m[w.Path]
+			i.Path = w.Path
+			i.Write = true
+			i.Delete = w.Delete
+			i.Val = w.Val
+			m[w.Path] = i
+		}
+
+		res = make([]pathState, 0, len(m))
+		for _, v := range m {
+			res = append(res, v)
+		}
 	}
 	// Iterate in a stable path order so the sequence of backend operations a
 	// transaction issues does not depend on Go's randomized map iteration. This
@@ -1328,6 +1411,7 @@ func toLog(id data.TxID, writes []WriteAccess) (storage.TxLog, error) {
 	tl := storage.TxLog{
 		ID:     id,
 		Status: storage.TxCommitStatusOK,
+		Writes: make([]storage.TxWrite, 0, len(writes)),
 	}
 	for _, w := range writes {
 		tl.Writes = append(tl.Writes, storage.TxWrite{

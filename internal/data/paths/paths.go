@@ -168,7 +168,17 @@ func prefixEncode(prefix string, category Type, a []byte) string {
 func encode(buf *bytes.Buffer, category Type, a []byte) {
 	buf.WriteString(string(category))
 	buf.WriteByte('/')
-	buf.WriteString(encoding.EncodeToString(a))
+	// Encode the base64 directly into the buffer's spare capacity instead of
+	// allocating an intermediate string via EncodeToString (which is then
+	// immediately copied into the buffer and discarded). AvailableBuffer
+	// returns an empty slice backed by buf's free space; AppendEncode fills it
+	// in place - allocating only if that capacity is insufficient - and Write
+	// commits the bytes. This removes one allocation per encoded path on the
+	// hottest universal path: every key/collection/transaction storage path is
+	// built here, so it is hit by every read, write, and commit.
+	dst := buf.AvailableBuffer()
+	dst = encoding.AppendEncode(dst, a)
+	buf.Write(dst)
 }
 
 func decode(category Type, suffix string) ([]byte, error) {
