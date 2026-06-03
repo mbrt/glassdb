@@ -280,3 +280,22 @@ session.
   single-element fanout inline, hot-path fan-out should short-circuit work that
   is already local.
 - Commit: 5a7cfbc
+
+## 4. Single-locker fast path in applyLockTags - DISCARDED (no effect)
+- Hypothesis: `applyLockTags` runs per lock/unlock op (core, all backends) and
+  builds an intermediate `[]string` + `strings.Join` for the `locked-by` tag.
+  Special-casing the common single-locker case should cut per-lock allocations
+  on lock-heavy workloads (multiRMW10, batchWrite100).
+- Change: `internal/storage/locker.go` - replace the slice+Join with a
+  `joinLockers` helper that returns `tidToTag(lockers[0])` directly for one
+  locker (and "" for none).
+- Correctness: not gated (discarded on measurement; change is a pure encoding
+  refactor with identical output).
+- Primary: 404.31 -> 404.31 (op counts identical).
+- Secondary: allocs/op unchanged (10RMW 125->125, 100W 6899->6899); B/op flat.
+- Outcome & why: DISCARDED. No measurable effect. `strings.Join` already skips
+  allocation for a single-element slice (returns s[0]), and the dominant
+  allocation in `applyLockTags` is the 2-entry `newTags` map, which this change
+  does not touch. Lesson: the lock-path allocation cost is the tag map + the
+  memory backend's defensive `copyTags`, not the locker-id encoding; a real
+  win would need to avoid the per-op map, which the backend API requires.
