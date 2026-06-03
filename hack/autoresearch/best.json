@@ -1,11 +1,11 @@
 {
-  "score": 420.87475877810493,
+  "score": 404.1094495642078,
   "secondary": {
-    "allocBytesPerTx": 20179.332354086644,
-    "allocsPerTx": 255.56532400369034,
-    "nsPerTx": 36284.8535892252,
-    "cpuNsPerTx": 79268.74123975703,
-    "mutexWaitNsPerTx": 658.8815810778286
+    "allocBytesPerTx": 19939.947561867688,
+    "allocsPerTx": 250.80107311534942,
+    "nsPerTx": 39745.723988319995,
+    "cpuNsPerTx": 83972.53852625174,
+    "mutexWaitNsPerTx": 447.9520142516952
   },
   "weights": {
     "objRead": 57,
@@ -20,15 +20,15 @@
       "txn": 200,
       "objReads": 1,
       "objWrites": 202,
-      "metaReads": 3,
-      "metaWrites": 5,
+      "metaReads": 2,
+      "metaWrites": 4,
       "objLists": 0,
       "retries": 0,
-      "costPerTx": 72.225,
-      "allocBytesPerTx": 2903.32,
-      "allocsPerTx": 40.21,
-      "nsPerTx": 2580.68,
-      "cpuNsPerTx": 3290,
+      "costPerTx": 71.915,
+      "allocBytesPerTx": 2898.44,
+      "allocsPerTx": 40.15,
+      "nsPerTx": 2824.33,
+      "cpuNsPerTx": 3520,
       "mutexWaitNsPerTx": 0
     },
     {
@@ -37,15 +37,15 @@
       "objReads": 10,
       "objWrites": 1100,
       "metaReads": 0,
-      "metaWrites": 990,
+      "metaWrites": 991,
       "objLists": 0,
       "retries": 0,
-      "costPerTx": 1082.6,
-      "allocBytesPerTx": 52405.28,
-      "allocsPerTx": 735.71,
-      "nsPerTx": 148149.73,
-      "cpuNsPerTx": 432390,
-      "mutexWaitNsPerTx": 31039.75
+      "costPerTx": 1082.91,
+      "allocBytesPerTx": 52548.88,
+      "allocsPerTx": 736.44,
+      "nsPerTx": 167922.99,
+      "cpuNsPerTx": 511870,
+      "mutexWaitNsPerTx": 11795.04
     },
     {
       "name": "batchRead10",
@@ -57,27 +57,27 @@
       "objLists": 0,
       "retries": 0,
       "costPerTx": 313.655,
-      "allocBytesPerTx": 16315.76,
-      "allocsPerTx": 181.145,
-      "nsPerTx": 49516.345,
-      "cpuNsPerTx": 114255,
-      "mutexWaitNsPerTx": 1685.035
+      "allocBytesPerTx": 16297.68,
+      "allocsPerTx": 181.095,
+      "nsPerTx": 44721.45,
+      "cpuNsPerTx": 95205,
+      "mutexWaitNsPerTx": 820.84
     },
     {
       "name": "batchWrite100",
       "txn": 50,
       "objReads": 0,
-      "objWrites": 9950,
-      "metaReads": 5000,
+      "objWrites": 9959,
+      "metaReads": 0,
       "metaWrites": 99,
       "objLists": 0,
       "retries": 0,
-      "costPerTx": 17091.38,
-      "allocBytesPerTx": 606221.44,
-      "allocsPerTx": 7601.08,
-      "nsPerTx": 1013714.86,
-      "cpuNsPerTx": 5169360,
-      "mutexWaitNsPerTx": 2374158.42
+      "costPerTx": 14003.98,
+      "allocBytesPerTx": 574892.32,
+      "allocsPerTx": 7002.38,
+      "nsPerTx": 945919.3,
+      "cpuNsPerTx": 4315640,
+      "mutexWaitNsPerTx": 1862942.88
     },
     {
       "name": "readRepeat",
@@ -89,16 +89,16 @@
       "objLists": 0,
       "retries": 0,
       "costPerTx": 31.505,
-      "allocBytesPerTx": 2223.44,
-      "allocsPerTx": 26.765,
-      "nsPerTx": 3277.385,
-      "cpuNsPerTx": 3725,
+      "allocBytesPerTx": 2208.92,
+      "allocsPerTx": 26.465,
+      "nsPerTx": 4943.75,
+      "cpuNsPerTx": 5640,
       "mutexWaitNsPerTx": 0
     }
   ],
   "scores": [
-    420.56100011554486,
-    422.00141069938644,
-    420.87475877810493
+    404.0598340731789,
+    404.407586635107,
+    404.1094495642078
   ]
 }

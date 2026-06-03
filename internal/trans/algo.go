@@ -761,6 +761,23 @@ func (t Algo) lockValidateKey(ctx context.Context, item *pathState, tx *Handle) 
 }
 
 func (t Algo) lockValidateFoundKey(ctx context.Context, item *pathState, tx *Handle) error {
+	// Blind-write optimization: a key that is written but never read, with no
+	// cached evidence that it exists, is most likely a fresh insert. Probing it
+	// with a write-lock first only to discover the key is absent costs a wasted
+	// backend metadata read per key (the dominant cost of bulk inserts). Route
+	// such keys straight to the create path instead: acquire the collection
+	// lock and attempt WriteIfNotExists. If the key turns out to exist after
+	// all, lockValidateNotFoundKey falls back to a normal write-lock, so the
+	// guess is self-correcting and never unsafe.
+	if item.Write && !item.Read && !item.NotFound && !t.localIndicatesPresent(item.Path) {
+		item.NotFound = true
+		if t.isKeyCollectionLocked(item.Path, storage.LockTypeWrite, tx) {
+			return t.lockValidateNotFoundKey(ctx, item, tx)
+		}
+		item.Result = vResultNeedsCLock
+		return nil
+	}
+
 	// First thing, lock.
 	var err error
 	if item.Write {
@@ -806,6 +823,20 @@ func (t Algo) lockValidateFoundKey(ctx context.Context, item *pathState, tx *Han
 	}
 	item.Result = vResultOK
 	return nil
+}
+
+// localIndicatesPresent reports whether the local cache holds positive evidence
+// that the key exists (a non-deleted value or non-null metadata). A false
+// result means "unknown" - the key may or may not exist - which the blind-write
+// optimization treats as a likely fresh insert.
+func (t Algo) localIndicatesPresent(path string) bool {
+	if lr, ok := t.local.Read(path, storage.MaxStaleness); ok && !lr.Deleted {
+		return true
+	}
+	if lm, ok := t.local.GetMeta(path, storage.MaxStaleness); ok && !lm.M.Version.IsNull() {
+		return true
+	}
+	return false
 }
 
 func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *Handle) error {
