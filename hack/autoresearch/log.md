@@ -353,6 +353,31 @@ session.
   when they barely move the allocation count.
 - Commit: f534ed8
 
+## 7. Co-allocate value and metadata in WriteWithMeta - KEPT (secondary)
+- Hypothesis: `storage.Local.WriteWithMeta` is the 2nd-largest non-backend
+  allocator in the profile (81MB flat) and runs on every backend write and
+  read-through miss. It allocates the `cacheValue` and `cacheMeta` as two
+  separate heap objects (`&cacheValue{}`, `&cacheMeta{}`). Since both are always
+  written together here, backing them with a single heap object halves the
+  allocation count on this path.
+- Change: `internal/storage/local.go` adds an unexported `cacheValueMeta{v,m}`
+  struct; `WriteWithMeta` allocates one `&cacheValueMeta` and points the entry's
+  `V`/`M` at its fields. The cache's copy-on-write updates (`MarkValueOutated`,
+  `SetMeta`) replace one pointer with a fresh allocation while the other keeps
+  the shared backing struct alive, so no aliasing hazard is introduced.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (hot-path co-allocation, no test edits).
+- Primary: 404.00 -> 403.71 (noise; op counts identical).
+- Secondary: deterministic internal bench batchWrite100 allocs 6862 -> 6661
+  (-201/tx, -2.9%), singleRMW 39 -> 38; B/op flat everywhere. Autoresearch
+  allocsPerTx ~249 -> ~242-246 (consistent across back-to-back pairs),
+  allocBytes flat-or-lower, ns/cpu flat-or-better. No regressions.
+- Outcome & why: KEPT under the secondary-axis rule. This is the first change to
+  move the allocation *count* (vs bytes), because it removes a whole object per
+  cache   write rather than just right-sizing one. Lesson: when two values share a
+  lifetime and are always set together, co-allocate them.
+- Commit: feade9f
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
