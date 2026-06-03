@@ -125,11 +125,25 @@ func (l Locker) applyLockTags(
 		lockedByTag: strings.Join(lockers, ","),
 	}
 	if update.Type == LockTypeCreate {
-		_, err := l.global.WriteIfNotExists(ctx, key, nil, newTags)
+		// Create-with-value: write the transaction's value straight into the
+		// create placeholder instead of an empty object. The value is immutable
+		// until commit, so finalizing the create later only needs to clear the
+		// create-lock tag (see below), saving one object write per inserted key.
+		_, err := l.global.WriteIfNotExists(ctx, key, update.Value.Value, newTags)
 		return err
 	}
 	if len(update.Writer) > 0 && !update.Value.NotWritten {
 		newTags[lastWriterTag] = tidToTag(update.Writer)
+		if update.PrevType == LockTypeCreate {
+			// The committed value was already written into the placeholder at
+			// create time and is never modified, so committing only clears the
+			// create-lock tag (a cheap metadata update) rather than rewriting
+			// the value. This holds for the creator and for any transaction
+			// finishing a wounded/crashed creator, since the placeholder value
+			// always equals the committed value by construction.
+			_, err = l.global.SetTagsIf(ctx, key, expected, newTags)
+			return err
+		}
 		_, err = l.global.WriteIf(ctx, key, update.Value.Value, expected, newTags)
 		return err
 	}
@@ -174,6 +188,9 @@ type LockRequest struct {
 	Type      LockType
 	Lockers   []data.TxID
 	Unlockers []data.TxID
+	// Value is the value to write into the placeholder for a create lock
+	// (create-with-value). It is ignored for non-create requests.
+	Value TValue
 }
 
 // TxPathState describes a transaction's commit status and the value it wrote
@@ -228,7 +245,7 @@ func ComputeLockUpdate(curr LockInfo, req LockRequest, txs []TxPathState) (LockO
 		curr.LastWriter = unlockOps.Update.Writer
 		curr.LockedBy = unlockOps.Update.Lockers
 	}
-	lockOps, err := computeLockUpdate(curr, req.Type, req.Lockers)
+	lockOps, err := computeLockUpdate(curr, req.Type, req.Lockers, req.Value)
 	if err != nil {
 		return LockOps{}, fmt.Errorf("computing locks: %w", err)
 	}
@@ -251,6 +268,12 @@ func ComputeLockUpdate(curr LockInfo, req LockRequest, txs []TxPathState) (LockO
 	// Merge lockOps into it.
 	ops.Update.Type = lockOps.Update.Type
 	ops.Update.Lockers = lockOps.Update.Lockers
+	if lockOps.Update.Type == LockTypeCreate {
+		// Carry the create-with-value payload. Only creates set a value on the
+		// lock side; for other lock types this would clobber a pending unlock's
+		// writeback value.
+		ops.Update.Value = lockOps.Update.Value
+	}
 	return ops, nil
 }
 
@@ -299,7 +322,7 @@ func computeUnlockUpdate(curr LockInfo, unlockers []data.TxID, txs []TxPathState
 	}, nil
 }
 
-func computeLockUpdate(curr LockInfo, lt LockType, lockers []data.TxID) (LockOps, error) {
+func computeLockUpdate(curr LockInfo, lt LockType, lockers []data.TxID, value TValue) (LockOps, error) {
 	if lt == LockTypeUnknown || lt == LockTypeNone {
 		return LockOps{}, fmt.Errorf("cannot lock with type %v", lt)
 	}
@@ -322,6 +345,7 @@ func computeLockUpdate(curr LockInfo, lt LockType, lockers []data.TxID) (LockOps
 			Update: LockUpdate{
 				Type:    LockTypeCreate,
 				Lockers: lockers,
+				Value:   value,
 			},
 			HasUpdate: true,
 			LockedFor: lockers,
@@ -497,6 +521,30 @@ func TagsLockInfo(tags backend.Tags) (LockInfo, error) {
 	res.LastWriter = lw
 
 	return res, nil
+}
+
+// CreateLockerFromTags returns the transaction holding a create-lock on the
+// object described by tags, or nil if the object is not create-locked. It is a
+// cheap check (a single tag lookup for the common, non-create-locked case) used
+// on the read path to tell an uncommitted create-with-value placeholder apart
+// from a committed value.
+func CreateLockerFromTags(tags backend.Tags) data.TxID {
+	if tags[lockTypeTag] != lockTagCreate {
+		return nil
+	}
+	lb := tags[lockedByTag]
+	if lb == "" {
+		return nil
+	}
+	// A create lock has a single locker; defensively take the first one.
+	if i := strings.IndexByte(lb, ','); i >= 0 {
+		lb = lb[:i]
+	}
+	tid, err := tagToTid(lb)
+	if err != nil {
+		return nil
+	}
+	return tid
 }
 
 func lastWriterFromTags(tags backend.Tags) (data.TxID, error) {

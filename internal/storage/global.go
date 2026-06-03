@@ -48,14 +48,16 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 				s.local.WriteWithMeta(key, r.Contents, meta)
 
 				return GlobalRead{
-					Value:   r.Contents,
-					Version: VersionFromMeta(meta),
+					Value:          r.Contents,
+					Version:        VersionFromMeta(meta),
+					CreateLockedBy: CreateLockerFromTags(r.Tags),
 				}, nil
 			}
 			// The cached value is up to date, use that.
 			return GlobalRead{
-				Value:   e.Value,
-				Version: e.Version,
+				Value:          e.Value,
+				Version:        e.Version,
+				CreateLockedBy: e.CreateLockedBy,
 			}, nil
 		}
 	}
@@ -69,8 +71,9 @@ func (s Global) Read(ctx context.Context, key string) (GlobalRead, error) {
 	s.local.WriteWithMeta(key, r.Contents, meta)
 
 	return GlobalRead{
-		Value:   r.Contents,
-		Version: VersionFromMeta(meta),
+		Value:          r.Contents,
+		Version:        VersionFromMeta(meta),
+		CreateLockedBy: CreateLockerFromTags(r.Tags),
 	}, nil
 }
 
@@ -179,6 +182,9 @@ func (s Global) DeleteIf(ctx context.Context, key string, expected backend.Versi
 type GlobalRead struct {
 	Value   []byte
 	Version Version
+	// CreateLockedBy is the transaction holding a create-lock on the object, or
+	// nil if it is not create-locked. See LocalRead.CreateLockedBy.
+	CreateLockedBy data.TxID
 }
 
 // Writer returns the transaction ID of the last writer of the value, as

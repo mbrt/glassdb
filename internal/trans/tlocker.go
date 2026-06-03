@@ -79,23 +79,26 @@ type lockerShard struct {
 
 // LockRead acquires a read lock on the given key for the transaction.
 func (v *Locker) LockRead(ctx context.Context, key string, tid data.TxID) error {
-	return v.pushRequest(ctx, key, storage.LockTypeRead, tid)
+	return v.pushRequest(ctx, key, storage.LockTypeRead, tid, storage.TValue{})
 }
 
 // LockWrite acquires a write lock on the given key for the transaction.
 func (v *Locker) LockWrite(ctx context.Context, key string, tid data.TxID) error {
-	return v.pushRequest(ctx, key, storage.LockTypeWrite, tid)
+	return v.pushRequest(ctx, key, storage.LockTypeWrite, tid, storage.TValue{})
 }
 
-// LockCreate acquires a create lock on the given key for the transaction,
-// used when a key is being created for the first time.
-func (v *Locker) LockCreate(ctx context.Context, key string, tid data.TxID) error {
-	return v.pushRequest(ctx, key, storage.LockTypeCreate, tid)
+// LockCreate acquires a create lock on the given key for the transaction, used
+// when a key is being created for the first time. The given value is written
+// straight into the create placeholder (create-with-value) so that committing
+// the create later only needs to clear the lock tag instead of writing the
+// value again.
+func (v *Locker) LockCreate(ctx context.Context, key string, tid data.TxID, value storage.TValue) error {
+	return v.pushRequest(ctx, key, storage.LockTypeCreate, tid, value)
 }
 
 // Unlock releases the lock held by the transaction on the given key.
 func (v *Locker) Unlock(ctx context.Context, key string, tid data.TxID) error {
-	return v.pushRequest(ctx, key, storage.LockTypeNone, tid)
+	return v.pushRequest(ctx, key, storage.LockTypeNone, tid, storage.TValue{})
 }
 
 // LockType returns the type of lock currently held by the transaction on the
@@ -151,7 +154,7 @@ func (v *Locker) StatsAndReset() LockStats {
 	}
 }
 
-func (v *Locker) pushRequest(ctx context.Context, key string, lt storage.LockType, tid data.TxID) error {
+func (v *Locker) pushRequest(ctx context.Context, key string, lt storage.LockType, tid data.TxID, value storage.TValue) error {
 	var err error
 
 	atomic.AddInt32(&v.nCalls, 1)
@@ -180,6 +183,7 @@ func (v *Locker) pushRequest(ctx context.Context, key string, lt storage.LockTyp
 		Type:      lt,
 		Lockers:   lockers,
 		Unlockers: unlockers,
+		Value:     value,
 	})
 
 	lockUpdated := err == nil

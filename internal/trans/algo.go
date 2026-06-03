@@ -860,7 +860,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 		// The item was read, not found and written to. We need to lock it
 		// in write and check that it's still not found afterwards.
 		// Lock create will do exactly that.
-		err := t.lockCreate(ctx, item.Path, tx)
+		err := t.lockCreate(ctx, item.Path, item.Val, tx)
 		if err != nil {
 			if errors.Is(err, backend.ErrPrecondition) {
 				// The item is there now, so the read is stale.
@@ -905,7 +905,7 @@ func (t Algo) lockValidateNotFoundKey(ctx context.Context, item *pathState, tx *
 	if item.Write {
 		// The item was written to, not read and it turned out to be not
 		// found while locking it. We need to lock-create it.
-		err := t.lockCreate(ctx, item.Path, tx)
+		err := t.lockCreate(ctx, item.Path, item.Val, tx)
 		if err == nil {
 			// All good.
 			item.Result = vResultOK
@@ -940,7 +940,9 @@ func (t Algo) lockPath(
 	case storage.LockTypeWrite:
 		err = t.lockWrite(ctx, path, tx)
 	case storage.LockTypeCreate:
-		err = t.lockCreate(ctx, path, tx)
+		// Only collection locks flow through lockPath, and those are never
+		// create locks, so there is no value to write here.
+		err = t.lockCreate(ctx, path, nil, tx)
 	default:
 		return fmt.Errorf("unsupported lock type %v", lt)
 	}
@@ -982,12 +984,13 @@ func (t Algo) lockWrite(
 func (t Algo) lockCreate(
 	ctx context.Context,
 	key string,
+	value []byte,
 	tx *Handle,
 ) error {
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate BEGIN", pathAttr(key))
 	var err error
 	trace.WithRegion(ctx, "lock-create", func() {
-		err = t.locker.LockCreate(ctx, key, tx.id)
+		err = t.locker.LockCreate(ctx, key, tx.id, storage.TValue{Value: value})
 	})
 	tx.log.LogAttrs(ctx, slog.LevelDebug, "LockCreate END", pathAttr(key), errAttr(err))
 	return err
@@ -1269,6 +1272,10 @@ type pathState struct {
 	Delete      bool
 	ReadVersion storage.Version
 	Result      vResult
+	// Val is the value to write for a written path. It is carried here so that
+	// a fresh insert can write it straight into the create placeholder
+	// (create-with-value).
+	Val []byte
 }
 
 func (p pathState) AccessType() accessType {
@@ -1328,6 +1335,7 @@ func initValidation(h *Handle) *validationState {
 				Path:   w.Path,
 				Write:  true,
 				Delete: w.Delete,
+				Val:    w.Val,
 			})
 		}
 	} else {
@@ -1345,6 +1353,7 @@ func initValidation(h *Handle) *validationState {
 			i.Path = w.Path
 			i.Write = true
 			i.Delete = w.Delete
+			i.Val = w.Val
 			m[w.Path] = i
 		}
 

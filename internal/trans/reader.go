@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mbrt/glassdb/backend"
+	"github.com/mbrt/glassdb/internal/data"
 	"github.com/mbrt/glassdb/internal/storage"
 )
 
@@ -40,7 +41,7 @@ func (r Reader) Read(
 			Value:   lr.Value,
 			Version: lr.Version,
 		}
-		return r.handleLockCreate(ctx, key, lres)
+		return r.handleLockCreate(ctx, key, lres, lr.CreateLockedBy)
 	}
 	// Otherwise global read.
 	gr, err := r.global.Read(ctx, key)
@@ -51,19 +52,21 @@ func (r Reader) Read(
 		Value:   gr.Value,
 		Version: gr.Version,
 	}
-	return r.handleLockCreate(ctx, key, gres)
+	return r.handleLockCreate(ctx, key, gres, gr.CreateLockedBy)
 }
 
 // ReadCached returns the value for key if it can be served entirely from the
 // local cache without any backend round-trip - i.e. a present, non-empty,
-// non-outdated value. It reports ok=false for every other case (cache miss,
-// outdated, deleted, or an empty value that might be a create-lock
-// placeholder), in which case the caller must fall back to Read. The fast-path
-// result is identical to what Read would return for a non-empty cached value
-// (handleLockCreate returns such values inline), so it is safe to substitute.
+// non-outdated value that is not create-locked. It reports ok=false for every
+// other case (cache miss, outdated, deleted, an empty value that might be a
+// create-lock placeholder, or a non-empty create-with-value placeholder that
+// may not be committed yet), in which case the caller must fall back to Read.
+// The fast-path result is identical to what Read would return for such a value
+// (handleLockCreate returns committed, non-create-locked values inline), so it
+// is safe to substitute.
 func (r Reader) ReadCached(key string) (ReadValue, bool) {
 	lr, ok := r.local.Read(key, storage.MaxStaleness)
-	if !ok || lr.Outdated || lr.Deleted || len(lr.Value) == 0 {
+	if !ok || lr.Outdated || lr.Deleted || len(lr.Value) == 0 || lr.CreateLockedBy != nil {
 		return ReadValue{}, false
 	}
 	return ReadValue{
@@ -86,41 +89,26 @@ func (r Reader) GetMetadata(
 	return r.global.GetMetadata(ctx, key)
 }
 
-func (r Reader) handleLockCreate(ctx context.Context, key string, rv ReadValue) (ReadValue, error) {
-	if len(rv.Value) > 0 {
-		// We are safe to return this value (it wasn't locked in create).
+// handleLockCreate resolves a value that may belong to a create-with-value
+// placeholder. createLockedBy is the create-lock holder reported by the read
+// (nil if the object is not create-locked). The lock state is read atomically
+// with the value, so a nil createLockedBy always denotes a committed value:
+// the placeholder's value is written together with its create-lock tag and is
+// immutable, and finalizing the create only clears that tag, so a value that is
+// not create-locked is always a committed one.
+func (r Reader) handleLockCreate(ctx context.Context, key string, rv ReadValue, createLockedBy data.TxID) (ReadValue, error) {
+	if createLockedBy == nil {
+		// Not locked in create: this is a committed value (possibly empty).
 		return rv, nil
 	}
-	// Otherwise we might have encountered a key locked in create.
-	// In which case, we may have read a value that wasn't committed yet.
-	// Let's check for that with an extra metadata read.
-	meta, err := r.global.GetMetadata(ctx, key)
-	if err != nil {
-		return ReadValue{}, err
-	}
-	info, err := storage.TagsLockInfo(meta.Tags)
-	if err != nil {
-		return ReadValue{}, err
-	}
-	if info.Type != storage.LockTypeCreate {
-		// No problem. This was really a committed empty value.
-		return rv, nil
-	}
-	// Locked in create. Is the new value available or not?
-	if len(info.LockedBy) != 1 {
-		// Something wrong with this lock. Return not found.
-		return ReadValue{}, backend.ErrNotFound
-	}
-	lockerID := info.LockedBy[0]
-
-	// We can check whether this is committed or not.
-	cv, err := r.tmon.CommittedValue(ctx, key, lockerID)
+	// Locked in create: the value may not be committed yet. Check the creator's
+	// transaction status to decide whether the value is visible.
+	cv, err := r.tmon.CommittedValue(ctx, key, createLockedBy)
 	if err != nil || cv.Status != storage.TxCommitStatusOK || cv.Value.NotWritten {
 		return ReadValue{}, backend.ErrNotFound
 	}
-	// Committed. Let's save ourselves some time and return this.
-	// Also cache the value for later.
-	version := storage.Version{Writer: lockerID}
+	// Committed. Cache the resolved value for later and return it.
+	version := storage.Version{Writer: createLockedBy}
 	if cv.Value.Deleted {
 		r.local.MarkDeleted(key, version)
 		return ReadValue{}, backend.ErrNotFound
