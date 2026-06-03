@@ -378,6 +378,32 @@ session.
   lifetime and are always set together, co-allocate them.
 - Commit: feade9f
 
+## 8. Presize res.Writes/res.Locks in TLogger.Get - DISCARDED (below aggregate noise)
+- Hypothesis: `TLogger.Get` (61MB flat in the profile) decodes a committed log
+  and builds `res.Writes`/`res.Locks` via `append` without presizing; a
+  multi-key transaction reads its whole log back on the writeback path, so a
+  100-write log regrows the slice ~7 times. Presizing (count entries in a cheap
+  first pass over the decoded collections) should cut allocBytes on batchWrite.
+- Change: `internal/storage/tlogger.go` `Get` - sum `len(cw.GetWrites())` and
+  lock counts first, then `make([]TxWrite,0,n)` / `make([]PathLock,0,m)`.
+- Correctness: not fully gated (discarded on measurement); change is a pure
+  capacity hint with identical output.
+- Primary: 404.00 -> ~404 (op counts identical).
+- Secondary: deterministic internal bench confirms the win - batchWrite100 B/op
+  519411 -> 500756 (-3.6%), allocs 6661 -> 6647; all other workloads and op
+  counts flat. BUT the harness's reported secondary is a geomean across 5
+  workloads, and only batchWrite benefits, so the aggregate allocBytesPerTx moves
+  only ~0.7% - below the run-to-run noise band (~+/-3-4%). Back-to-back
+  count-3 pairs overlapped (exp8 18495/19204 vs ctrl 18623/18624).
+- Outcome & why: DISCARDED. The change is real and strictly safe (less memory,
+  identical behavior), but the acceptance rule requires a secondary axis to
+  *clearly* improve in the reported metric, and a single-workload byte win is
+  diluted below noise by the geomean. Contrast exp6, which also improved 10RMW
+  and so showed a detectable aggregate move. Lesson: to clear the secondary bar,
+  a change must help a workload whose metric carries enough geomean weight, or
+  help several workloads at once - an isolated batchWrite-only byte win will not
+  register.
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
