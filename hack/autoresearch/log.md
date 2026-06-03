@@ -404,6 +404,36 @@ session.
   help several workloads at once - an isolated batchWrite-only byte win will not
   register.
 
+## 9. Skip cache write in read-only commit validation - KEPT (secondary)
+- Hypothesis: on the read-only commit path, `validateRead`/`validateReadNotFound`
+  fetch the freshest metadata via `Global.GetMetadata`, which also calls
+  `Local.SetMeta` to populate the cache. But that cached metadata is never
+  reused - the next validation always re-reads fresh from the backend - so the
+  SetMeta write is pure overhead: it allocates a cacheMeta + copies the cache
+  entry, and (worse) takes the cache shard mutex from each of the parallel
+  per-key validation goroutines. Skipping it should cut allocs and, because it
+  removes shard-lock contention, ns/cpu on batchRead10 and readRepeat.
+- Change: `internal/storage/global.go` adds `GetMetadataUncached` (backend
+  GetMetadata with no SetMeta); `internal/trans/algo.go` `validateRead` and
+  `validateReadNotFound` use it. No backend op changes (GetMetadata already
+  always hits the backend here), so the primary is unaffected; the cached value
+  stays consistent (its writer is unchanged, so reads still hit cache).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (still reads backend metadata, just skips
+  cache population; no test edits). Safe under concurrency: the cache is only a
+  perf hint and staleness is always caught by fresh validation reads and
+  conditional lock writes.
+- Primary: 404.06 -> 403.79 (noise; op counts identical).
+- Secondary (back-to-back x3): allocsPerTx ~241-246 -> ~221-225 (-8.5%,
+  consistent), nsPerTx ~32-36k -> ~24-31k (-20%+), cpuNsPerTx ~69-74k -> ~49-66k
+  (-20%+), allocBytes flat-or-lower, mutexWait flat. No regressions.
+- Outcome & why: KEPT - the strongest secondary win of the session. The lesson:
+  a "free" cache write on a hot parallel path is not free - the allocation is
+  minor next to the shard-mutex contention it creates across fan-out goroutines.
+  Validation should read, not write.
+
+- Commit: 50e480c
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
