@@ -550,6 +550,28 @@ session.
   hidden allocation; AppendEncode into spare capacity is the idiomatic fix.
 - Commit: fff599b
 
+## 14. Replace grouping map with slice in commit-log marshalling - DISCARDED (flat)
+- Hypothesis: `marshalLog` allocates a `map[string]*pb.CollectionWrites` on every
+  commit to group writes/locks by collection prefix. Since every benchmark
+  workload touches a single collection, the map holds one entry; a small slice
+  with linear find-or-create should be cheaper than a per-commit map allocation
+  and shave ~1 alloc/tx universally on the commit path.
+- Change: `internal/storage/tlogger.go` - introduce a `collWrites` slice type
+  with `forPrefix` find-or-create; `marshalWrite`/`marshalLock` take `*collWrites`
+  instead of the map; `tr.Writes` is assigned the slice directly.
+- Correctness: build + storage unit tests (incl. tx-log round-trip) PASS;
+  discarded on measurement, so full gate not run.
+- Primary: flat (op counts identical).
+- Secondary (stable internal benches, 3000x): singleRMW 31 -> 31 allocs/op,
+  2655 -> 2655 B/op; batchWrite100 6252 -> 6252 allocs/op; 10RMW 105 -> 105
+  allocs/op. Completely flat.
+- Outcome & why: DISCARDED. Trading a one-entry map for a one-element slice
+  nets the same allocation count (both allocate a backing structure), and there
+  is no other effect since proto.Marshal is unchanged. No measurable win, so
+  not worth the added indirection. Lesson: a small map and a small slice cost
+  about the same single allocation; swapping containers only helps when it
+  removes an allocation outright (it did not here).
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
