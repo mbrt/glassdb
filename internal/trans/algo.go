@@ -378,8 +378,10 @@ func (t Algo) validateReadonly(ctx context.Context, vstate *validationState, tx 
 // validateRead validates that the item is still consistent with the read we
 // did earlier, without holding any lock on it.
 func (t Algo) validateRead(ctx context.Context, item *pathState) error {
-	// We need the freshest possible meta, because we don't have a lock.
-	meta, err := t.global.GetMetadata(ctx, item.Path)
+	// We need the freshest possible meta, because we don't have a lock. This is
+	// a one-shot version check on the read-only commit path; the result is not
+	// reused, so read straight from the backend without populating the cache.
+	meta, err := t.global.GetMetadataUncached(ctx, item.Path)
 	if err != nil {
 		if errors.Is(err, backend.ErrNotFound) {
 			// The item is not there anymore. Retry.
@@ -505,8 +507,9 @@ func (t Algo) validateLockedRead(
 }
 
 func (t Algo) validateReadNotFound(ctx context.Context, item *pathState) error {
-	// We need the freshest possible meta, because we don't have a lock.
-	meta, err := t.global.GetMetadata(ctx, item.Path)
+	// We need the freshest possible meta, because we don't have a lock. One-shot
+	// version check on the read-only commit path; do not populate the cache.
+	meta, err := t.global.GetMetadataUncached(ctx, item.Path)
 	if err != nil {
 		if errors.Is(err, backend.ErrNotFound) {
 			// All good here, the item is still not found now.

@@ -85,6 +85,14 @@ func (s Global) GetMetadata(ctx context.Context, key string) (backend.Metadata, 
 	return meta, nil
 }
 
+// GetMetadataUncached fetches the object metadata straight from the backend
+// without touching the local cache. It is for callers (e.g. read-only commit
+// validation) that need the freshest metadata for a one-shot version check and
+// whose result is not reused, so populating the cache would only allocate.
+func (s Global) GetMetadataUncached(ctx context.Context, key string) (backend.Metadata, error) {
+	return s.backend.GetMetadata(ctx, key)
+}
+
 // SetTagsIf conditionally sets tags on the object if its current version
 // matches expected, and updates the local metadata cache.
 func (s Global) SetTagsIf(
