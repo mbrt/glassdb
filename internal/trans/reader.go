@@ -54,6 +54,24 @@ func (r Reader) Read(
 	return r.handleLockCreate(ctx, key, gres)
 }
 
+// ReadCached returns the value for key if it can be served entirely from the
+// local cache without any backend round-trip - i.e. a present, non-empty,
+// non-outdated value. It reports ok=false for every other case (cache miss,
+// outdated, deleted, or an empty value that might be a create-lock
+// placeholder), in which case the caller must fall back to Read. The fast-path
+// result is identical to what Read would return for a non-empty cached value
+// (handleLockCreate returns such values inline), so it is safe to substitute.
+func (r Reader) ReadCached(key string) (ReadValue, bool) {
+	lr, ok := r.local.Read(key, storage.MaxStaleness)
+	if !ok || lr.Outdated || lr.Deleted || len(lr.Value) == 0 {
+		return ReadValue{}, false
+	}
+	return ReadValue{
+		Value:   lr.Value,
+		Version: lr.Version,
+	}, true
+}
+
 // GetMetadata returns the object metadata, using the local cache when fresh
 // enough and falling back to global storage otherwise.
 func (r Reader) GetMetadata(
