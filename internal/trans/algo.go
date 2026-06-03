@@ -111,8 +111,21 @@ func (t Algo) Begin(ctx context.Context, d Data) *Handle {
 		id:     tid,
 		data:   d,
 		status: statusNew,
-		log:    t.log.With("tx", txLog(tid)),
+		log:    t.handleLog(ctx, tid),
 	}
+}
+
+// handleLog returns a logger tagged with the transaction id. The per-tx With
+// clone and id formatting are only worth paying for when the logger would emit
+// something; all of this package's tx logs are at Debug or Error level, so
+// "any log will fire" is exactly Enabled(LevelError). When logging is off (the
+// common production and benchmark case) reuse the base logger and skip the
+// per-transaction allocation entirely.
+func (t Algo) handleLog(ctx context.Context, tid data.TxID) *slog.Logger {
+	if !t.log.Enabled(ctx, slog.LevelError) {
+		return t.log
+	}
+	return t.log.With("tx", txLog(tid))
 }
 
 // Commit validates all reads and applies all writes for the transaction,
@@ -222,13 +235,13 @@ func (t Algo) Reset(tx *Handle, data Data) {
 // the original priority (timestamp) so it is not starved, but with a new ID so
 // it gets a distinct transaction log. The locks of the old attempt are not
 // carried over; callers should release them separately.
-func (t Algo) Rebegin(_ context.Context, old *Handle, d Data) *Handle {
+func (t Algo) Rebegin(ctx context.Context, old *Handle, d Data) *Handle {
 	tid := t.txIDs.Renew(old.id)
 	return &Handle{
 		id:     tid,
 		data:   d,
 		status: statusNew,
-		log:    t.log.With("tx", txLog(tid)),
+		log:    t.handleLog(ctx, tid),
 	}
 }
 
