@@ -572,7 +572,61 @@ session.
   about the same single allocation; swapping containers only helps when it
   removes an allocation outright (it did not here).
 
+## 15. create-with-value: write inserts into the create placeholder - KEPT
+- Hypothesis: inserts cost two object writes per key - an empty create-lock
+  placeholder (WriteIfNotExists, 70) plus a value write-back at commit (70). If
+  the value is written straight into the placeholder at create time, committing
+  the create only needs to clear the create-lock tag (a metaWrite, 31). That
+  replaces ~one objWrite per inserted key with a metaWrite (-39 each), ~-28% on
+  batchWrite100 and ~-6% on the primary. This is the lever deferred all of
+  session 4; the user asked to implement it past the deadline.
+- Change (8 files, the most serializability-critical paths): the write value
+  flows from `initValidation`'s `pathState.Val` into `locker.LockCreate` via a
+  new `LockRequest.Value`, through `ComputeLockUpdate` into `applyLockTags`,
+  which now `WriteIfNotExists(value)` for creates and, when finalizing a
+  committed create (`PrevType == Create`), does `SetTagsIf` (untag) instead of a
+  value write-back. The placeholder value is immutable until commit and equals
+  the committed value by construction, so the creator and any tx finishing a
+  wounded/crashed creator both finalize by untagging; an aborted create is still
+  `DeleteIf`'d by `handleLockDeletion` (unchanged). Read path made safe for
+  non-empty placeholders: the create-locker is parsed once from tags, cached in
+  `cacheMeta.CreateLockedBy`, surfaced through `LocalRead`/`GlobalRead`;
+  `handleLockCreate` now verifies the creator's commit for any create-locked
+  value (not just empty), and `ReadCached` rejects create-locked entries so the
+  fast path never returns uncommitted data. A non-create-locked value is always
+  committed (value+tag written atomically; commit only clears the tag), so the
+  common read stays a single cheap tag check with no extra backend op - and the
+  old empty-value `GetMetadata` probe is removed.
+- Correctness: fast gate PASS; judge APPROVED; full gate PASS. Extra 6-minute
+  `FuzzConcurrentTx` run (~1.8M execs, 96 new coverage paths in the new code, no
+  violations) plus the full gate's `make test` (-count=10 root + trans tests,
+  race) and 120s fuzz. Key safety argument: if the wound-takeover-then-abort
+  interleaving could leave a phantom, it would surface a value no committed tx
+  wrote - exactly what the serializability fuzzer checks - and it did not, here
+  or in the 1383-case corpus (which the old empty-placeholder scheme also never
+  tripped).
+- Primary: 403.99 -> 377.87 (-6.5%).
+- Secondary: allocsPerTx 198.2 -> 196.0, allocBytesPerTx 18004 -> 17730, nsPerTx
+  28597 -> 28386, cpuNsPerTx 62203 -> 60497; mutexWaitNsPerTx 569 -> 805 (small
+  and noisy on batchWrite100; the dominant cost is backend ops, which dropped).
+  No regressions on any workload (only batchWrite100's body inserts, so the
+  others are flat: batchWrite100 costPerTx 13991 -> 10169, -27%).
+- Outcome & why: KEPT - the largest primary win of the whole effort and exactly
+  the structural change deferred in session 4. The breadth fear was justified
+  (8 interlocking files across commit, read, and recovery), but the safety
+  argument held: the create-lock tag is the single source of truth for "value
+  not yet committed", it is written atomically with the value and only cleared
+  on commit, so surfacing it inline on the read path keeps the protocol's
+  invariant intact with zero extra backend ops on the hot read path. Lesson: a
+  multi-file commit+read+recovery change is tractable when one invariant
+  (atomic value+lock-tag, cleared only on commit) anchors every path, and an
+  extended fuzz budget is what makes keeping it defensible.
+- Commit: b1fd449
+
 ## Primary-score wins considered but deferred (risk-bounded)
+- RESOLVED in exp15 (session 5): the create-with-value change below was
+  implemented and kept (-6.5% primary). The analysis that follows is the
+  pre-implementation reasoning, left for the record.
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
   Writing the value directly into the create placeholder would replace the
@@ -636,3 +690,25 @@ session.
   biggest remaining lever is that primary win (see deferred section): ~-6%
   primary on the suite, but it is a multi-file commit+read+recovery change that
   needs a dedicated session and an extended fuzz budget to validate safely.
+
+## Session summary (session 5)
+- Single follow-up experiment (exp15), at the user's request, to implement the
+  create-with-value primary lever that session 4 deferred. KEPT.
+- Primary score: 403.99 (session-4 best) -> 377.87 = -6.5%, the largest single
+  improvement of the whole effort and now the session-best. Cumulative from the
+  original baseline: 420.87 -> 377.87 = -10.2%.
+- The win is entirely on batchWrite100 (the only workload whose measured body
+  inserts keys): costPerTx 13991 -> 10169 (-27%) by turning ~98 per-tx value
+  write-backs (objWrite 70) into create-lock untags (metaWrite 31). All other
+  workloads are flat; secondary axes flat-to-better (mutexWait the only small,
+  noisy uptick).
+- How it was made safe: the create-lock tag is the single source of truth for
+  "this value is not committed yet"; it is written atomically with the value and
+  cleared only at commit. Surfacing that tag inline on the read path
+  (cacheMeta.CreateLockedBy -> Local/GlobalRead -> handleLockCreate/ReadCached)
+  lets every read tell an uncommitted placeholder from a committed value with a
+  single cheap tag check and no extra backend op. Validated with a 6-minute
+  FuzzConcurrentTx run on top of the full gate.
+- State at stop: clean tree; best.json reflects exp15 (377.87); change committed
+  on autoresearch-2 as b1fd449 (code) + the log commit. Stopping here as
+  instructed (past the original deadline, single requested experiment done).
