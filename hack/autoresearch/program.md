@@ -21,24 +21,40 @@ a faster but incorrect database is a failed experiment.
 Fair game (this is your `train.py`):
 
 - The implementation: `db.go`, `tx.go`, `collection.go`, `iter.go`, `stats.go`,
-  and everything under `internal/**` and `backend/**`.
+  and everything under `internal/**` and `backend/**`. Changes may be **large
+  and span multiple files** - you may rework whole algorithms (locking,
+  validation, the commit protocol, recovery) - as long as each experiment
+  pursues a single, clearly stated hypothesis.
+- **Unit tests under `internal/**` and `backend/**`** (e.g.
+  `internal/trans/algo_test.go`, `internal/storage/locker_test.go`). When a
+  bigger change reshapes internals, you may rewrite, add, remove, or adjust
+  these unit tests to match the new code. They track the implementation; they
+  are not the correctness contract. But edit them only to track **honest**
+  implementation changes: do not skip or delete a test that should still pass,
+  hardcode outputs or special-case the benchmark to game the score, or otherwise
+  fake the work. The judge rejects clear reward hacking (see `evaluator.md`).
 
-Off-limits - never modify these (they define the metric and the rules; changing
-them invalidates the experiment):
+Off-limits - never modify these (they define the metric, the rules, and the
+correctness contract; changing them invalidates the experiment):
 
 - `hack/autoresearch/bench/**` (the scoring harness)
 - `hack/autoresearch/check.sh` (the correctness gate)
 - `hack/autoresearch/evaluate.sh` and `hack/autoresearch/evaluator.md` (the
   judge)
 - `hack/autoresearch/program.md` (this file)
+- The **integration / verification tests in the repo root**: every `*_test.go`
+  directly in the repository root - currently `fuzz_test.go` (the
+  `FuzzConcurrentTx` serializability fuzzer), `glassdb_test.go`, `bench_test.go`,
+  and `version_test.go`. These define strict serializability and the public-API
+  contract; they are the invariant your experiments must preserve. You may NEVER
+  edit, weaken, skip, delete, or rename them.
 
-Tests (`*_test.go`, including `bench_test.go` and `fuzz_test.go`): you MAY edit
-them only for **mechanical, coverage-preserving** reasons - updating call sites
-after a signature/type change, fixing imports, renaming a symbol. You may NEVER
-disable, skip, weaken, delete, or loosen a test or its assertions to make it
-pass. A separate judge
-sub-agent enforces this (see step 5); if you broke a test, fix the code, not the
-test.
+Correctness is still non-negotiable - it is enforced by these immutable root
+tests plus the fuzzer and `make test` (all run by `check.sh`), **not** by
+freezing the internal unit tests. Because the root tests are fixed and exercise
+your changes through the public API, you are free to evolve the internal unit
+tests alongside the implementation. If a root test or the fuzzer fails, fix the
+code, never the test.
 
 ## The metric
 
@@ -80,26 +96,35 @@ must beat.
 For each experiment:
 
 1. **Study & hypothesize.** Read the relevant code and the architecture doc
-   (`docs/architecture.md`). Pick exactly ONE concrete, well-motivated change.
-   Write the hypothesis down before editing: what you will change and why you
-   expect fewer backend ops (or better secondary axes).
-2. **Implement** the single change in the implementation files. Keep it small
-   and reviewable. Then `make format`.
+   (`docs/architecture.md`). Pick ONE coherent, well-motivated hypothesis. The
+   change it implies may be **substantial and span multiple files** (e.g.
+   reworking how locks or validation work); that is fine as long as it all
+   serves the single hypothesis. Write the hypothesis down before editing: what
+   you will change and why you expect fewer backend ops (or better secondary
+   axes).
+2. **Implement** the change in the implementation files, and update any internal
+   unit tests it affects. The change may be large, but keep it focused on the
+   one hypothesis - avoid bundling unrelated edits so the result stays
+   reviewable. Then `make format`.
 3. **Correctness gate (fast):**
 
    ```bash
    hack/autoresearch/check.sh
    ```
 
-   If it fails, the experiment is dead. Revert (step 8) and log why.
-4. **(If you touched any test)** be sure the edit was purely mechanical.
+   If it fails, the experiment is dead: discard it (step 8) - log why, then
+   revert.
+4. **(If you touched any test)** confirm you only touched unit tests under
+   `internal/**` or `backend/**` - never a repo-root `*_test.go` or any
+   autoresearch infrastructure file.
 5. **Test-integrity judge:**
 
    ```bash
    hack/autoresearch/evaluate.sh
    ```
 
-   If it rejects, revert and log the reason. Do not argue with the judge.
+   If it rejects, discard (step 8) - log the reason, then revert. Do not argue
+   with the judge.
 6. **Measure:**
 
    ```bash
@@ -129,16 +154,30 @@ For each experiment:
      )"
      ```
 
-   - Discard: `git restore --staged --worktree . && git clean -fd` (restore the
-     tree to the last kept state). Do NOT touch `best.json`.
-9. **Log** the experiment (always, kept or discarded) - see below - then go back
-   to step 1.
+     Then write the log entry (step 9) with the new commit hash.
+   - Discard: **first append the log entry (step 9)** so the failed attempt is
+     recorded, then revert everything except the log:
+
+     ```bash
+     git restore --staged --worktree -- . ':!hack/autoresearch/log.md'
+     git clean -fd
+     ```
+
+     This restores the implementation and unit tests to the last kept state
+     while preserving your new `log.md` entry (`git clean` never touches the
+     tracked log; the pathspec exclude keeps `git restore` off it). Do NOT touch
+     `best.json`.
+9. **Log** the experiment - see below - then go back to step 1.
 
 ## Logging protocol
 
-Append one entry per experiment to `hack/autoresearch/log.md`. Autoresearch
-experiments do NOT get ADRs; the log is the record. Each entry must contain the
-reasoning, not just the numbers:
+Append one entry per experiment to `hack/autoresearch/log.md` - **always**,
+whether the experiment was kept, discarded, or died at a gate. Failed attempts
+are part of the record (they tell the human and your future self what does not
+work). For a discard, write this entry **before** running the revert; the
+discard revert in step 8 deliberately excludes `hack/autoresearch/log.md` so the
+entry survives. Autoresearch experiments do NOT get ADRs; the log is the record.
+Each entry must contain the reasoning, not just the numbers:
 
 ```markdown
 ## <n>. <short title> - KEPT | DISCARDED
@@ -170,14 +209,29 @@ reduce backend operations (`MetaReads`/`MetaWrites`/`ObjReads`/`ObjWrites`):
 - Allocation hot spots in `tx.go`/`internal/storage`: reuse buffers, avoid
   per-op allocations to improve `allocBytesPerTx`/`allocsPerTx`.
 
-Prefer changes that are obviously correct. If a change makes the serializability
-reasoning harder, it is probably not worth it.
+Bigger, structural changes (reworking a protocol, redesigning the lock or
+validation path) are welcome when they have a clear cost rationale - the root
+tests and the fuzzer are there to catch a mistake. Still prefer changes you can
+reason about: if a change makes the serializability argument materially harder
+to follow, weigh that against the expected win and lean toward the
+clearer option.
 
 ## Budget & stop conditions
 
-- Run experiments until the human-provided budget (time or count) is exhausted.
-- Stop early and summarize if: the tree cannot be returned to a clean state, the
-  baseline `--full` gate fails, or you have made many consecutive experiments
-  with no improvement (reflect in the log and try a different area).
-- At the end, write a short summary at the bottom of `log.md`: total
-  experiments, kept count, baseline score -> best score.
+- The budget is fixed: keep running experiments until the user provided budget
+  is reached. That is the hard ceiling - never run more. Both **kept and
+  discarded experiments count** toward the limit; a discard is still a completed
+  experiment.
+- Run no fewer. Do NOT stop before the budget is reached. Running out of obvious
+  ideas in one area is NOT a reason to stop: switch to a different part of the
+  system (read path, commit path, locking, allocations, recovery, ...) and keep
+  forming and running new hypotheses until the ceiling. A long run of discards
+  is expected and fine - log each one and continue to the next experiment.
+- The ONLY thing that may halt the loop before the budget is an **unrecoverable
+  failure**: the working tree cannot be returned to a clean state by the discard
+  revert, so continuing would corrupt later experiments. If that happens, log it
+  and stop. (A failing baseline `--full` gate is a setup problem - resolve it in
+  setup, before the loop starts; it is not a mid-loop early stop.)
+- When the budget is reached (or on an unrecoverable stop), write a short
+  summary at the bottom of `log.md`: total experiments, kept count, baseline
+  score -> best score.
