@@ -205,3 +205,24 @@ session.
 - Stopped because the safe primary-optimization space for the current workloads
   is exhausted (see "Analyzed but not attempted"); further gains would require
   protocol changes that weaken strict-serializability reasoning.
+
+---
+
+# Session 3 (budget: 25 experiments or 3 hours)
+
+## 1. Baseline - ESTABLISHED
+- Tree/branch: clean working tree on `autoresearch-2` (the working branch for
+  this run; HEAD carries Session 2's kept commits). Baseline taken after a
+  passing full gate (`check.sh --full`: build + `make test` + 120s
+  FuzzConcurrentTx, all green; took ~3.5 min).
+- Baseline primary score (median of 3): **420.87**. Per-workload cost/tx:
+  singleRMW 72.23, multiRMW10 1082.6, batchRead10 313.66, batchWrite100
+  17091.38, readRepeat 31.51.
+- Per-workload backend ops/tx (deterministic): singleRMW 1 objW; multiRMW10
+  ~10 metaW (locks) + ~11 objW (10 write-back + 1 log); batchRead10 10 metaR
+  (per-key read validation); batchWrite100 100 metaR (absence probe) + ~199
+  objW (100 create placeholders + ~99 write-back + log); readRepeat 1 metaR.
+- Secondary (per tx, geomean): allocBytes 20179, allocs 255.6, ns 36285,
+  cpuNs 79269, mutexWait 659.
+- `baseline.json` and `best.json` written (both = 420.87). New experiments must
+  beat `best.json`.
