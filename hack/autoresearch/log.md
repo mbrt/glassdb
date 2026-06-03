@@ -584,8 +584,55 @@ session.
   tags from `Global.Read` and changing the read path to detect create-locks by
   tag for every read - a core-protocol change whose serializability cannot be
   validated within one experiment slot. Deferred as too risky for the budget.
+  Session-4 update: confirmed `Global.Read` already receives the object tags
+  for free (the backend Read/ReadIfModified reply carries `Tags`, written to
+  the local cache via `WriteWithMeta`), so the read could detect a create-lock
+  inline with no extra backend op - either by surfacing lock state through
+  GlobalRead/LocalRead or by a follow-up `local.GetMeta` cache hit. The real
+  blocker is not the enabler but the breadth: the value must be threaded into
+  `locker.LockCreate` from `h.data.Writes` through the validation/lock path,
+  the creator's commit must untag (metaWrite) while recovery still writes back
+  from the log, and the read path's create-lock detection must stay correct
+  under stale cache + wound-wait recovery. That is ~5-6 interlocking changes in
+  the most serializability-critical code; a subtle visibility bug could pass a
+  2-minute fuzz. Best done as a dedicated session with an extended fuzz budget.
 - Read-set validation (batchRead10: 10 metaReads/tx; readRepeat: 1/tx) and the
   RMW write protocol (1 lock metaWrite + 1 write-back objWrite per key) are at
   the OCC protocol's theoretical minimum; List-based batch validation was
   rejected earlier on object-store list-consistency grounds. No safe primary win
   found here beyond exp2's metaRead elimination.
+
+## Session summary (session 4)
+- Experiments this session: 13 (exp2-exp14). Kept: 9 (exp2, 3, 5, 6, 7, 9, 10,
+  12, 13). Discarded: 4 (exp4, 8, 11, 14). No experiment ever failed a
+  correctness gate or the judge; discards were measurement decisions (no win or
+  below noise) and reverted to a clean tree, log preserved.
+- Primary score: 420.87 (baseline) -> 403.99 (best) = -4.01%. The whole primary
+  gain came from exp2 (blind-write create-first: drop the absence-probe metaRead
+  on bulk inserts); all later keeps held the primary flat while improving the
+  secondary axes.
+- Secondary (geomean over the suite), baseline -> best:
+  allocBytesPerTx 20179 -> 18004 (-10.8%), allocsPerTx 255.6 -> 198.2 (-22.5%),
+  nsPerTx 36285 -> 28597 (-21.2%), cpuNsPerTx 79269 -> 62203 (-21.5%),
+  mutexWaitNsPerTx 659 -> 569 (-13.7%).
+- Where the secondary wins came from: removing per-tx/per-op scheduling and
+  allocation overhead - inline cache-hit reads (exp3), skip the dedup map for
+  read-only/write-only validation (exp5), presize commit slices (exp6),
+  co-allocate cached value+meta (exp7), skip the cache write on read-only
+  validation (exp9, the biggest ns/cpu win), skip the per-tx logger clone when
+  logging is off (exp10), an intrusive LRU cache that removes per-write
+  interface boxing (exp12), and encoding storage-path base64 directly into the
+  buffer (exp13, a universal ~2 allocs/path cut).
+- State at stop: clean working tree; best.json reflects exp13; all keeps are on
+  the autoresearch-2 branch as code+log commit pairs.
+- Stopping point: concluded a few minutes before the 3h ceiling. The safe,
+  confidently-measurable optimization space for the fixed suite was swept end to
+  end with allocation profiles (path encoding, cache, commit-log marshalling, tx
+  staging, lock path, dedup, stats wrapper); the remaining allocations are
+  interface-mandated (`backend.Tags` maps), need unsafe object pooling (Tx,
+  dedup call, single-element TxID slices), live only in the in-memory test
+  backend (optimizing it would not reflect GCS/S3 and risks gaming the metric),
+  or sit behind the deferred create-with-value protocol change. The single
+  biggest remaining lever is that primary win (see deferred section): ~-6%
+  primary on the suite, but it is a multi-file commit+read+recovery change that
+  needs a dedicated session and an extended fuzz budget to validate safely.
