@@ -481,6 +481,40 @@ session.
   relative to the fan-out's actual work; shaving one channel is not enough to
   register.
 
+## 12. Intrusive LRU cache (drop container/list) - KEPT
+- Hypothesis: the cache shard backs its LRU with `container/list`, which (a)
+  allocates a `list.Element` per insert and (b) boxes the `entry{key,value}`
+  struct into the element's `any` field on every `update` - including updates
+  to keys that already exist. Existing-key updates happen on every transaction
+  (lock SetMeta + value write-back per key), so this boxing is a per-tx,
+  per-key allocation that buys nothing. An intrusive doubly-linked list whose
+  nodes hold key/value/prev/next directly removes both: inserts allocate one
+  node, and in-place updates allocate nothing.
+- Change: rewrote `internal/cache/cache.go`'s `cacheShard` to use a sentinel
+  circular doubly-linked list of `*node` (key, value, prev, next) plus the
+  existing `map[string]*node`. Public API (`Cache`, `New`, `Get/Set/Update/
+  Delete/SizeB`), `newShard`, shard method signatures, and eviction semantics
+  (never evict the MRU entry; bounded overshoot) are all unchanged. No test
+  edits: the existing `cache_test.go` shard-level tests cover get/set/update/
+  delete/eviction and all pass under -race.
+- Correctness: fast gate PASS (incl. FuzzConcurrentTx), judge APPROVED, full
+  gate PASS (make test + 2m fuzz).
+- Primary: 404.36 -> 403.7 (flat, within noise; op counts unchanged).
+- Secondary (same-machine, back-to-back, count=5): allocs/tx geomean
+  210.6 -> 203.5 (-3.4%); allocBytes/tx 17610 -> 17368 (-1.4%). Per-workload
+  allocs/tx: multiRMW 721.6 -> 689.4 (-32), batchWrite 6760.4 -> 6461.2 (-299),
+  singleRMW 36.2 -> 34.1 (-2.1), readRepeat 20.9 -> 20.5; batchRead flat (reads
+  are gets, no update). ns/cpu/mutexWait within noise (mixed small deltas).
+- Outcome & why: KEPT. Primary flat with a clear, deterministic allocation
+  reduction on every write-touching workload and no regression on the others -
+  this is the acceptance case "primary within noise AND a secondary axis
+  clearly improves without regressing the rest". The win is broad because the
+  eliminated interface-boxing happens on the common existing-key update path,
+  not just inserts. Lesson: `container/list` is convenient but its `any`-typed
+  element value forces a heap box for any multi-word entry on every mutation;
+  an intrusive list is the idiomatic fix for hot LRU paths.
+- Commit: 910b401
+
 ## Primary-score wins considered but deferred (risk-bounded)
 - batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
   an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
