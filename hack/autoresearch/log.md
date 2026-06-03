@@ -326,3 +326,47 @@ session.
   every tx. Lesson: dedup structures are only worth their allocation when a
   collision can actually occur; bound them by the access pattern.
 - Commit: c6067f8
+
+## 6. Presize commit slices in toLog and collectAccesses - KEPT (secondary)
+- Hypothesis: alloc profiling of batchWrite100 (the biggest allocator) shows
+  `toLog` (41MB flat) and `Tx.collectAccesses` (33MB flat) among the top
+  non-backend allocators. Both build slices via `append` from a source of known
+  length (`writes` and the `staged`/`reads` maps), so a multi-key commit regrows
+  the backing array log2(n) times. Presizing to the exact upper bound replaces
+  that with a single allocation.
+- Change: `internal/trans/algo.go` `toLog` sets
+  `Writes: make([]storage.TxWrite, 0, len(writes))`; `tx.go` `collectAccesses`
+  presizes `reads`/`writes` to `len(t.reads)`/`len(t.staged)` (exact upper bound
+  - each staged/read entry yields at most one access).
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (honest preallocation, no test edits). Both
+  are single-threaded per-tx paths, so no concurrency risk; empty non-nil slices
+  behave identically to nil downstream (len-based logic, incl. exp5).
+- Primary: 404.06 -> 404.00 (noise; op counts identical).
+- Secondary: deterministic internal benches: 10RMW B/op 9277->8121 (-12.5%),
+  allocs 122->118; batchWrite100 B/op 543419->519418 (-4.4%), allocs 6876->6862.
+  Autoresearch allocBytes ~3-4% lower across back-to-back pairs; ns/cpu
+  flat-or-better; no regressions.
+- Outcome & why: KEPT under the secondary-axis rule. Cheap, obviously-correct
+  capacity hints on the commit hot path. Lesson: when a slice is built from a
+  collection of known size, presize it - the regrowth copies dominate bytes even
+  when they barely move the allocation count.
+- Commit: f534ed8
+
+## Primary-score wins considered but deferred (risk-bounded)
+- batchWrite100 dominates the cost (~14k/tx) via ~2 objWrites per created key:
+  an empty create-lock placeholder (WriteIfNotExists) plus a value write-back.
+  Writing the value directly into the create placeholder would replace the
+  write-back objWrite (70) with a cheap untag metaWrite (31), ~-28% on the
+  workload (~-6% primary). It is NOT safe under the current read protocol:
+  `Reader.handleLockCreate` treats any non-empty value as committed and only
+  probes the create lock for empty values, so a non-empty placeholder would let
+  a concurrent reader return uncommitted data. Making it safe requires surfacing
+  tags from `Global.Read` and changing the read path to detect create-locks by
+  tag for every read - a core-protocol change whose serializability cannot be
+  validated within one experiment slot. Deferred as too risky for the budget.
+- Read-set validation (batchRead10: 10 metaReads/tx; readRepeat: 1/tx) and the
+  RMW write protocol (1 lock metaWrite + 1 write-back objWrite per key) are at
+  the OCC protocol's theoretical minimum; List-based batch validation was
+  rejected earlier on object-store list-consistency grounds. No safe primary win
+  found here beyond exp2's metaRead elimination.
