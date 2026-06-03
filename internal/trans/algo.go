@@ -1386,6 +1386,7 @@ func toLog(id data.TxID, writes []WriteAccess) (storage.TxLog, error) {
 	tl := storage.TxLog{
 		ID:     id,
 		Status: storage.TxCommitStatusOK,
+		Writes: make([]storage.TxWrite, 0, len(writes)),
 	}
 	for _, w := range writes {
 		tl.Writes = append(tl.Writes, storage.TxWrite{

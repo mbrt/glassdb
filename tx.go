@@ -191,8 +191,11 @@ func (t *Tx) reset() {
 }
 
 func (t *Tx) collectAccesses() trans.Data {
-	var reads []trans.ReadAccess
-	var writes []trans.WriteAccess
+	// Pre-size from the staged maps: every staged entry yields at most one
+	// access, so this is an exact upper bound and avoids slice regrowth on the
+	// commit hot path (notably for multi-key writes like batch inserts).
+	reads := make([]trans.ReadAccess, 0, len(t.reads))
+	writes := make([]trans.WriteAccess, 0, len(t.staged))
 
 	// Collect writes.
 	for k, v := range t.staged {
