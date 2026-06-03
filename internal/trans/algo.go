@@ -1289,26 +1289,53 @@ func (p pathState) NeedsLocks() ([]storage.PathLock, error) {
 }
 
 func initValidation(h *Handle) *validationState {
-	m := map[string]pathState{}
-	for _, r := range h.data.Reads {
-		i := m[r.Path]
-		i.Path = r.Path
-		i.Read = true
-		i.ReadVersion = r.Version.ToStorageVersion()
-		i.NotFound = !r.Found
-		m[r.Path] = i
-	}
-	for _, w := range h.data.Writes {
-		i := m[w.Path]
-		i.Path = w.Path
-		i.Write = true
-		i.Delete = w.Delete
-		m[w.Path] = i
-	}
+	reads := h.data.Reads
+	writes := h.data.Writes
 
-	res := make([]pathState, 0, len(m))
-	for _, v := range m {
-		res = append(res, v)
+	var res []pathState
+	if len(reads) == 0 || len(writes) == 0 {
+		// A path cannot be both read and written here, so no per-path merge is
+		// needed: collectAccesses yields each path at most once within reads and
+		// within writes. Build the slice directly and skip the map allocation.
+		// This is the common case for read-only and blind-write transactions.
+		res = make([]pathState, 0, len(reads)+len(writes))
+		for _, r := range reads {
+			res = append(res, pathState{
+				Path:        r.Path,
+				Read:        true,
+				ReadVersion: r.Version.ToStorageVersion(),
+				NotFound:    !r.Found,
+			})
+		}
+		for _, w := range writes {
+			res = append(res, pathState{
+				Path:   w.Path,
+				Write:  true,
+				Delete: w.Delete,
+			})
+		}
+	} else {
+		m := make(map[string]pathState, len(reads)+len(writes))
+		for _, r := range reads {
+			i := m[r.Path]
+			i.Path = r.Path
+			i.Read = true
+			i.ReadVersion = r.Version.ToStorageVersion()
+			i.NotFound = !r.Found
+			m[r.Path] = i
+		}
+		for _, w := range writes {
+			i := m[w.Path]
+			i.Path = w.Path
+			i.Write = true
+			i.Delete = w.Delete
+			m[w.Path] = i
+		}
+
+		res = make([]pathState, 0, len(m))
+		for _, v := range m {
+			res = append(res, v)
+		}
 	}
 	// Iterate in a stable path order so the sequence of backend operations a
 	// transaction issues does not depend on Go's randomized map iteration. This
