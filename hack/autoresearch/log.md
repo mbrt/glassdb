@@ -226,3 +226,31 @@ session.
   cpuNs 79269, mutexWait 659.
 - `baseline.json` and `best.json` written (both = 420.87). New experiments must
   beat `best.json`.
+
+## 2. Blind-write create-first (skip absence probe) - KEPT
+- Hypothesis: `batchWrite100` does ~100 backend metadata reads/tx. Each blind
+  write to a fresh key first attempts a write-lock, whose `fetchLockInfo`
+  GetMetadata only discovers the key is absent before the code falls back to
+  create. For a key that is written-not-read with no cached evidence it exists,
+  going straight to the create path (collection lock + WriteIfNotExists) skips
+  that wasted read. (The `algo.go` "Blind write optimization" TODO.)
+- Change: `internal/trans/algo.go` `lockValidateFoundKey` - for a pure blind
+  write (`Write && !Read && !NotFound`) whose key the local cache does not show
+  present, mark it NotFound and route to the existing create path
+  (needs-collection-lock, then `lockValidateNotFoundKey` -> `lockCreate`). If
+  the key actually exists, `lockCreate`'s WriteIfNotExists fails precondition
+  and falls back to a write-lock, so the guess is self-correcting and never
+  unsafe. New helper `localIndicatesPresent`.
+- Correctness: fast gate pass, full gate pass (build + make test + 120s
+  FuzzConcurrentTx), judge approved (general fast path, reuses create logic, no
+  test weakening).
+- Primary: 420.87 -> 404.11 (-3.98%).
+- Secondary: allocBytes 20179 -> 19940, allocs 255.6 -> 250.8 (-1.9%), ns ~flat
+  (noisy), cpu ~flat (noisy), mutexWait 659 -> 448. No regressions.
+- Outcome & why: KEPT. `batchWrite100` metaReads dropped 100->0/tx (cost
+  17091->13991, -18%); every other workload unchanged (none do pure blind
+  writes). Confirms the absence probe was pure overhead for inserts. The
+  collection lock is taken for blind writes regardless (create needs it), so the
+  only added cost on the rare "blind write to an uncached existing key" path is
+  one failed WriteIfNotExists, which is acceptable.
+- Commit: b2c586e
